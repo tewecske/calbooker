@@ -51,11 +51,10 @@ standalone project with no booking features yet:
 
 ## Not verified yet
 
-- `tests/browser/sso.spec.ts` has not been run (no Playwright browsers were
-  installed; `npx playwright install chromium`, then `make e2e`).
-- The tailnet branch of `scripts/dev-setup.sh` (relay container on
-  `127.0.0.1:4447`) was written to mirror goweb's relay but only the loopback
-  layout was exercised.
+- `tests/browser/sso.spec.ts` ran green from a worktree in the tailnet layout
+  (issue #1, 2026-10-23, Nix browsers, relay on `127.0.0.1:4448`) except the
+  revocation scenario, which needs `CALBOOKER_BROWSER_PROVIDER_ADMIN_EMAIL`
+  and `_PASSWORD` and was skipped.
 - Nothing has been deployed. The code is on GitHub (`tewecske/calbooker`,
   branch `master`); check that the CI `image` job is green and make the
   `calbooker` package public before `deploy/PREPARE.txt` step 4.

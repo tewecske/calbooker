@@ -74,6 +74,8 @@ Put these in each brief together with the issue number:
    changes).
 9. Do not merge. Do not push to `master`. Do not change anything outside the
    worktree except the shared goweb containers described below.
+10. Stop only the processes you started, by PID or process group. Never
+    `pkill -f "go run ./cmd/web"` or similar: it also kills goweb's provider.
 
 ## Local environment
 

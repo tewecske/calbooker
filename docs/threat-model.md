@@ -128,6 +128,8 @@ state, and revision-checked writes. None are trusted from the client.
 | Administrator action repudiation | Admin surface | Per-action audit records with actor, target, time, origin, mirrored to the security stream | Audit store compromise |
 | Database compromise | Services → PostgreSQL | Own least-privilege role, encrypted backups, parameterized queries; sessions and flow state stored only as digests | Exposes guest transfer codes and ID token hints of live sessions |
 | Denial of service | Browser → adapter | Bounded queues, clamped inputs, graceful shutdown | No in-app WAF; rely on the edge |
+| Development pages in production | Browser → adapter | The week grid demo (`/{language}/dev/weekgrid`, unauthenticated, in-memory state) is registered only when `Dependencies.DevelopmentRoutes` is set, which `cmd/web` derives from `CALBOOKER_ENV=development`; tests prove production and test configuration serve 404 | A deployment started with `CALBOOKER_ENV=development` would serve it (and skip the production safety checks); the deploy env template, runbook, and NixOS module set `production` |
+| Forged grid changes | Browser → week grid handlers | Drag-and-drop only proposes a change: the HTMX POST carries the CSRF token, `ParseWeekGridChange` validates weekday, resource, week, and times against the grid and snaps to its step, and the handler re-renders the grid from server state | Feature handlers must still authorize the item itself |
 
 ## Out of scope
 

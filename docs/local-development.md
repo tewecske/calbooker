@@ -152,6 +152,15 @@ Nothing sends mail yet. When booking notifications land, point
 `CALBOOKER_MAIL_RELAY=smtp://localhost:1025` at goweb's Mailpit (started by
 goweb's `make db-up`, inbox at `http://127.0.0.1:8025`).
 
+## Week grid demo
+
+With `CALBOOKER_ENV=development` (the `.env.example` default), calbooker
+serves a demo of the week grid component at `/en/dev/weekgrid` (no sign-in;
+items live in memory). Query parameters switch views: `week=B`,
+`from=2026-10-19` (dated week), `resources=1`, `readonly=1`.
+`tests/browser/weekgrid.spec.ts` drives it on a desktop and a touch viewport.
+Other environments do not register the route.
+
 ## Conventions
 
 - Configuration comes only from environment variables through

@@ -1,0 +1,187 @@
+{{/* Week grid component. The dot is a *WeekGridView built by BuildWeekGrid
+     (internal/adapter/http/weekgrid.go). Placement uses generated wg-* classes
+     from static/src/app.css; the Content-Security-Policy forbids style
+     attributes. Drag-and-drop lives in static/app.js. */}}
+{{define "weekgrid"}}
+<div id="{{.ID}}" class="wg {{.StepClass}} space-y-3" data-week-grid
+     data-start="{{.StartMinute}}" data-end="{{.EndMinute}}" data-step="{{.Step}}" data-rows="{{.Rows}}"
+     data-week="{{.Week}}" data-default-duration="{{.DefaultDuration}}"
+     {{- if .MoveURL}} data-move-url="{{.MoveURL}}"{{end}}
+     {{- if .CreateURL}} data-create-url="{{.CreateURL}}"{{end}}>
+  {{if or .WeekTabs .RangeLabel}}
+  <div class="flex flex-wrap items-center gap-3">
+    {{if .WeekTabs}}
+    <nav class="tabs tabs-box tabs-sm" aria-label="{{.Labels.WeekSwitch}}">
+      {{range .WeekTabs}}
+      <a class="tab{{if .Current}} tab-active{{end}}" href="{{.URL}}"{{if .Current}} aria-current="page"{{end}} data-wg-week-tab>{{.Label}}</a>
+      {{end}}
+    </nav>
+    {{end}}
+    {{if .RangeLabel}}
+    <nav class="flex items-center gap-2" aria-label="{{.Labels.Region}}">
+      {{if .PreviousURL}}
+      <a class="btn btn-sm btn-square" href="{{.PreviousURL}}" aria-label="{{.Labels.Previous}}" title="{{.Labels.Previous}}" data-wg-previous>
+        <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5"/></svg>
+      </a>
+      {{end}}
+      <span class="font-medium" data-wg-range>{{.RangeLabel}}</span>
+      {{if .NextURL}}
+      <a class="btn btn-sm btn-square" href="{{.NextURL}}" aria-label="{{.Labels.Next}}" title="{{.Labels.Next}}" data-wg-next>
+        <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5"/></svg>
+      </a>
+      {{end}}
+    </nav>
+    {{end}}
+  </div>
+  {{end}}
+
+  <div class="wg-scroll overflow-x-auto rounded-box border border-base-300" role="region" aria-label="{{.Labels.Region}}" tabindex="0">
+    <div class="wg-board grid {{.BoardClass}}">
+      <div class="wg-corner" aria-hidden="true"></div>
+      {{range .Days}}
+      <div class="wg-day-head {{$.DaySpanClass}}" data-wg-day="{{.Weekday}}">
+        <span class="sm:hidden" aria-hidden="true">{{.ShortName}}</span>
+        <span class="max-sm:sr-only">{{.Name}}</span>
+        {{if .DateLabel}}<span class="block text-xs font-normal text-base-content/70">{{.DateLabel}}</span>{{end}}
+      </div>
+      {{end}}
+      {{if .HasResources}}
+      <div class="wg-corner" aria-hidden="true"></div>
+      {{range .Days}}{{range .Columns}}
+      <div class="wg-resource-head">{{.ResourceLabel}}</div>
+      {{end}}{{end}}
+      {{end}}
+      <div class="wg-gutter grid {{.RowsClass}}" aria-hidden="true">
+        {{range .TimeLabels}}<span class="wg-time {{.RowClass}}">{{.Label}}</span>{{end}}
+      </div>
+      {{range .Days}}{{range .Columns}}
+      <ol class="wg-column grid {{$.RowsClass}}{{with $.HourClass}} {{.}}{{end}}" data-wg-column data-weekday="{{.Weekday}}" data-resource="{{.Resource}}" aria-label="{{.Label}}">
+        {{range .Items}}
+        <li class="wg-item {{.VariantClass}} {{.PlacementClass}}{{if .Warning}} wg-item-warn{{end}}{{if .Movable}} wg-item-movable{{end}}"
+            data-wg-item="{{.ID}}" data-weekday="{{.Weekday}}" data-start="{{.StartMinute}}" data-end="{{.EndMinute}}" data-resource="{{.Resource}}"
+            {{- if .Movable}} data-wg-draggable{{end}}>
+          <span class="wg-item-label">{{.Label}}</span>
+          <span class="wg-item-time">{{if .ClippedStart}}<span aria-hidden="true">↑ </span>{{end}}{{.TimeLabel}}{{if .ClippedEnd}}<span aria-hidden="true"> ↓</span>{{end}}</span>
+          <span class="sr-only">{{.DayName}}{{if .ResourceLabel}}, {{.ResourceLabel}}{{end}}{{if .ClippedStart}}, {{$.Labels.StartsBefore}}{{end}}{{if .ClippedEnd}}, {{$.Labels.EndsAfter}}{{end}}</span>
+          {{if .Detail}}<span class="wg-item-detail">{{.Detail}}</span>{{end}}
+          {{if .Warning}}
+          <span class="wg-warning-badge" title="{{if .WarningText}}{{.WarningText}}{{else}}{{$.Labels.Warning}}{{end}}" data-wg-warning>
+            <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z"/></svg>
+            <span class="sr-only">{{$.Labels.Warning}}{{if .WarningText}}: {{.WarningText}}{{end}}</span>
+          </span>
+          {{end}}
+          {{if .Movable}}<span class="wg-resize" data-wg-resize title="{{$.Labels.ResizeHandle}}" aria-hidden="true"></span>{{end}}
+        </li>
+        {{end}}
+      </ol>
+      {{end}}{{end}}
+    </div>
+  </div>
+
+  {{if .Hidden}}
+  <section class="text-sm" aria-labelledby="{{.ID}}-hidden-heading">
+    <h3 id="{{.ID}}-hidden-heading" class="font-medium">{{.Labels.Hidden}}</h3>
+    <ul class="mt-1 list-disc pl-5 text-base-content/80" data-wg-hidden>
+      {{range .Hidden}}
+      <li data-wg-hidden-item="{{.ID}}">{{.Label}}: {{.DayName}}{{if .ResourceLabel}}, {{.ResourceLabel}}{{end}} {{.TimeLabel}}</li>
+      {{end}}
+    </ul>
+  </section>
+  {{end}}
+
+  {{if .Editable}}
+  <p class="text-sm text-base-content/70">{{.Labels.DragHint}}</p>
+  <details class="collapse collapse-arrow border border-base-300 bg-base-100">
+    <summary class="collapse-title font-medium">{{.Labels.Keyboard}}</summary>
+    <div class="collapse-content grid gap-6 md:grid-cols-2">
+      {{if and .MoveURL .MovableItems}}
+      <form method="post" action="{{.MoveURL}}" hx-post="{{.MoveURL}}" hx-target="#{{.ID}}" hx-swap="outerHTML" data-wg-move-form>
+        <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
+        <input type="hidden" name="week" value="{{.Week}}">
+        <fieldset class="fieldset">
+          <legend class="fieldset-legend">{{.Labels.MoveHeading}}</legend>
+          <label class="label" for="{{.ID}}-move-item">{{.Labels.Item}}</label>
+          <select id="{{.ID}}-move-item" class="select" name="item">
+            {{range .MovableItems}}<option value="{{.ID}}">{{.Label}} ({{.DayName}}{{if .ResourceLabel}}, {{.ResourceLabel}}{{end}} {{.TimeLabel}})</option>{{end}}
+          </select>
+          {{template "weekgrid-target-fields" .MoveFields}}
+          <button class="btn mt-2" type="submit">{{.Labels.MoveSubmit}}</button>
+        </fieldset>
+      </form>
+      {{end}}
+      {{if .CreateURL}}
+      <form method="post" action="{{.CreateURL}}" hx-post="{{.CreateURL}}" hx-target="#{{.ID}}" hx-swap="outerHTML" data-wg-create-form>
+        <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
+        <input type="hidden" name="week" value="{{.Week}}">
+        <fieldset class="fieldset">
+          <legend class="fieldset-legend">{{.Labels.CreateHead}}</legend>
+          {{template "weekgrid-target-fields" .CreateFields}}
+          <button class="btn mt-2" type="submit">{{.Labels.CreateSubmit}}</button>
+        </fieldset>
+      </form>
+      {{end}}
+    </div>
+  </details>
+  {{end}}
+</div>
+{{end}}
+
+{{/* Day, resource, start, and end selects of the keyboard forms. The dot is
+     a WeekGridFieldSet. */}}
+{{define "weekgrid-target-fields"}}
+  <label class="label" for="{{.Prefix}}-day">{{.Grid.Labels.Day}}</label>
+  <select id="{{.Prefix}}-day" class="select" name="weekday">
+    {{range .Grid.Options.Days}}<option value="{{.Value}}">{{.Label}}</option>{{end}}
+  </select>
+  {{if .Grid.HasResources}}
+  <label class="label" for="{{.Prefix}}-resource">{{.Grid.Labels.Resource}}</label>
+  <select id="{{.Prefix}}-resource" class="select" name="resource">
+    {{range .Grid.Options.Resources}}<option value="{{.Value}}">{{.Label}}</option>{{end}}
+  </select>
+  {{end}}
+  <label class="label" for="{{.Prefix}}-start">{{.Grid.Labels.Start}}</label>
+  <select id="{{.Prefix}}-start" class="select" name="start">
+    {{range .Grid.Options.Starts}}<option value="{{.Value}}">{{.Label}}</option>{{end}}
+  </select>
+  <label class="label" for="{{.Prefix}}-end">{{.Grid.Labels.End}}</label>
+  <select id="{{.Prefix}}-end" class="select" name="end">
+    {{range .Grid.Options.Ends}}<option value="{{.Value}}">{{.Label}}</option>{{end}}
+  </select>
+{{end}}
+
+{{/* Development-only demo page (weekgrid_demo.go). */}}
+{{define "weekgrid-demo"}}
+  {{template "layout" .}}
+{{end}}
+
+{{define "weekgrid-demo-content"}}
+  <p class="mt-4 max-w-2xl text-base-content/70">{{.Description}}</p>
+  <div class="mt-4 flex flex-wrap items-center gap-2">
+    <nav class="flex flex-wrap gap-2" aria-label="{{.Labels.views}}">
+      {{range .WeekGridDemo.Views}}
+      <a class="btn btn-sm{{if .Current}} btn-active{{end}}" href="{{.URL}}"{{if .Current}} aria-current="true"{{end}}>{{.Label}}</a>
+      {{end}}
+    </nav>
+    <form method="post" action="{{.WeekGridDemo.ResetURL}}" data-wg-reset>
+      <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
+      <button class="btn btn-sm btn-ghost" type="submit">{{.Labels.reset}}</button>
+    </form>
+  </div>
+  <div class="mt-6">
+    {{template "weekgrid" .WeekGridDemo.Grid}}
+  </div>
+{{end}}
+
+{{define "weekgrid-demo-fragment"}}
+  {{template "alerts-oob" .}}
+  <section id="page-content" aria-labelledby="page-heading">
+    <h1 id="page-heading" class="text-3xl font-semibold tracking-tight">{{.Heading}}</h1>
+    {{template "weekgrid-demo-content" .}}
+  </section>
+{{end}}
+
+{{/* Answer to a grid change: the grid (outer swap) and the alerts. */}}
+{{define "weekgrid-demo-swap"}}
+  {{template "alerts-oob" .}}
+  {{template "weekgrid" .WeekGridDemo.Grid}}
+{{end}}

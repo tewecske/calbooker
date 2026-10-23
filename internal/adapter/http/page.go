@@ -65,6 +65,7 @@ type PageData struct {
 	Groups            *GroupsView
 	Group             *GroupDetailView
 	Admin             *AdminView
+	WeekGridDemo      *WeekGridDemoView
 }
 
 // AdminView contains administrator page data. URLs are empty when a section is

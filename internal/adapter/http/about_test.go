@@ -22,6 +22,9 @@ func TestAboutPageRendersCredits(t *testing.T) {
 		`href="https://github.com/tailwindlabs/heroicons"`,
 		"MIT License",
 		"Copyright (c) Tailwind Labs, Inc.",
+		`href="https://github.com/SortableJS/Sortable"`,
+		"SortableJS 1.15.7",
+		"Copyright (c) 2019 All contributors to Sortable",
 	} {
 		if !strings.Contains(body, fragment) {
 			t.Errorf("about page missing %q", fragment)

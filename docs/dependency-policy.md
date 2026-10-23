@@ -39,6 +39,24 @@ Do not use floating source URLs, vendored copies without review, or dependencies
 
 Commit `go.sum`.
 
+## Vendored browser assets
+
+Browser libraries are copied into `static/` at an exact version and served
+from the application (no CDN, no npm runtime dependency for the app). Each
+one records its source, checksum, and license here, and its license notice
+appears on the about page. Download into a scratch directory, verify the
+registry integrity, then copy only the distributed file.
+
+| Asset | Version | Source | SHA-256 of the vendored file | License |
+| --- | --- | --- | --- | --- |
+| `static/sortable.min.js` (SortableJS, week grid drag and drop) | 1.15.7 | `npm pack sortablejs@1.15.7` (`https://registry.npmjs.org/sortablejs/-/sortablejs-1.15.7.tgz`, integrity `sha512-Kk8wLQPlS+yi1ZEf48a4+fzHa4yxjC30M/Sr2AnQu+f/MPwvvX9XjZ6OWejiz8crBsLwSq8GHqaxaET7u6ux0A==`), file `package/Sortable.min.js` | `bf4241bc73fef7f11c59a283a69fe8051cdd31c6d8ff5a2b9ba219e7831fcf76` | MIT |
+
+SortableJS has no dependencies, sets styles only through the CSSOM (allowed
+by the Content-Security-Policy), and does not use `eval`.
+`static/static_test.go` checks the checksum, so an unreviewed change to the
+file fails the tests. HTMX is copied from the pinned `htmx.org` npm package by
+`npm run build:css`.
+
 ## Updates
 
 Keep runtime dependencies on supported releases. Prefer patch updates, review transitive changes, rerun all checks, and record breaking upgrades in the change description.

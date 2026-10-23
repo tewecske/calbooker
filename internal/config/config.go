@@ -304,6 +304,13 @@ func Load(getenv func(string) string) (Config, error) {
 	return loaded, nil
 }
 
+// DevelopmentRoutes reports whether development-only pages (the week grid
+// demo) are served. Only the development environment serves them; test and
+// production never do.
+func (c Config) DevelopmentRoutes() bool {
+	return c.Environment == EnvironmentDevelopment
+}
+
 // validateProduction rejects deployment settings that are unsafe to serve with
 // in production. It reports every problem at once without echoing values.
 func validateProduction(cfg Config) error {

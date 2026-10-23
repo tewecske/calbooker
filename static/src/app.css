@@ -19,3 +19,118 @@
   opacity: 1;
   transition: opacity 200ms ease-in;
 }
+
+/* ---- Week grid (templates/weekgrid.html, internal/adapter/http/weekgrid.go) ----
+   The Content-Security-Policy forbids style attributes, so placement uses
+   classes. @source inline generates exactly the numbered classes the Go view
+   model can emit: up to 96 time rows, 7 days x 8 resources = 56 columns, and
+   12 lane columns inside each day column. */
+@source inline("wg-rows-{1..96} wg-row-{1..96} wg-rspan-{1..96} wg-cols-{1..56} wg-col-{1..12} wg-cspan-{1..12} wg-hour-at-{1..11}");
+
+@utility wg-rows-* {
+  grid-template-rows: repeat(--value(integer), var(--wg-row));
+}
+
+@utility wg-row-* {
+  grid-row-start: --value(integer);
+}
+
+@utility wg-rspan-* {
+  grid-row-end: span --value(integer);
+}
+
+@utility wg-cols-* {
+  grid-template-columns: var(--wg-gutter) repeat(--value(integer), minmax(var(--wg-column-min), 1fr));
+}
+
+/* Moves the hour lines when the grid does not start on a full hour. */
+@utility wg-hour-at-* {
+  background-position: 0 calc(var(--wg-row) * --value(integer)), 0 0;
+}
+
+@utility wg-col-* {
+  grid-column-start: --value(integer);
+}
+
+@utility wg-cspan-* {
+  grid-column-end: span --value(integer);
+}
+
+/* One hour is always --wg-hour tall; a row is one step of it. */
+.wg {
+  --wg-hour: 4rem;
+  --wg-gutter: 3.25rem;
+  --wg-column-min: 7rem;
+  --wg-row: calc(var(--wg-hour) / 4);
+}
+.wg-step-5 { --wg-row: calc(var(--wg-hour) / 12); }
+.wg-step-10 { --wg-row: calc(var(--wg-hour) / 6); }
+.wg-step-15 { --wg-row: calc(var(--wg-hour) / 4); }
+.wg-step-20 { --wg-row: calc(var(--wg-hour) / 3); }
+.wg-step-30 { --wg-row: calc(var(--wg-hour) / 2); }
+.wg-step-60 { --wg-row: var(--wg-hour); }
+
+.wg-corner,
+.wg-day-head,
+.wg-resource-head {
+  @apply border-b border-base-300 bg-base-200 px-2 py-1 text-center text-sm font-semibold;
+}
+.wg-resource-head {
+  @apply truncate text-xs font-medium;
+}
+.wg-gutter {
+  @apply border-r border-base-300 bg-base-100;
+}
+.wg-time {
+  @apply px-1 text-right text-xs text-base-content/60;
+}
+.wg-column {
+  @apply relative border-l border-base-300;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  background-image:
+    linear-gradient(to bottom, color-mix(in oklab, var(--color-base-content) 18%, transparent) 1px, transparent 1px),
+    linear-gradient(to bottom, color-mix(in oklab, var(--color-base-content) 6%, transparent) 1px, transparent 1px);
+  background-size: 100% var(--wg-hour), 100% var(--wg-row);
+}
+.wg-item {
+  @apply relative m-px flex min-w-0 flex-col overflow-hidden rounded-field border border-base-content/10 px-1.5 py-0.5 text-xs leading-tight shadow-sm;
+}
+.wg-item-movable {
+  @apply cursor-grab select-none;
+  touch-action: manipulation;
+}
+.wg-item-label {
+  @apply truncate font-semibold;
+}
+.wg-item-time,
+.wg-item-detail {
+  @apply truncate opacity-80;
+}
+.wg-item-warn {
+  @apply outline-2 outline-offset-[-2px] outline-warning;
+}
+.wg-warning-badge {
+  @apply absolute top-0.5 right-0.5 rounded-full bg-warning p-0.5 text-warning-content;
+}
+.wg-resize {
+  @apply absolute inset-x-0 bottom-0 h-2 cursor-ns-resize;
+  touch-action: none;
+}
+.wg-resize:hover {
+  @apply bg-base-content/20;
+}
+.wg-item-neutral { @apply bg-neutral text-neutral-content; }
+.wg-item-primary { @apply bg-primary text-primary-content; }
+.wg-item-secondary { @apply bg-secondary text-secondary-content; }
+.wg-item-accent { @apply bg-accent text-accent-content; }
+.wg-item-info { @apply bg-info text-info-content; }
+.wg-item-success { @apply bg-success text-success-content; }
+.wg-item-warning { @apply bg-warning text-warning-content; }
+.wg-item-error { @apply bg-error text-error-content; }
+/* SortableJS state classes. */
+.wg-item-ghost {
+  @apply opacity-40;
+}
+.wg-item-drag {
+  @apply opacity-90 shadow-lg;
+}

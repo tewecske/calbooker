@@ -95,26 +95,8 @@ Calbooker depends on these goweb details; if goweb changes them, update
 - the NixOS options `services.goweb.issuerUrl`, `providerUrl`, `mailFrom`, and
   goweb's Cloudflare Tunnel (`services.cloudflared.tunnels.<id>`)
 
-## Open questions for the booking features
+## Booking features
 
-Ask before designing the schema:
-
-1. Who offers time and who books it? (people with calendars, rooms or other
-   resources, or both; one host per booking or several)
-2. How is availability defined? (weekly working hours, explicit slots,
-   exceptions and holidays, buffers, minimum notice, maximum horizon)
-3. Do groups become organizations or teams that own resources and members?
-4. Can guests book without signing in, and what must a guest provide?
-5. Time zones: per user, per resource, or one site time zone?
-6. Notifications: confirmation, reminder, and cancellation mail; ICS
-   attachments or calendar feeds; external calendar sync (Google, CalDAV)?
-7. Rules: cancellation and rescheduling windows, approval by the host, limits
-   per person, paid bookings?
-
-Implementation hints carried over from the template's conventions: keep
-booking times as `timestamptz`/`tstzrange` in PostgreSQL, prevent double
-booking in the database (an exclusion constraint needs the `btree_gist`
-extension, which a migration must create), use revision-checked writes for
-edits, audit administrator actions, key all data by user ID so a guest's
-bookings survive the SSO upgrade, and add en and hu catalog entries for every
-new message.
+The open questions from the first session were answered on 2026-10-23. The
+decisions and data model are in [design/booking.md](design/booking.md), and the
+delivery plan with the GitHub issues is in [plan.md](plan.md).

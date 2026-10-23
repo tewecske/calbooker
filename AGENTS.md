@@ -2,7 +2,7 @@
 
 Before any Go coding, review and load the `samber/cc-skills-golang@golang-how-to` skill first. It routes each task to relevant Go skills.
 
-Calbooker is a calendar booking app that signs people in only through the goweb single sign-on stack (Ory Hydra and the goweb provider, in `../goweb`). Start with `docs/handoff.md`: it explains what was carried over from goweb, what was removed, and the open questions for the booking features.
+Calbooker is a calendar booking app that signs people in only through the goweb single sign-on stack (Ory Hydra and the goweb provider, in `../goweb`). Start with `docs/plan.md`: it is the delivery plan for the booking features (milestones, GitHub issues, lanes, subagent rules, local environment). Product decisions and the data model are in `docs/design/booking.md`; what was carried over from goweb is in `docs/handoff.md`.
 
 ## Architecture
 

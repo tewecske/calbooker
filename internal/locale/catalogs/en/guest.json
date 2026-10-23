@@ -1,0 +1,17 @@
+{
+  "messages": {
+    "guest.upgrade.sso_help": {"text": "Sign in or create an account with your organization's sign-in service. This guest account becomes that account and keeps everything you saved."},
+    "guest.upgrade.sso_submit": {"text": "Sign in to keep this account"},
+    "guest.error.sso_taken": {"text": "That sign-in already has an account here, and accounts cannot be merged. Keep using this guest account, or sign out and sign in to the other account."},
+    "guest.write.title": {"text": "Guest workspace | Calbooker"},
+    "guest.write.heading": {"text": "Guest workspace"},
+    "guest.transfer.title": {"text": "Transfer guest account | Calbooker"},
+    "guest.transfer.heading": {"text": "Transfer guest account"},
+    "guest.upgrade.title": {"text": "Keep guest account | Calbooker"},
+    "guest.upgrade.heading": {"text": "Keep guest account"},
+    "guest.error.create": {"text": "Guest workspace could not be created. Try again."},
+    "guest.error.invalid": {"text": "This guest action could not be completed."},
+    "guest.error.invalid_code": {"text": "That transfer code is invalid or no longer available."},
+    "guest.error.duplicate_email": {"text": "An account already uses this email address."}
+  }
+}

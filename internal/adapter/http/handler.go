@@ -53,60 +53,16 @@ func newRouterWithServices(recoveryLogger *slog.Logger, requestLogger middleware
 	if err != nil {
 		panic(err)
 	}
-	mux.HandleFunc("GET /", defaultLocale)
 	auth := newAuthHandler(renderer, dependencies)
-	mux.HandleFunc("GET /{language}", home(renderer, auth))
-	mux.HandleFunc("GET /{language}/{path...}", localized(renderer, auth))
-	settings := newSettingsHandler(renderer, dependencies)
-	groups := newGroupHandler(renderer, dependencies)
-	admin := newAdminHandler(renderer, dependencies)
-	for _, language := range locale.Codes() {
-		prefix := "/" + string(language)
-		mux.HandleFunc("GET "+prefix+"/home", auth.home)
-		mux.HandleFunc("GET "+prefix+"/about", about(renderer, auth))
-		mux.HandleFunc("POST "+prefix+"/sign-out", auth.signOut)
-		mux.HandleFunc("GET "+prefix+"/account/settings", settings.page)
-		mux.HandleFunc("POST "+prefix+"/account/settings/locale", settings.updateLocale)
-		mux.HandleFunc("POST "+prefix+"/account/theme", settings.updateTheme)
-		mux.HandleFunc("GET "+prefix+"/groups", groups.list)
-		mux.HandleFunc("POST "+prefix+"/groups", groups.create)
-		mux.HandleFunc("GET "+prefix+"/admin", admin.index)
-		mux.HandleFunc("GET "+prefix+"/admin/users", admin.list)
-		mux.HandleFunc("GET "+prefix+"/admin/audit", admin.audit)
-		mux.HandleFunc("GET "+prefix+"/admin/system", admin.system)
-		mux.HandleFunc("POST "+prefix+"/admin/system/maintenance/run", admin.runMaintenance)
-		mux.HandleFunc("GET "+prefix+"/admin/ratelimits", admin.rateLimits)
-		mux.HandleFunc("POST "+prefix+"/admin/ratelimits/clear", admin.clearRateLimit)
-		mux.HandleFunc("GET "+prefix+"/admin/usage", admin.usage)
-		mux.HandleFunc("GET "+prefix+"/admin/suspicious", admin.suspicious)
-		mux.HandleFunc("GET "+prefix+"/admin/users/{id}", admin.detail)
-		mux.HandleFunc("GET "+prefix+"/admin/users/{id}/edit", admin.editAccount)
-		mux.HandleFunc("POST "+prefix+"/admin/users/{id}/edit", admin.editAccount)
-		mux.HandleFunc("POST "+prefix+"/admin/users/{id}/delete", admin.deleteAccount)
-		mux.HandleFunc("POST "+prefix+"/admin/users/{id}/sessions/revoke", admin.revokeSessions)
-		mux.HandleFunc("GET "+prefix+"/groups/join", groups.join)
-		mux.HandleFunc("POST "+prefix+"/groups/join", groups.join)
-		mux.HandleFunc("GET "+prefix+"/groups/{id}", groups.detail)
-		mux.HandleFunc("POST "+prefix+"/groups/{id}/rename", groups.rename)
-		mux.HandleFunc("POST "+prefix+"/groups/{id}/invite", groups.rotateInvite)
-		mux.HandleFunc("POST "+prefix+"/groups/{id}/leave", groups.leave)
-		mux.HandleFunc("POST "+prefix+"/groups/{id}/members/{memberID}/role", groups.changeRole)
-		mux.HandleFunc("POST "+prefix+"/groups/{id}/members/{memberID}/remove", groups.removeMember)
-		mux.HandleFunc("GET "+prefix+"/guest/write", auth.guestWrite)
-		mux.HandleFunc("POST "+prefix+"/guest/write", auth.guestWrite)
-		mux.HandleFunc("GET "+prefix+"/guest/transfer", auth.guestTransfer)
-		mux.HandleFunc("POST "+prefix+"/guest/transfer", auth.guestTransfer)
-		// Credentials live at the single sign-on provider; this app only
-		// starts and finishes the issuer's sign-in flow.
-		mux.HandleFunc("GET "+prefix+"/sign-in", auth.ssoSignIn)
-		mux.HandleFunc("GET "+prefix+"/oauth/sso", auth.ssoStart)
-		mux.HandleFunc("GET "+prefix+"/oauth/sso/callback", auth.ssoCallback)
-		mux.HandleFunc("GET "+prefix+"/guest/upgrade", auth.ssoGuestUpgrade)
-		mux.HandleFunc("POST "+prefix+"/guest/upgrade", auth.ssoGuestUpgrade)
-	}
-	mux.HandleFunc("POST "+ssoBackChannelLogoutPath, auth.ssoBackChannelLogout)
-	mux.Handle("GET /static/{path...}", http.StripPrefix("/static/", http.FileServer(http.FS(staticassets.Files()))))
-	mux.HandleFunc("GET /healthz", health)
+	// One call per area. Each register<Area>Routes function lives next to
+	// the area's handlers, so feature branches add routes in their own files.
+	registerCoreRoutes(mux, renderer, auth)
+	registerAboutRoutes(mux, renderer, auth)
+	registerAuthRoutes(mux, auth)
+	registerGuestRoutes(mux, auth)
+	registerSettingsRoutes(mux, newSettingsHandler(renderer, dependencies))
+	registerGroupRoutes(mux, newGroupHandler(renderer, dependencies))
+	registerAdminRoutes(mux, newAdminHandler(renderer, dependencies))
 
 	shared := []middleware.Middleware{
 		middleware.WithRequestID(nil),
@@ -145,6 +101,27 @@ func newRouterWithServices(recoveryLogger *slog.Logger, requestLogger middleware
 		panic(err)
 	}
 	return handler
+}
+
+// registerCoreRoutes registers the language redirect, the localized home and
+// not-found fallbacks, static assets, and the health check.
+func registerCoreRoutes(mux *http.ServeMux, renderer *PageRenderer, auth *authHandler) {
+	mux.HandleFunc("GET /", defaultLocale)
+	mux.HandleFunc("GET /{language}", home(renderer, auth))
+	mux.HandleFunc("GET /{language}/{path...}", localized(renderer, auth))
+	mux.Handle("GET /static/{path...}", http.StripPrefix("/static/", http.FileServer(http.FS(staticassets.Files()))))
+	mux.HandleFunc("GET /healthz", health)
+}
+
+// localizedPrefixes returns the path prefix ("/en", "/hu", ...) of every
+// supported language. Areas register each localized route once per prefix.
+func localizedPrefixes() []string {
+	codes := locale.Codes()
+	prefixes := make([]string, 0, len(codes))
+	for _, language := range codes {
+		prefixes = append(prefixes, "/"+string(language))
+	}
+	return prefixes
 }
 
 func defaultLocale(writer http.ResponseWriter, request *http.Request) {

@@ -8,6 +8,9 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
+	// Embed the IANA time zone database so group time zones resolve in
+	// minimal images without /usr/share/zoneinfo.
+	_ "time/tzdata"
 
 	httpadapter "github.com/tewecske/calbooker/internal/adapter/http"
 	"github.com/tewecske/calbooker/internal/adapter/http/middleware"

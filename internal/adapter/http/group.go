@@ -66,6 +66,23 @@ type groupHandler struct {
 	authenticator *SessionAuthenticator
 }
 
+// registerGroupRoutes registers the group list, join, detail, and membership
+// routes.
+func registerGroupRoutes(mux *http.ServeMux, groups *groupHandler) {
+	for _, prefix := range localizedPrefixes() {
+		mux.HandleFunc("GET "+prefix+"/groups", groups.list)
+		mux.HandleFunc("POST "+prefix+"/groups", groups.create)
+		mux.HandleFunc("GET "+prefix+"/groups/join", groups.join)
+		mux.HandleFunc("POST "+prefix+"/groups/join", groups.join)
+		mux.HandleFunc("GET "+prefix+"/groups/{id}", groups.detail)
+		mux.HandleFunc("POST "+prefix+"/groups/{id}/rename", groups.rename)
+		mux.HandleFunc("POST "+prefix+"/groups/{id}/invite", groups.rotateInvite)
+		mux.HandleFunc("POST "+prefix+"/groups/{id}/leave", groups.leave)
+		mux.HandleFunc("POST "+prefix+"/groups/{id}/members/{memberID}/role", groups.changeRole)
+		mux.HandleFunc("POST "+prefix+"/groups/{id}/members/{memberID}/remove", groups.removeMember)
+	}
+}
+
 func newGroupHandler(renderer *PageRenderer, dependencies Dependencies) *groupHandler {
 	authenticator, _ := NewSessionAuthenticator(dependencies.Users, dependencies.Sessions, dependencies.SessionCookie)
 	return &groupHandler{

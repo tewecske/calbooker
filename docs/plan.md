@@ -88,9 +88,9 @@ client, so lanes can run browser tests at the same time:
 
 The main checkout keeps 8082, `calbooker`, `calbooker-dev`, relay 4447. The
 owner's goweb `.env` uses the tailnet layout (`SSO_DEV_BIND` is a tailnet
-address), so `dev-setup` starts a back-channel relay; until issue #1 makes the
-relay's container name and port configurable (`CALBOOKER_DEV_RELAY_PORT`),
-only one checkout can run at a time.
+address), so `dev-setup` starts a back-channel relay per checkout: its port
+comes from `CALBOOKER_DEV_RELAY_PORT` and its container name from the client
+ID (`<client ID>-backchannel-relay`), so the checkouts run side by side.
 
 In a worktree:
 
@@ -112,10 +112,13 @@ from it; check its printed `.env.local` values.
 Playwright browsers come from Nix: home-manager sets
 `PLAYWRIGHT_BROWSERS_PATH` from nixpkgs `playwright-driver`, and
 `@playwright/test` must match the browser revisions in
-`$PLAYWRIGHT_BROWSERS_PATH` (on 2026-10-23: chromium-1243; `nix eval
-nixpkgs#playwright-driver.version` printed 1.59.1, which may not be the
-nixpkgs home-manager uses, so trust the revisions). Issue #1
-pins it. Never run `npx playwright install`.
+`$PLAYWRIGHT_BROWSERS_PATH`, not the driver's version number. On 2026-10-23
+the directory held chromium-1243, chromium_headless_shell-1243, firefox-1543,
+and webkit-2359, which is `@playwright/test` 1.63.0 (1.64.x expects
+chromium-1248), so `package.json` pins 1.63.0. How to re-check after a Nix
+update is in `docs/local-development.md` ("Playwright browsers"). Install npm
+packages with `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npm ci` and never run
+`npx playwright install`.
 
 ## Review checklist for the manager
 

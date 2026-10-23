@@ -16,6 +16,22 @@ type authHandler struct {
 	authenticator *SessionAuthenticator
 }
 
+// registerAuthRoutes registers the signed-in home, sign-out, and single
+// sign-on routes. Credentials live at the single sign-on provider; this app
+// only starts and finishes the issuer's sign-in flow.
+func registerAuthRoutes(mux *http.ServeMux, auth *authHandler) {
+	for _, prefix := range localizedPrefixes() {
+		mux.HandleFunc("GET "+prefix+"/home", auth.home)
+		mux.HandleFunc("POST "+prefix+"/sign-out", auth.signOut)
+		mux.HandleFunc("GET "+prefix+"/sign-in", auth.ssoSignIn)
+		mux.HandleFunc("GET "+prefix+"/oauth/sso", auth.ssoStart)
+		mux.HandleFunc("GET "+prefix+"/oauth/sso/callback", auth.ssoCallback)
+		mux.HandleFunc("GET "+prefix+"/guest/upgrade", auth.ssoGuestUpgrade)
+		mux.HandleFunc("POST "+prefix+"/guest/upgrade", auth.ssoGuestUpgrade)
+	}
+	mux.HandleFunc("POST "+ssoBackChannelLogoutPath, auth.ssoBackChannelLogout)
+}
+
 func newAuthHandler(renderer *PageRenderer, dependencies Dependencies) *authHandler {
 	authenticator, _ := NewSessionAuthenticator(dependencies.Users, dependencies.Sessions, dependencies.SessionCookie)
 	return &authHandler{renderer: renderer, dependencies: dependencies, authenticator: authenticator}

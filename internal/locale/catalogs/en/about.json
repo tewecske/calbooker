@@ -1,0 +1,10 @@
+{
+  "messages": {
+    "about.title": {"text": "About | Calbooker"},
+    "about.heading": {"text": "About Calbooker"},
+    "about.description": {"text": "A server-rendered Go and HTMX application foundation."},
+    "about.icons_heading": {"text": "Icons"},
+    "about.icons_credit": {"text": "Theme icons use Heroicons by Tailwind Labs, licensed under the MIT License. Copyright (c) Tailwind Labs, Inc."},
+    "about.license_summary": {"text": "Heroicons MIT License"}
+  }
+}

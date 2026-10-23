@@ -18,10 +18,18 @@
 #   CALBOOKER_DEV_BIND          listen address; default SSO_DEV_BIND, else 127.0.0.1
 #   CALBOOKER_DEV_ISSUER_URL    default SSO_DEV_ISSUER_URL, else http://127.0.0.1:4444
 #   CALBOOKER_DEV_PROVIDER_URL  default SSO_DEV_PROVIDER_URL, else http://localhost:8080
+#   CALBOOKER_DEV_DATABASE      database name; default calbooker
+#   CALBOOKER_DEV_CLIENT_ID     Hydra client ID; default calbooker-dev
+#   CALBOOKER_DEV_CLIENT_NAME   Hydra client name the provider shows;
+#                               default "Calbooker (development)"
+#   CALBOOKER_DEV_RELAY_PORT    loopback port of the back-channel relay;
+#                               default 4447
 #
 # Hydra only calls loopback and private addresses, so when calbooker listens
 # elsewhere (a tailnet address) this starts a loopback relay container,
-# calbooker-backchannel-relay on 127.0.0.1:4447, for back-channel logout.
+# <client ID>-backchannel-relay on 127.0.0.1:<relay port>, for back-channel
+# logout. Give each checkout its own port, database, client ID, and relay
+# port so several can run at once (docs/plan.md, "Local environment").
 set -eu
 
 goweb_dir="${GOWEB_DIR:-../goweb}"
@@ -53,7 +61,27 @@ bind="${CALBOOKER_DEV_BIND:-${dev_bind:-127.0.0.1}}"
 issuer_url="${CALBOOKER_DEV_ISSUER_URL:-${dev_issuer:-http://127.0.0.1:4444}}"
 provider_url="${CALBOOKER_DEV_PROVIDER_URL:-${dev_provider:-http://localhost:8080}}"
 client_id="${CALBOOKER_DEV_CLIENT_ID:-calbooker-dev}"
+client_name="${CALBOOKER_DEV_CLIENT_NAME:-Calbooker (development)}"
 db_name="${CALBOOKER_DEV_DATABASE:-calbooker}"
+relay_port="${CALBOOKER_DEV_RELAY_PORT:-4447}"
+
+case "$client_id" in
+'' | *[!A-Za-z0-9_.-]* | [!A-Za-z0-9]*) echo "CALBOOKER_DEV_CLIENT_ID may contain only letters, digits, '_', '.', and '-', and must start with a letter or digit" >&2; exit 2 ;;
+esac
+case "$db_name" in
+'' | *[!a-z0-9_]* | [!a-z_]*) echo "CALBOOKER_DEV_DATABASE may contain only a-z, 0-9, and '_', and must not start with a digit" >&2; exit 2 ;;
+esac
+case "$client_name" in
+'' | *"'"* | *'
+'*) echo "CALBOOKER_DEV_CLIENT_NAME must be one line without single quotes" >&2; exit 2 ;;
+esac
+case "$relay_port" in
+'' | *[!0-9]*) echo "CALBOOKER_DEV_RELAY_PORT must be a port number" >&2; exit 2 ;;
+esac
+if [ "$relay_port" -lt 1 ] || [ "$relay_port" -gt 65535 ]; then
+	echo "CALBOOKER_DEV_RELAY_PORT must be between 1 and 65535" >&2; exit 2
+fi
+relay_name="$client_id-backchannel-relay"
 
 echo "SELECT 'CREATE DATABASE $db_name' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = '$db_name') \\gexec" |
 	docker exec -i goweb-postgres psql -X -q -v ON_ERROR_STOP=1 -U "$pg_user" -d "$pg_db" >/dev/null
@@ -61,11 +89,15 @@ echo "database $db_name ready" >&2
 
 backchannel="http://127.0.0.1:$port/oauth/sso/backchannel-logout"
 if [ "$bind" != "127.0.0.1" ]; then
-	docker rm -f calbooker-backchannel-relay >/dev/null 2>&1 || true
-	docker run -d --name calbooker-backchannel-relay --network host alpine/socat:1.8.0.3 \
-		"TCP-LISTEN:4447,bind=127.0.0.1,fork,reuseaddr" "TCP:$bind:$port" >/dev/null
-	backchannel="http://127.0.0.1:4447/oauth/sso/backchannel-logout"
-	echo "back-channel relay 127.0.0.1:4447 -> $bind:$port started" >&2
+	docker rm -f "$relay_name" >/dev/null 2>&1 || true
+	if [ "$client_id" = "calbooker-dev" ]; then
+		# The relay's name before it was derived from the client ID.
+		docker rm -f calbooker-backchannel-relay >/dev/null 2>&1 || true
+	fi
+	docker run -d --name "$relay_name" --network host alpine/socat:1.8.0.3 \
+		"TCP-LISTEN:$relay_port,bind=127.0.0.1,fork,reuseaddr" "TCP:$bind:$port" >/dev/null
+	backchannel="http://127.0.0.1:$relay_port/oauth/sso/backchannel-logout"
+	echo "back-channel relay $relay_name 127.0.0.1:$relay_port -> $bind:$port started" >&2
 fi
 
 secret="$(od -An -tx1 -N32 /dev/urandom | tr -d ' \n')"
@@ -74,7 +106,7 @@ hydra delete oauth2-client "$client_id" >/dev/null 2>&1 || true
 hydra create oauth2-client \
 	--id "$client_id" \
 	--secret "$secret" \
-	--name "Calbooker (development)" \
+	--name "$client_name" \
 	--grant-type authorization_code \
 	--response-type code \
 	--scope openid,email,profile \
@@ -98,4 +130,7 @@ CALBOOKER_SSO_ISSUER_URL=$issuer_url
 CALBOOKER_SSO_CLIENT_ID=$client_id
 CALBOOKER_SSO_CLIENT_SECRET=$secret
 CALBOOKER_SSO_ACCOUNT_URL=$provider_url/en/account/settings
+# Browser specs (make e2e, tests/browser/support/env.ts).
+CALBOOKER_BROWSER_PROVIDER_URL=$provider_url
+CALBOOKER_BROWSER_CLIENT_NAME='$client_name'
 ENV

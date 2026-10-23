@@ -1,65 +1,30 @@
-import { expect, test, type Browser, type BrowserContext, type Page } from "@playwright/test";
+import { expect, test } from "@playwright/test";
+
+import {
+  appURL,
+  becomeGuest,
+  providerAdmin,
+  providerURL,
+  signInAtProvider,
+  signUpAtProvider,
+  signUpUser as newUser,
+  ssoEnabled as enabled,
+  startSignIn,
+  uniqueEmail,
+  uniqueName,
+  uniquePassword,
+} from "./support";
 
 // Single sign-on between calbooker and the goweb provider through Hydra.
 //
 // Opt-in: CALBOOKER_SSO_E2E=1 (make e2e) with goweb's Hydra and provider
 // running and calbooker started with make run (see docs/local-development.md).
 // The provider and calbooker must be on different host names because cookies
-// ignore ports; the defaults match the documented loopback setup.
-const enabled = process.env.CALBOOKER_SSO_E2E === "1";
-const providerURL = (process.env.CALBOOKER_BROWSER_PROVIDER_URL ?? "http://localhost:8080").replace(/\/$/, "");
-const appURL = (process.env.CALBOOKER_BROWSER_BASE_URL ?? process.env.CALBOOKER_PUBLIC_URL ?? "http://127.0.0.1:8082").replace(/\/$/, "");
-// The name scripts/dev-setup.sh registers for the development client.
-const clientName = process.env.CALBOOKER_BROWSER_CLIENT_NAME ?? "Calbooker (development)";
-// A provider administrator, for the revocation scenario (goweb's bootstrap
-// administrator in development).
-const providerAdminEmail = process.env.CALBOOKER_BROWSER_PROVIDER_ADMIN_EMAIL ?? "";
-const providerAdminPassword = process.env.CALBOOKER_BROWSER_PROVIDER_ADMIN_PASSWORD ?? "";
+// ignore ports. URLs and the client name come from tests/browser/support/env.ts.
+const providerAdminEmail = providerAdmin.email;
+const providerAdminPassword = providerAdmin.password;
 
 const invitePattern = /^[A-HJKMNPQRSTUVWXYZ2-9]{12}$/;
-
-function uniqueEmail(prefix: string): string {
-  return `${prefix}-${crypto.randomUUID()}@example.test`;
-}
-
-function uniquePassword(): string {
-  return `sso-${crypto.randomUUID()}-password`;
-}
-
-// The provider's sign-up form redirects straight back to Hydra when a login
-// challenge is pending, so signing up there finishes the flow.
-async function signUpAtProvider(page: Page, email: string, password: string): Promise<void> {
-  await page.goto(`${providerURL}/en/sign-up`);
-  await expect(page.getByTestId("sso-client-name")).toContainText(clientName);
-  await page.getByLabel("Email", { exact: true }).fill(email);
-  await page.getByLabel("Password", { exact: true }).fill(password);
-  await page.getByRole("button", { name: /create account/i }).click();
-}
-
-async function signInAtProvider(page: Page, identifier: string, password: string): Promise<void> {
-  await page.getByLabel("Email or username", { exact: true }).fill(identifier);
-  await page.getByLabel("Password", { exact: true }).fill(password);
-  await page.getByRole("button", { name: /^sign in$/i }).click();
-}
-
-async function startSignIn(page: Page): Promise<void> {
-  await page.goto(`${appURL}/en/sign-in`);
-  await page.getByTestId("sso-sign-in").click();
-}
-
-// A brand-new person opens calbooker, is sent to the provider, signs up there,
-// and lands on the calbooker home signed in.
-async function newUser(browser: Browser): Promise<{ context: BrowserContext; page: Page; email: string }> {
-  const context = await browser.newContext();
-  const page = await context.newPage();
-  const email = uniqueEmail("calbooker");
-  await startSignIn(page);
-  await expect(page).toHaveURL(`${providerURL}/en/sign-in`);
-  await expect(page.getByTestId("sso-client-name")).toContainText(clientName);
-  await signUpAtProvider(page, email, uniquePassword());
-  await expect(page).toHaveURL(`${appURL}/en/home`);
-  return { context, page, email };
-}
 
 test.describe("single sign-on", () => {
   test.skip(!enabled, "set CALBOOKER_SSO_E2E=1 (make e2e) to run the single sign-on specs");
@@ -129,18 +94,14 @@ test.describe("single sign-on", () => {
   test("a guest upgrade through single sign-on keeps the guest's groups", async ({ browser }) => {
     const owner = await newUser(browser);
     await owner.page.goto(`${appURL}/en/groups`);
-    await owner.page.locator("#group-new-name").fill(`SSO ${crypto.randomUUID().slice(0, 8)}`);
+    await owner.page.locator("#group-new-name").fill(uniqueName("SSO"));
     await owner.page.locator("#group-new-name").locator("xpath=ancestor::form").getByRole("button").click();
     await owner.page.waitForURL(/\/en\/groups\/\d+$/);
     const inviteCode = (await owner.page.getByTestId("group-invite-code").innerText()).trim();
     expect(inviteCode).toMatch(invitePattern);
     const groupName = await owner.page.locator("#group-summary-heading").innerText();
 
-    const guestContext = await browser.newContext();
-    const guest = await guestContext.newPage();
-    await guest.goto(`${appURL}/en/guest/write`);
-    await guest.getByRole("button", { name: /save/i }).first().click();
-    await expect(guest.locator("[data-guest-banner]")).toBeVisible();
+    const { context: guestContext, page: guest } = await becomeGuest(browser);
     await guest.goto(`${appURL}/en/groups/join`);
     await guest.locator("#group-invite-code").fill(inviteCode);
     await guest.locator("#group-invite-code").locator("xpath=ancestor::form").getByRole("button").click();

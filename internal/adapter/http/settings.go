@@ -55,6 +55,16 @@ type settingsHandler struct {
 	authenticator *SessionAuthenticator
 }
 
+// registerSettingsRoutes registers the account settings, language, and theme
+// routes.
+func registerSettingsRoutes(mux *http.ServeMux, settings *settingsHandler) {
+	for _, prefix := range localizedPrefixes() {
+		mux.HandleFunc("GET "+prefix+"/account/settings", settings.page)
+		mux.HandleFunc("POST "+prefix+"/account/settings/locale", settings.updateLocale)
+		mux.HandleFunc("POST "+prefix+"/account/theme", settings.updateTheme)
+	}
+}
+
 func newSettingsHandler(renderer *PageRenderer, dependencies Dependencies) *settingsHandler {
 	authenticator, _ := NewSessionAuthenticator(dependencies.Users, dependencies.Sessions, dependencies.SessionCookie)
 	return &settingsHandler{auth: newAuthHandler(renderer, dependencies), settings: NewSettingsRenderer(renderer, dependencies), dependencies: dependencies, authenticator: authenticator}

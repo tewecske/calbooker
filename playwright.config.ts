@@ -1,9 +1,10 @@
 import { defineConfig, devices } from "@playwright/test";
 
-// Specs run against an already running stack (see tests/README.md); nothing
-// is started from here.
-const baseURL = process.env.CALBOOKER_BROWSER_BASE_URL ?? process.env.CALBOOKER_PUBLIC_URL ?? "http://127.0.0.1:8082";
+import { appURL } from "./tests/browser/support/env";
 
+// Specs run against an already running stack (see tests/README.md); nothing
+// is started from here. Browsers come from PLAYWRIGHT_BROWSERS_PATH (Nix);
+// @playwright/test is pinned to the version whose browser revisions match it.
 export default defineConfig({
   testDir: "./tests/browser",
   timeout: 30_000,
@@ -13,7 +14,7 @@ export default defineConfig({
   reporter: "list",
   use: {
     ...devices["Desktop Chrome"],
-    baseURL,
+    baseURL: appURL,
     trace: "retain-on-failure",
   },
 });

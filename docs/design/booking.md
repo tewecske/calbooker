@@ -76,8 +76,8 @@ lines:
 - `internal/adapter/http/<area>.go` with a `register<Area>Routes` function
   called from `handler.go`
 - `templates/<area>.html`
-- `internal/locale/catalogs/<lang>/<area>.json` (after issue #1 splits the
-  catalogs)
+- `internal/locale/catalogs/<lang>/<area>.json` (merged at load; a message
+  ID in two files is an error)
 - `tests/browser/<area>.spec.ts` using helpers from `tests/browser/support/`
 
 Shared hot spots: `handler.go` (one line per area), `GroupAccess`, the group

@@ -134,13 +134,12 @@ packages with `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npm ci` and never run
 
 ## Next step
 
-Nothing has been started. The milestones and issues #1 to #15 exist on
-GitHub; no branches, worktrees, or agents yet. The first session in this
-folder should:
+Progress is in the Status table below. The original first steps were:
 
 1. ~~Ask the owner the open questions~~ (answered, see below).
 2. Ask the owner to start goweb's stack, or for an explicit yes to start it.
-3. Brief one subagent for #1 (`isolation: "worktree"`, lane solo/A
+3. Done: #1 merged as #16 on 2026-10-24.
+   Brief one subagent for #1 (`isolation: "worktree"`, lane solo/A
    environment), review and merge its PR.
 4. Then #2 and #6 in parallel (#6 in lane B), then #3, then lanes A, B, and C
    as the table allows.
@@ -149,7 +148,10 @@ folder should:
 
 | # | State | PR |
 | --- | --- | --- |
-| 1–15 | open | |
+| 1 | merged | #16 |
+| 2 | in progress (lane solo/A) | |
+| 6 | in progress (lane B) | |
+| 3–5, 7–15 | open | |
 
 ## Owner answers (2026-10-23)
 

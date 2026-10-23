@@ -1,0 +1,679 @@
+{{define "admin"}}
+  {{template "layout" .}}
+{{end}}
+
+{{define "admin-fragment"}}
+  {{template "alerts-oob" .}}
+  <section id="page-content">
+    {{template "admin-content" .}}
+  </section>
+{{end}}
+
+{{define "admin-content"}}
+  <div>
+    {{template "admin-tabs" .}}
+    {{if and .Admin (eq .Admin.Page "detail")}}
+      {{template "admin-detail-content" .}}
+    {{else if and .Admin (eq .Admin.Page "audit")}}
+      {{template "admin-audit-content" .}}
+    {{else if and .Admin (eq .Admin.Page "system")}}
+      {{template "admin-system-content" .}}
+    {{else if and .Admin (eq .Admin.Page "ratelimits")}}
+      {{template "admin-ratelimits-content" .}}
+    {{else if and .Admin (eq .Admin.Page "usage")}}
+      {{template "admin-usage-content" .}}
+    {{else if and .Admin (eq .Admin.Page "suspicious")}}
+      {{template "admin-suspicious-content" .}}
+    {{else if and .Admin (eq .Admin.Page "users")}}
+      {{template "admin-users-content" .}}
+    {{else}}
+      {{template "admin-overview-content" .}}
+    {{end}}
+  </div>
+{{end}}
+
+{{define "admin-tabs"}}
+  {{with .Admin}}
+    {{if .Sections}}
+      <div role="tablist" class="tabs tabs-border mt-6" aria-label="{{$.Labels.admin_sections}}">
+        {{range .Sections}}
+          <a role="tab" class="tab text-lg {{if .Current}}tab-active{{end}}" href="{{.URL}}"
+             aria-selected="{{if .Current}}true{{else}}false{{end}}" {{if .Current}}aria-current="page"{{end}}
+             hx-get="{{.URL}}" hx-target="#page-content" hx-swap="outerHTML" hx-push-url="true">{{.Label}}</a>
+        {{end}}
+      </div>
+    {{end}}
+  {{end}}
+{{end}}
+
+{{define "admin-system-content"}}
+  {{with .Admin.System}}
+  <div class="mt-6 grid gap-6 w-full max-w-5xl">
+    <p class="text-sm opacity-70">{{$.Description}}</p>
+
+    {{with .Configuration}}
+    <section class="card card-border bg-base-100 shadow-sm" aria-labelledby="admin-system-config-heading">
+      <div class="card-body">
+        <h2 id="admin-system-config-heading" class="card-title">{{$.Labels.admin_system_config_heading}}</h2>
+        <dl class="grid grid-cols-1 gap-2 md:grid-cols-2">
+          <div><dt class="text-sm opacity-70">{{$.Labels.admin_system_config_environment}}</dt><dd>{{.Environment}}</dd></div>
+          <div><dt class="text-sm opacity-70">{{$.Labels.admin_system_config_public_address}}</dt><dd>{{.PublicAddress}}</dd></div>
+          <div><dt class="text-sm opacity-70">{{$.Labels.admin_system_config_public_url}}</dt><dd>{{.PublicURL}}</dd></div>
+          <div><dt class="text-sm opacity-70">{{$.Labels.admin_system_config_secure_cookies}}</dt><dd>{{if .SecureSessionCookies}}{{$.Labels.admin_system_yes}}{{else}}{{$.Labels.admin_system_no}}{{end}}</dd></div>
+          <div><dt class="text-sm opacity-70">{{$.Labels.admin_system_config_mail}}</dt><dd>{{if .MailConfigured}}{{$.Labels.admin_system_yes}}{{else}}{{$.Labels.admin_system_no}}{{end}}</dd></div>
+          <div><dt class="text-sm opacity-70">{{$.Labels.admin_system_config_mail_relay}}</dt><dd>{{if .MailRelay}}{{.MailRelay}}{{else}}{{$.Labels.admin_system_config_not_configured}}{{end}}</dd></div>
+          <div><dt class="text-sm opacity-70">{{$.Labels.admin_system_config_trusted_proxy}}</dt><dd>{{if .TrustedProxy}}{{.TrustedProxy}}{{else}}{{$.Labels.admin_system_config_not_configured}}{{end}}</dd></div>
+          {{if .SSOIssuer}}<div><dt class="text-sm opacity-70">{{$.Labels.admin_system_config_sso_issuer}}</dt><dd>{{.SSOIssuer}}</dd></div>{{end}}
+          <div><dt class="text-sm opacity-70">{{$.Labels.admin_system_config_session}}</dt><dd>{{.SessionLifetime}}</dd></div>
+          <div><dt class="text-sm opacity-70">{{$.Labels.admin_system_config_interval}}</dt><dd>{{.MaintenanceInterval}}</dd></div>
+          <div><dt class="text-sm opacity-70">{{$.Labels.admin_system_config_guest}}</dt><dd>{{.GuestRetention}}</dd></div>
+          <div><dt class="text-sm opacity-70">{{$.Labels.admin_system_config_usage}}</dt><dd>{{.UsageRetention}}</dd></div>
+        </dl>
+      </div>
+    </section>
+    {{end}}
+
+    {{with .Runtime}}
+    <section class="card card-border bg-base-100 shadow-sm" aria-labelledby="admin-system-runtime-heading">
+      <div class="card-body">
+        <h2 id="admin-system-runtime-heading" class="card-title">{{$.Labels.admin_system_runtime_heading}}</h2>
+        <dl class="grid grid-cols-1 gap-2 md:grid-cols-2">
+          <div><dt class="text-sm opacity-70">{{$.Labels.admin_system_runtime_version}}</dt><dd>{{.Version}}</dd></div>
+          <div><dt class="text-sm opacity-70">{{$.Labels.admin_system_runtime_started}}</dt><dd>{{.StartedAt}}</dd></div>
+          <div><dt class="text-sm opacity-70">{{$.Labels.admin_system_runtime_uptime}}</dt><dd>{{.Uptime}}</dd></div>
+          <div><dt class="text-sm opacity-70">{{$.Labels.admin_system_runtime_go}}</dt><dd>{{.GoVersion}}</dd></div>
+          <div><dt class="text-sm opacity-70">{{$.Labels.admin_system_runtime_platform}}</dt><dd>{{.Platform}}</dd></div>
+          <div><dt class="text-sm opacity-70">{{$.Labels.admin_system_runtime_cpus}}</dt><dd>{{.CPUs}}</dd></div>
+          <div><dt class="text-sm opacity-70">{{$.Labels.admin_system_runtime_gomaxprocs}}</dt><dd>{{.GOMAXPROCS}}</dd></div>
+          <div><dt class="text-sm opacity-70">{{$.Labels.admin_system_runtime_goroutines}}</dt><dd>{{.Goroutines}}</dd></div>
+          <div><dt class="text-sm opacity-70">{{$.Labels.admin_system_runtime_heap}}</dt><dd>{{.HeapAlloc}}</dd></div>
+          <div><dt class="text-sm opacity-70">{{$.Labels.admin_system_runtime_sys}}</dt><dd>{{.SysMemory}}</dd></div>
+          <div><dt class="text-sm opacity-70">{{$.Labels.admin_system_runtime_gc}}</dt><dd>{{.GC}}</dd></div>
+        </dl>
+      </div>
+    </section>
+    {{end}}
+
+    <section class="card card-border bg-base-100 shadow-sm" aria-labelledby="admin-system-migrations-heading">
+      <div class="card-body">
+        <h2 id="admin-system-migrations-heading" class="card-title">{{$.Labels.admin_system_migrations_heading}}</h2>
+        {{if .Migrations}}
+          <div class="overflow-x-auto">
+            <table class="table" aria-label="{{$.Labels.admin_system_migrations_heading}}">
+              <thead>
+                <tr>
+                  <th scope="col">{{$.Labels.admin_system_migrations_rank}}</th>
+                  <th scope="col">{{$.Labels.admin_system_migrations_version}}</th>
+                  <th scope="col">{{$.Labels.admin_system_migrations_description}}</th>
+                  <th scope="col">{{$.Labels.admin_system_migrations_status}}</th>
+                  <th scope="col">{{$.Labels.admin_system_migrations_applied}}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {{range .Migrations}}
+                  <tr data-migration="{{.Version}}">
+                    <td>{{.Rank}}</td>
+                    <td>{{.Version}}</td>
+                    <td>{{.Description}}</td>
+                    <td>{{if .Installed}}<span class="badge badge-success">{{$.Labels.admin_system_migrations_installed}}</span>{{else}}<span class="badge badge-warning">{{$.Labels.admin_system_migrations_pending}}</span>{{end}}</td>
+                    <td>{{.InstalledAt}}</td>
+                  </tr>
+                {{end}}
+              </tbody>
+            </table>
+          </div>
+        {{else}}
+          <p class="text-sm opacity-70">{{$.Labels.admin_system_migrations_empty}}</p>
+        {{end}}
+      </div>
+    </section>
+
+    {{with .Counts}}
+    <section class="card card-border bg-base-100 shadow-sm" aria-labelledby="admin-system-counts-heading">
+      <div class="card-body">
+        <h2 id="admin-system-counts-heading" class="card-title">{{$.Labels.admin_system_counts_heading}}</h2>
+        <dl class="grid grid-cols-1 gap-2 md:grid-cols-3">
+          <div><dt class="text-sm opacity-70">{{$.Labels.admin_system_counts_total_accounts}}</dt><dd>{{.TotalAccounts}}</dd></div>
+          <div><dt class="text-sm opacity-70">{{$.Labels.admin_system_counts_guests}}</dt><dd>{{.GuestAccounts}}</dd></div>
+          <div><dt class="text-sm opacity-70">{{$.Labels.admin_system_counts_admins}}</dt><dd>{{.AdministratorAccounts}}</dd></div>
+          <div><dt class="text-sm opacity-70">{{$.Labels.admin_system_counts_unconfirmed}}</dt><dd>{{.UnconfirmedAccounts}}</dd></div>
+          <div><dt class="text-sm opacity-70">{{$.Labels.admin_system_counts_active_sessions}}</dt><dd>{{.ActiveSessions}}</dd></div>
+          <div><dt class="text-sm opacity-70">{{$.Labels.admin_system_counts_expired_sessions}}</dt><dd>{{.ExpiredSessions}}</dd></div>
+          <div><dt class="text-sm opacity-70">{{$.Labels.admin_system_counts_expired_states}}</dt><dd>{{.ExpiredOAuthStates}}</dd></div>
+        </dl>
+      </div>
+    </section>
+    {{end}}
+
+    <section class="card card-border bg-base-100 shadow-sm" aria-labelledby="admin-system-jobs-heading">
+      <div class="card-body">
+        <h2 id="admin-system-jobs-heading" class="card-title">{{$.Labels.admin_system_jobs_heading}}</h2>
+        {{if .Jobs}}
+          <div class="overflow-x-auto">
+            <table class="table" aria-label="{{$.Labels.admin_system_jobs_heading}}">
+              <thead>
+                <tr>
+                  <th scope="col">{{$.Labels.admin_system_job}}</th>
+                  <th scope="col">{{$.Labels.admin_system_job_runs}}</th>
+                  <th scope="col">{{$.Labels.admin_system_job_failures}}</th>
+                  <th scope="col">{{$.Labels.admin_system_job_last_run}}</th>
+                  <th scope="col">{{$.Labels.admin_system_job_duration}}</th>
+                  <th scope="col">{{$.Labels.admin_system_job_removed}}</th>
+                  <th scope="col">{{$.Labels.admin_system_job_error}}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {{range .Jobs}}
+                  <tr data-job="{{.Job}}">
+                    <td>{{.Label}}</td>
+                    <td>{{.Runs}}</td>
+                    <td>
+                      {{if .Failures}}<span class="badge badge-warning">{{.Failures}}</span>{{else}}<span class="badge badge-success">0</span>{{end}}
+                    </td>
+                    <td>{{.LastRun}}</td>
+                    <td>{{.LastDuration}}</td>
+                    <td>{{.LastDeleted}}</td>
+                    <td>{{if .Failed}}<span class="text-error">{{.LastError}}</span>{{end}}</td>
+                  </tr>
+                {{end}}
+              </tbody>
+            </table>
+          </div>
+        {{else}}
+          <p class="text-sm opacity-70">{{$.Labels.admin_system_job_empty}}</p>
+        {{end}}
+        <form method="post" action="{{.RunURL}}" hx-post="{{.RunURL}}"
+              hx-target="#page-content" hx-swap="outerHTML" hx-disabled-elt="this"
+              hx-confirm="{{$.Labels.admin_system_run_confirm}}">
+          <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
+          <button class="btn btn-sm btn-primary" type="submit">{{$.Labels.admin_system_run}}</button>
+        </form>
+      </div>
+    </section>
+  </div>
+  {{end}}
+{{end}}
+
+{{define "admin-audit-content"}}
+  {{with .Admin.Audit}}
+  <div class="mt-6 grid gap-6 w-full max-w-5xl">
+    <p class="text-sm opacity-70">{{$.Description}}</p>
+    <form class="grid gap-4 md:grid-cols-3" method="get" action="{{.BaseURL}}"
+          hx-get="{{.BaseURL}}" hx-target="#page-content" hx-swap="outerHTML"
+          hx-push-url="true" hx-trigger="submit">
+      <input type="hidden" name="size" value="{{.Size}}">
+      <fieldset class="fieldset">
+        <label class="fieldset-legend" for="audit-action">{{$.Labels.admin_audit_action}}</label>
+        <input id="audit-action" class="input w-full" name="action" value="{{.ActionFilter}}">
+      </fieldset>
+      <fieldset class="fieldset">
+        <label class="fieldset-legend" for="audit-actor">{{$.Labels.admin_audit_actor}}</label>
+        <input id="audit-actor" class="input w-full" name="actor" value="{{.ActorFilter}}">
+      </fieldset>
+      <fieldset class="fieldset">
+        <label class="fieldset-legend" for="audit-target">{{$.Labels.admin_audit_target}}</label>
+        <input id="audit-target" class="input w-full" name="target" value="{{.TargetFilter}}">
+      </fieldset>
+      <div class="flex gap-2 md:col-span-3">
+        <button class="btn btn-primary" type="submit">{{$.Labels.admin_audit_apply}}</button>
+        <a class="btn btn-ghost" href="{{.BaseURL}}" hx-get="{{.BaseURL}}"
+           hx-target="#page-content" hx-swap="outerHTML" hx-push-url="true">{{$.Labels.admin_audit_clear}}</a>
+      </div>
+    </form>
+
+    <div class="overflow-x-auto">
+      <table class="table" aria-label="{{$.Labels.admin_audit_heading}}">
+        <thead>
+          <tr>
+            <th scope="col">{{$.Labels.admin_audit_time}}</th>
+            <th scope="col">{{$.Labels.admin_audit_actor_column}}</th>
+            <th scope="col">{{$.Labels.admin_audit_action_column}}</th>
+            <th scope="col">{{$.Labels.admin_audit_target_column}}</th>
+            <th scope="col">{{$.Labels.admin_audit_detail_column}}</th>
+            <th scope="col">{{$.Labels.admin_audit_origin_column}}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{range .Entries}}
+            <tr>
+              <td>{{.Time}}</td>
+              <td>{{.Actor}}</td>
+              <td>{{.Action}}</td>
+              <td>{{.Target}}</td>
+              <td>{{.Detail}}</td>
+              <td>{{.Origin}}</td>
+            </tr>
+          {{else}}
+            <tr><td colspan="6" class="text-sm opacity-70">{{$.Labels.admin_audit_empty}}</td></tr>
+          {{end}}
+        </tbody>
+      </table>
+    </div>
+
+    <nav class="flex items-center gap-3" aria-label="pagination">
+      {{if .HasPrevious}}
+        <a class="btn btn-sm" href="{{.PreviousURL}}" hx-get="{{.PreviousURL}}"
+           hx-target="#page-content" hx-swap="outerHTML" hx-push-url="true">{{$.Labels.admin_prev}}</a>
+      {{end}}
+      <span class="text-sm opacity-70">{{.Page}} / {{.Pages}}</span>
+      {{if .HasNext}}
+        <a class="btn btn-sm" href="{{.NextURL}}" hx-get="{{.NextURL}}"
+           hx-target="#page-content" hx-swap="outerHTML" hx-push-url="true">{{$.Labels.admin_next}}</a>
+      {{end}}
+    </nav>
+  </div>
+  {{end}}
+{{end}}
+
+{{define "admin-suspicious-content"}}
+  {{with .Admin.Suspicious}}
+  <div class="mt-6 grid gap-6 w-full max-w-5xl">
+    <p class="text-sm opacity-70">{{$.Description}}</p>
+
+    <div class="alert alert-warning" role="status">
+      <span>{{$.Labels.admin_suspicious_disclaimer}}</span>
+    </div>
+
+    <div class="join" role="group" aria-label="{{$.Labels.admin_usage_window}}">
+      {{range .Windows}}
+        <a class="btn btn-sm join-item {{if .Current}}btn-active{{end}}" href="{{.URL}}"
+           hx-get="{{.URL}}" hx-target="#page-content" hx-swap="outerHTML" hx-push-url="true">{{.Label}}</a>
+      {{end}}
+    </div>
+
+    <p class="text-sm opacity-70">{{$.Labels.admin_suspicious_thresholds}}: {{.ActionThreshold}} / {{.OriginThreshold}}</p>
+
+    <div class="overflow-x-auto">
+      <table class="table" aria-label="{{$.Labels.admin_suspicious_heading}}">
+        <thead>
+          <tr>
+            <th scope="col">{{$.Labels.admin_suspicious_account}}</th>
+            <th scope="col">{{$.Labels.admin_suspicious_requests}}</th>
+            <th scope="col">{{$.Labels.admin_suspicious_origins}}</th>
+            <th scope="col">{{$.Labels.admin_suspicious_flags}}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{range .Accounts}}
+            <tr data-account-id="{{.UserID}}">
+              <td><a class="link" href="{{.DetailURL}}">{{.UserID}}</a></td>
+              <td>{{.Requests}}</td>
+              <td>{{.DistinctOrigins}}</td>
+              <td class="flex flex-wrap gap-1">
+                {{if .ActionFlag}}<span class="badge badge-warning">{{$.Labels.admin_suspicious_flag_actions}}</span>{{end}}
+                {{if .OriginFlag}}<span class="badge badge-warning">{{$.Labels.admin_suspicious_flag_origins}}</span>{{end}}
+              </td>
+            </tr>
+          {{else}}
+            <tr><td colspan="4" class="text-sm opacity-70">{{$.Labels.admin_suspicious_empty}}</td></tr>
+          {{end}}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {{end}}
+{{end}}
+
+{{define "admin-usage-content"}}
+  {{with .Admin.Usage}}
+  <div class="mt-6 grid gap-6 w-full max-w-5xl">
+    <p class="text-sm opacity-70">{{$.Description}}</p>
+
+    <div class="flex flex-wrap items-center gap-3">
+      <div class="join" role="group" aria-label="{{$.Labels.admin_usage_window}}">
+        {{range .Windows}}
+          <a class="btn btn-sm join-item {{if .Current}}btn-active{{end}}" href="{{.URL}}"
+             hx-get="{{.URL}}" hx-target="#page-content" hx-swap="outerHTML" hx-push-url="true">{{.Label}}</a>
+        {{end}}
+      </div>
+      <div class="join" role="group" aria-label="{{$.Labels.admin_usage_order}}">
+        <a class="btn btn-sm join-item {{if not .Ascending}}btn-active{{end}}" href="{{.MostURL}}"
+           hx-get="{{.MostURL}}" hx-target="#page-content" hx-swap="outerHTML" hx-push-url="true">{{$.Labels.admin_usage_most}}</a>
+        <a class="btn btn-sm join-item {{if .Ascending}}btn-active{{end}}" href="{{.LeastURL}}"
+           hx-get="{{.LeastURL}}" hx-target="#page-content" hx-swap="outerHTML" hx-push-url="true">{{$.Labels.admin_usage_least}}</a>
+      </div>
+    </div>
+
+    <div class="overflow-x-auto">
+      <table class="table" aria-label="{{$.Labels.admin_usage_heading}}">
+        <thead><tr><th scope="col">{{$.Labels.admin_usage_route}}</th><th scope="col">{{$.Labels.admin_usage_requests}}</th></tr></thead>
+        <tbody>
+          {{range .Routes}}
+            <tr data-route="{{.Route}}"><td>{{.Route}}</td><td>{{.Requests}}</td></tr>
+          {{else}}
+            <tr><td colspan="2" class="text-sm opacity-70">{{$.Labels.admin_usage_empty}}</td></tr>
+          {{end}}
+        </tbody>
+      </table>
+    </div>
+
+    <section class="card card-border bg-base-100 shadow-sm" aria-labelledby="admin-usage-queue-heading">
+      <div class="card-body">
+        <h2 id="admin-usage-queue-heading" class="card-title">{{$.Labels.admin_usage_queue_heading}}</h2>
+        <dl class="grid grid-cols-2 gap-2 md:grid-cols-5">
+          <div><dt class="text-sm opacity-70">{{$.Labels.admin_usage_queue_capacity}}</dt><dd>{{.Queue.Capacity}}</dd></div>
+          <div><dt class="text-sm opacity-70">{{$.Labels.admin_usage_queue_pending}}</dt><dd>{{.Queue.Pending}}</dd></div>
+          <div><dt class="text-sm opacity-70">{{$.Labels.admin_usage_queue_recorded}}</dt><dd>{{.Queue.Recorded}}</dd></div>
+          <div><dt class="text-sm opacity-70">{{$.Labels.admin_usage_queue_failed}}</dt><dd>{{.Queue.Failed}}</dd></div>
+          <div><dt class="text-sm opacity-70">{{$.Labels.admin_usage_queue_dropped}}</dt><dd>{{.Queue.Dropped}}</dd></div>
+        </dl>
+      </div>
+    </section>
+  </div>
+  {{end}}
+{{end}}
+
+{{define "admin-ratelimits-content"}}
+  {{with .Admin.Limits}}
+  <div class="mt-6 grid gap-6 w-full max-w-5xl">
+    <p class="text-sm opacity-70">{{$.Description}}</p>
+
+    <div class="flex justify-end">
+      <form method="post" action="{{.ClearAllURL}}" hx-post="{{.ClearAllURL}}"
+            hx-target="#page-content" hx-swap="outerHTML" hx-disabled-elt="this"
+            hx-confirm="{{.ClearConfirm}}">
+        <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
+        <button class="btn btn-sm btn-warning" type="submit">{{$.Labels.admin_ratelimits_clear_all}}</button>
+      </form>
+    </div>
+
+    {{range .Actions}}
+      <section class="card card-border bg-base-100 shadow-sm" aria-labelledby="admin-ratelimit-{{.Action}}">
+        <div class="card-body">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <h2 id="admin-ratelimit-{{.Action}}" class="card-title">{{.Action}}</h2>
+            <div class="flex items-center gap-2">
+              <span class="badge badge-neutral" data-testid="ratelimit-buckets">{{.Buckets}}</span>
+              {{if .Locked}}<span class="badge badge-warning">{{$.Labels.admin_ratelimits_locked}}: {{.Locked}}</span>{{end}}
+              <form method="post" action="{{.ClearURL}}" hx-post="{{.ClearURL}}"
+                    hx-target="#page-content" hx-swap="outerHTML" hx-disabled-elt="this"
+                    hx-confirm="{{$.Labels.admin_ratelimits_clear}}">
+                <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
+                <input type="hidden" name="action" value="{{.Action}}">
+                <button class="btn btn-xs btn-warning" type="submit">{{$.Labels.admin_ratelimits_clear}}</button>
+              </form>
+            </div>
+          </div>
+          <dl class="grid grid-cols-1 gap-2 md:grid-cols-3">
+            <div><dt class="text-sm opacity-70">{{$.Labels.admin_ratelimits_limit}}</dt><dd>{{.Limit}}</dd></div>
+            <div><dt class="text-sm opacity-70">{{$.Labels.admin_ratelimits_window}}</dt><dd>{{.Window}}</dd></div>
+          </dl>
+          {{if .Entries}}
+            <div class="overflow-x-auto">
+              <table class="table">
+                <thead><tr><th scope="col">{{$.Labels.admin_ratelimits_key}}</th><th scope="col">{{$.Labels.admin_ratelimits_count}}</th><th scope="col">{{$.Labels.admin_ratelimits_limit}}</th><th scope="col">{{$.Labels.admin_ratelimits_retry}}</th></tr></thead>
+                <tbody>
+                  {{range .Entries}}<tr><td>{{.KeyHint}}</td><td>{{.Count}}</td><td>{{.Limit}}</td><td>{{.Retry}}</td></tr>{{end}}
+                </tbody>
+              </table>
+            </div>
+          {{else}}
+            <p class="text-sm opacity-70">{{$.Labels.admin_ratelimits_empty}}</p>
+          {{end}}
+        </div>
+      </section>
+    {{end}}
+  </div>
+  {{end}}
+{{end}}
+
+{{define "admin-detail-content"}}
+  {{with .Admin.Detail}}
+  <div class="mt-6 grid gap-6 w-full max-w-3xl">
+    <p><a class="link" href="{{.ListURL}}">{{$.Labels.admin_detail_back}}</a></p>
+    <section class="card card-border bg-base-100 shadow-sm" aria-labelledby="admin-account-summary-heading">
+      <div class="card-body">
+        <h2 id="admin-account-summary-heading" class="card-title">{{.Label}}</h2>
+        <dl class="grid grid-cols-1 gap-2 md:grid-cols-2">
+          <div><dt class="text-sm opacity-70">{{$.Labels.admin_account_email}}</dt><dd>{{.Email}}</dd></div>
+          <div><dt class="text-sm opacity-70">{{$.Labels.admin_detail_username}}</dt><dd>{{.Username}}</dd></div>
+          <div><dt class="text-sm opacity-70">{{$.Labels.admin_detail_display_name}}</dt><dd>{{.DisplayName}}</dd></div>
+          <div><dt class="text-sm opacity-70">{{$.Labels.admin_detail_role}}</dt><dd>{{if .IsAdmin}}{{$.Labels.admin_role_admin}}{{else}}{{$.Labels.admin_role_user}}{{end}}</dd></div>
+          <div><dt class="text-sm opacity-70">{{$.Labels.admin_detail_locale}}</dt><dd>{{.Locale}}</dd></div>
+          <div><dt class="text-sm opacity-70">{{$.Labels.admin_detail_theme}}</dt><dd>{{.Theme}}</dd></div>
+          <div><dt class="text-sm opacity-70">{{$.Labels.admin_detail_created}}</dt><dd>{{.CreatedAt}}</dd></div>
+          <div><dt class="text-sm opacity-70">{{$.Labels.admin_detail_version}}</dt><dd>{{.Version}}</dd></div>
+        </dl>
+        <div class="mt-2">
+          <a class="btn btn-sm" href="{{.EditURL}}" hx-get="{{.EditURL}}"
+             hx-target="#page-content" hx-swap="outerHTML" hx-push-url="true">{{$.Labels.admin_detail_edit}}</a>
+        </div>
+      </div>
+    </section>
+
+    <section class="card card-border bg-base-100 shadow-sm" aria-labelledby="admin-confirmation-heading">
+      <div class="card-body">
+        <h2 id="admin-confirmation-heading" class="card-title">{{$.Labels.admin_detail_confirmation}}</h2>
+        <p>{{if .Confirmed}}{{$.Labels.admin_detail_confirmed}}{{else}}{{$.Labels.admin_detail_unconfirmed}}{{end}}</p>
+      </div>
+    </section>
+
+    <section class="card card-border bg-base-100 shadow-sm" aria-labelledby="admin-sessions-heading">
+      <div class="card-body">
+        <div class="flex items-center justify-between">
+          <h2 id="admin-sessions-heading" class="card-title">{{$.Labels.admin_detail_sessions}}</h2>
+          <span class="badge badge-neutral" data-testid="session-count">{{.SessionCount}}</span>
+        </div>
+        {{if .Sessions}}
+          <form method="post" action="{{.SessionsRevokeURL}}" hx-post="{{.SessionsRevokeURL}}"
+                hx-target="#page-content" hx-swap="outerHTML" hx-disabled-elt="this"
+                hx-confirm="{{$.Labels.admin_sessions_revoke_confirm}}">
+            <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
+            <button class="btn btn-sm btn-error btn-outline" type="submit">{{$.Labels.admin_sessions_revoke}}</button>
+          </form>
+          <div class="overflow-x-auto">
+            <table class="table">
+              <thead><tr><th scope="col">{{$.Labels.admin_sessions_created}}</th><th scope="col">{{$.Labels.admin_sessions_expires}}</th></tr></thead>
+              <tbody>
+                {{range .Sessions}}<tr><td>{{.CreatedAt}}</td><td>{{.ExpiresAt}}</td></tr>{{end}}
+              </tbody>
+            </table>
+          </div>
+        {{else}}
+          <p class="text-sm opacity-70">{{$.Labels.admin_sessions_empty}}</p>
+        {{end}}
+      </div>
+    </section>
+
+    <section class="card card-border bg-base-100 shadow-sm" aria-labelledby="admin-providers-heading">
+      <div class="card-body">
+        <h2 id="admin-providers-heading" class="card-title">{{$.Labels.admin_detail_providers}}</h2>
+        {{if .Identities}}
+          <div class="overflow-x-auto">
+            <table class="table">
+              <thead><tr><th scope="col">{{$.Labels.admin_providers_provider}}</th><th scope="col">{{$.Labels.admin_providers_account}}</th></tr></thead>
+              <tbody>
+                {{range .Identities}}
+                  <tr>
+                    <td>{{.Provider}}</td>
+                    <td>{{.Label}}</td>
+                  </tr>
+                {{end}}
+              </tbody>
+            </table>
+          </div>
+        {{else}}
+          <p class="text-sm opacity-70">{{$.Labels.admin_providers_empty}}</p>
+        {{end}}
+      </div>
+    </section>
+  </div>
+  {{end}}
+{{end}}
+
+{{define "admin-overview-content"}}
+  <div class="mt-6 grid gap-6 w-full max-w-3xl">
+    <p class="text-sm opacity-70">{{.Description}}</p>
+  </div>
+{{end}}
+
+{{define "admin-account-form"}}
+  <section class="card card-border bg-base-100 shadow-sm" aria-labelledby="admin-account-form-heading">
+    <div class="card-body">
+      <h2 id="admin-account-form-heading" class="card-title">{{.Admin.List.Form.Heading}}</h2>
+      <form class="grid gap-4" method="post" action="{{.Admin.List.Form.ActionURL}}"
+            hx-post="{{.Admin.List.Form.ActionURL}}" hx-target="#page-content" hx-swap="outerHTML" hx-disabled-elt="this">
+        <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
+        <input type="hidden" name="version" value="{{.Admin.List.Form.Version}}">
+        {{if .Admin.List.Form.Email}}
+        <div>
+          <p class="text-sm opacity-70">{{.Labels.admin_account_email}}</p>
+          <p class="font-medium" data-testid="admin-account-email">{{.Admin.List.Form.Email}}</p>
+        </div>
+        {{end}}
+        <label class="label cursor-pointer justify-start gap-3" for="admin-account-is-admin">
+          <input id="admin-account-is-admin" class="checkbox" type="checkbox" name="is_admin" value="true"
+                 {{if .Admin.List.Form.IsAdmin}}checked{{end}}>
+          <span class="label-text">{{.Labels.admin_account_is_admin}}</span>
+        </label>
+        <div class="flex gap-2">
+          <button class="btn btn-primary" type="submit">{{.Admin.List.Form.SubmitLabel}}</button>
+          <a class="btn btn-ghost" href="{{.Admin.List.Form.CancelURL}}">{{.Labels.admin_account_cancel}}</a>
+          <span class="htmx-indicator loading loading-spinner" aria-hidden="true"></span>
+        </div>
+      </form>
+      {{if and .Admin.List.Form.DeleteURL (not .Admin.List.Form.IsSelf)}}
+        <div class="divider"></div>
+        <form class="grid gap-3" method="post" action="{{.Admin.List.Form.DeleteURL}}"
+              hx-post="{{.Admin.List.Form.DeleteURL}}" hx-target="#page-content" hx-swap="outerHTML"
+              hx-disabled-elt="this" hx-confirm="{{.Labels.admin_account_delete_confirm}}">
+          <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
+          <input type="hidden" name="version" value="{{.Admin.List.Form.Version}}">
+          <label class="label cursor-pointer justify-start gap-3" for="admin-account-confirm-delete">
+            <input id="admin-account-confirm-delete" class="checkbox checkbox-error" type="checkbox" name="confirm" value="true" required>
+            <span class="label-text">{{.Labels.admin_account_confirm_delete}}</span>
+          </label>
+          <div>
+            <button class="btn btn-error" type="submit">{{.Labels.admin_account_delete}}</button>
+          </div>
+        </form>
+      {{end}}
+    </div>
+  </section>
+{{end}}
+
+{{define "admin-users-content"}}
+  {{with .Admin.List}}
+  <div class="mt-6 grid gap-6 w-full max-w-5xl">
+    {{if eq .Mode "edit"}}
+      {{template "admin-account-form" $}}
+    {{else}}
+      <form class="grid gap-4" method="get" action="{{.BaseURL}}"
+            hx-get="{{.BaseURL}}" hx-target="#page-content" hx-swap="outerHTML"
+            hx-replace-url="true" hx-trigger="input changed delay:350ms from:#admin-search, submit">
+        <input type="hidden" name="admin" value="{{.AdminFilter}}">
+        <input type="hidden" name="guest" value="{{.GuestFilter}}">
+        <input type="hidden" name="confirmed" value="{{.ConfirmedFilter}}">
+        <input type="hidden" name="sort" value="{{.Sort}}">
+        <input type="hidden" name="dir" value="{{.Direction}}">
+        <input type="hidden" name="size" value="{{.Size}}">
+        <fieldset class="fieldset">
+          <label class="fieldset-legend" for="admin-search">{{$.Labels.admin_search}}</label>
+          <input id="admin-search" class="input w-full" type="search" name="q" value="{{.SearchValue}}"
+                 placeholder="{{$.Labels.admin_search_placeholder}}" autocomplete="off">
+        </fieldset>
+        <div>
+          <button class="btn" type="submit">{{$.Labels.admin_search}}</button>
+        </div>
+      </form>
+
+      <div class="flex flex-wrap gap-4">
+        <fieldset class="fieldset">
+          <legend class="fieldset-legend">{{$.Labels.admin_filter_admin}}</legend>
+          <div class="join">
+            <a class="btn btn-sm join-item {{if not .AdminFilter}}btn-active{{end}}" href="{{index .FilterURLs "admin_all"}}"
+               hx-get="{{index .FilterURLs "admin_all"}}" hx-target="#page-content" hx-swap="outerHTML" hx-push-url="true">{{$.Labels.admin_filter_all}}</a>
+            <a class="btn btn-sm join-item {{if eq .AdminFilter "yes"}}btn-active{{end}}" href="{{index .FilterURLs "admin_yes"}}"
+               hx-get="{{index .FilterURLs "admin_yes"}}" hx-target="#page-content" hx-swap="outerHTML" hx-push-url="true">{{$.Labels.admin_filter_yes}}</a>
+            <a class="btn btn-sm join-item {{if eq .AdminFilter "no"}}btn-active{{end}}" href="{{index .FilterURLs "admin_no"}}"
+               hx-get="{{index .FilterURLs "admin_no"}}" hx-target="#page-content" hx-swap="outerHTML" hx-push-url="true">{{$.Labels.admin_filter_no}}</a>
+          </div>
+        </fieldset>
+        <fieldset class="fieldset">
+          <legend class="fieldset-legend">{{$.Labels.admin_filter_guest}}</legend>
+          <div class="join">
+            <a class="btn btn-sm join-item {{if not .GuestFilter}}btn-active{{end}}" href="{{index .FilterURLs "guest_all"}}"
+               hx-get="{{index .FilterURLs "guest_all"}}" hx-target="#page-content" hx-swap="outerHTML" hx-push-url="true">{{$.Labels.admin_filter_all}}</a>
+            <a class="btn btn-sm join-item {{if eq .GuestFilter "yes"}}btn-active{{end}}" href="{{index .FilterURLs "guest_yes"}}"
+               hx-get="{{index .FilterURLs "guest_yes"}}" hx-target="#page-content" hx-swap="outerHTML" hx-push-url="true">{{$.Labels.admin_filter_yes}}</a>
+            <a class="btn btn-sm join-item {{if eq .GuestFilter "no"}}btn-active{{end}}" href="{{index .FilterURLs "guest_no"}}"
+               hx-get="{{index .FilterURLs "guest_no"}}" hx-target="#page-content" hx-swap="outerHTML" hx-push-url="true">{{$.Labels.admin_filter_no}}</a>
+          </div>
+        </fieldset>
+        <fieldset class="fieldset">
+          <legend class="fieldset-legend">{{$.Labels.admin_filter_confirmed}}</legend>
+          <div class="join">
+            <a class="btn btn-sm join-item {{if not .ConfirmedFilter}}btn-active{{end}}" href="{{index .FilterURLs "confirmed_all"}}"
+               hx-get="{{index .FilterURLs "confirmed_all"}}" hx-target="#page-content" hx-swap="outerHTML" hx-push-url="true">{{$.Labels.admin_filter_all}}</a>
+            <a class="btn btn-sm join-item {{if eq .ConfirmedFilter "yes"}}btn-active{{end}}" href="{{index .FilterURLs "confirmed_yes"}}"
+               hx-get="{{index .FilterURLs "confirmed_yes"}}" hx-target="#page-content" hx-swap="outerHTML" hx-push-url="true">{{$.Labels.admin_filter_yes}}</a>
+            <a class="btn btn-sm join-item {{if eq .ConfirmedFilter "no"}}btn-active{{end}}" href="{{index .FilterURLs "confirmed_no"}}"
+               hx-get="{{index .FilterURLs "confirmed_no"}}" hx-target="#page-content" hx-swap="outerHTML" hx-push-url="true">{{$.Labels.admin_filter_no}}</a>
+          </div>
+        </fieldset>
+      </div>
+
+      <div class="overflow-x-auto">
+        <table class="table" aria-label="{{$.Labels.admin_heading}}">
+          <thead>
+            <tr>
+              <th scope="col">
+                <a class="link" href="{{index .SortURLs "created_at"}}" hx-get="{{index .SortURLs "created_at"}}"
+                   hx-target="#page-content" hx-swap="outerHTML" hx-push-url="true">{{$.Labels.admin_column_created}}</a>
+              </th>
+              <th scope="col">
+                <a class="link" href="{{index .SortURLs "email"}}" hx-get="{{index .SortURLs "email"}}"
+                   hx-target="#page-content" hx-swap="outerHTML" hx-push-url="true">{{$.Labels.admin_column_email}}</a>
+              </th>
+              <th scope="col">
+                <a class="link" href="{{index .SortURLs "username"}}" hx-get="{{index .SortURLs "username"}}"
+                   hx-target="#page-content" hx-swap="outerHTML" hx-push-url="true">{{$.Labels.admin_column_account}}</a>
+              </th>
+              <th scope="col">{{$.Labels.admin_column_role}}</th>
+              <th scope="col">{{$.Labels.admin_column_status}}</th>
+              <th scope="col"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {{range .Rows}}
+              <tr data-account-id="{{.ID}}">
+                <td>{{.CreatedAt}}</td>
+                <td>{{.Email}}</td>
+                <td>{{.Label}}</td>
+                <td>{{if .IsAdmin}}{{$.Labels.admin_role_admin}}{{else}}{{$.Labels.admin_role_user}}{{end}}</td>
+                <td>
+                  {{if .IsGuest}}{{$.Labels.admin_status_guest}}
+                  {{else if .Confirmed}}{{$.Labels.admin_status_confirmed}}
+                  {{else}}{{$.Labels.admin_status_unconfirmed}}{{end}}
+                </td>
+                <td class="text-right">
+                  <div class="flex justify-end gap-2">
+                    <a class="btn btn-xs" href="{{.DetailURL}}" hx-get="{{.DetailURL}}"
+                       hx-target="#page-content" hx-swap="outerHTML" hx-push-url="true">{{$.Labels.admin_view}}</a>
+                    <a class="btn btn-xs" href="{{.EditURL}}" hx-get="{{.EditURL}}"
+                       hx-target="#page-content" hx-swap="outerHTML" hx-push-url="true">{{$.Labels.admin_edit}}</a>
+                  </div>
+                </td>
+              </tr>
+            {{else}}
+              <tr><td colspan="6" class="text-sm opacity-70">{{$.Labels.admin_empty}}</td></tr>
+            {{end}}
+          </tbody>
+        </table>
+      </div>
+
+      <nav class="flex items-center gap-3" aria-label="pagination">
+        {{if .HasPrevious}}
+          <a class="btn btn-sm" href="{{.PreviousURL}}" hx-get="{{.PreviousURL}}"
+             hx-target="#page-content" hx-swap="outerHTML" hx-push-url="true">{{$.Labels.admin_prev}}</a>
+        {{end}}
+        <span class="text-sm opacity-70">{{.Page}} / {{.Pages}}</span>
+        {{if .HasNext}}
+          <a class="btn btn-sm" href="{{.NextURL}}" hx-get="{{.NextURL}}"
+             hx-target="#page-content" hx-swap="outerHTML" hx-push-url="true">{{$.Labels.admin_next}}</a>
+        {{end}}
+      </nav>
+    {{end}}
+  </div>
+  {{end}}
+{{end}}

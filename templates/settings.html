@@ -1,0 +1,55 @@
+{{define "settings"}}
+  {{template "layout" .}}
+{{end}}
+
+{{define "settings-fragment"}}
+  {{template "alerts-oob" .}}
+  <section id="page-content" aria-labelledby="page-heading">
+    <h1 id="page-heading" class="text-3xl font-semibold tracking-tight">{{.Heading}}</h1>
+    {{template "settings-content" .}}
+  </section>
+{{end}}
+
+{{define "settings-content"}}
+  <div class="grid gap-6 mt-6 w-full max-w-3xl">
+    {{with .Settings}}
+    <section class="card card-border bg-base-100 shadow-sm" aria-labelledby="sso-account-heading">
+      <div class="card-body">
+        <h2 id="sso-account-heading" class="card-title">{{$.Labels.settings_sso_heading}}</h2>
+        {{if .Email}}<p class="font-medium" data-testid="sso-account-email">{{.Email}}</p>{{end}}
+        <p>{{$.Labels.settings_sso_help}}</p>
+        {{if .AccountURL}}<div><a class="btn btn-primary" href="{{.AccountURL}}">{{$.Labels.settings_sso_manage}}</a></div>{{end}}
+      </div>
+    </section>
+
+    <section class="card card-border bg-base-100 shadow-sm" aria-labelledby="preferences-heading">
+      <div class="card-body">
+        <h2 id="preferences-heading" class="card-title">{{$.Labels.settings_preferences}}</h2>
+        <form class="grid gap-4" method="post" action="{{.LocaleAction}}" hx-post="{{.LocaleAction}}" hx-target="#page-content" hx-swap="outerHTML" hx-disabled-elt="this" hx-indicator=".htmx-indicator">
+          <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
+          <fieldset class="fieldset">
+            <label class="fieldset-legend" for="settings-locale">{{$.Labels.settings_language}}</label>
+            <select id="settings-locale" class="select w-full" name="locale" aria-describedby="settings-locale-error">
+              {{range .Languages}}
+                <option value="{{.Code}}" {{if .Current}}selected{{end}}>{{.Label}}</option>
+              {{end}}
+            </select>
+            {{with $.Form.Error "locale"}}<p id="settings-locale-error" class="text-sm text-error" role="alert">{{.}}</p>{{end}}
+          </fieldset>
+          <div>
+            <button class="btn btn-primary" type="submit">{{$.Labels.save}}</button>
+            <span class="htmx-indicator loading loading-spinner" aria-hidden="true"></span>
+          </div>
+        </form>
+        <div class="divider"></div>
+        <h3 class="font-semibold">{{$.Labels.settings_theme}}</h3>
+        <label class="flex items-center gap-3">
+          <input class="toggle" id="settings-theme-toggle" type="checkbox" {{if eq .Theme "dark"}}checked{{end}} aria-label="{{$.Labels.settings_theme}}">
+          <span>{{$.Labels.settings_theme_toggle}}</span>
+        </label>
+      </div>
+    </section>
+
+    {{end}}
+  </div>
+{{end}}

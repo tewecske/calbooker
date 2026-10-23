@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+# Prepares an Amp orb to build and test goweb: the Go toolchain pinned in
+# go.mod, Go modules, and the npm packages used to build static assets.
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+step() {
+	echo "==> $*"
+}
+
+sudo_cmd() {
+	if [ "$(id -u)" -eq 0 ]; then
+		"$@"
+	else
+		sudo "$@"
+	fi
+}
+
+started=$SECONDS
+
+go_version="$(awk '$1 == "toolchain" { print $2 }' go.mod)"
+if [ -z "$go_version" ]; then
+	go_version="go$(awk '$1 == "go" { print $2 }' go.mod)"
+fi
+if [ "$(/usr/local/go/bin/go env GOVERSION 2>/dev/null || true)" != "$go_version" ]; then
+	step "Installing $go_version"
+	archive="$go_version.linux-$(dpkg --print-architecture).tar.gz"
+	download_dir="$(mktemp -d)"
+	trap 'rm -rf "$download_dir"' EXIT
+	curl -fsSL "https://dl.google.com/go/$archive" -o "$download_dir/$archive"
+	echo "$(curl -fsSL "https://dl.google.com/go/$archive.sha256")  $download_dir/$archive" | sha256sum --check --quiet
+	sudo_cmd rm -rf /usr/local/go
+	sudo_cmd tar -C /usr/local -xzf "$download_dir/$archive"
+else
+	step "$go_version already installed"
+fi
+# Symlinks put go on PATH for every shell, including non-interactive ones.
+sudo_cmd ln -sf /usr/local/go/bin/go /usr/local/bin/go
+sudo_cmd ln -sf /usr/local/go/bin/gofmt /usr/local/bin/gofmt
+
+step "Downloading Go modules"
+GOTOOLCHAIN=local go mod download
+
+step "Installing npm packages"
+npm ci --no-audit --no-fund --loglevel=error
+
+step "Setup finished in $((SECONDS - started))s"

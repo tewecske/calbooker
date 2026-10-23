@@ -1,0 +1,116 @@
+# SETUP-nix.txt - NixOS server that already runs goweb's module (goweb's
+# deploy/SETUP-nix.txt done: services.goweb with Hydra, the provider, and
+# cloudflared). Requires everything in PREPARE.txt, and passwordless sudo for
+# your ssh user on the server. Run in ONE shell on the workstation that holds
+# your server flake. Lines starting with "# EDIT" need your value.
+# Everything else: paste as is.
+
+
+# ===== 0. Tools and variables =====
+nix shell nixpkgs#sops nixpkgs#jq nixpkgs#openssl nixpkgs#curl nixpkgs#git nixpkgs#age
+# EDIT:
+export FLAKE_DIR=$HOME/nixos
+export HOST=myserver
+export SERVER_HOST=server.example.com
+export BASE_DOMAIN=example.com
+export ADMIN_EMAIL=you@example.com
+export CALBOOKER_TAG=REPLACE_WITH_COMMIT_SHA
+export TUNNEL_ID=00000000-0000-0000-0000-000000000000
+export AGE_RECIPIENTS="age1workstationkey...,age1serverkey..."
+export RESEND_API_KEY=re_xxxxxxxxxxxxxxxxxxxxxxxxxxxx
+# no edit needed:
+export APP_HOST=calbooker.$BASE_DOMAIN
+enc() { sops --encrypt --age "$AGE_RECIPIENTS" --input-type binary --output-type binary "$1" > "$1.enc" && rm "$1"; }
+
+
+# ===== 1. Register calbooker in Hydra =====
+ssh $SERVER_HOST 'test -d calbooker || git clone https://github.com/tewecske/calbooker.git calbooker'
+ssh $SERVER_HOST "cd calbooker && git pull -q && sudo env CONTAINER_ENGINE=podman deploy/register-client.sh calbooker 'Calbooker' https://$APP_HOST" > /tmp/calbooker.creds
+cat /tmp/calbooker.creds | sed 's/SECRET=.*/SECRET=(hidden)/'
+
+
+# ===== 2. Secrets =====
+umask 077
+mkdir -p $FLAKE_DIR/secrets/calbooker
+cd $FLAKE_DIR/secrets/calbooker
+export APP_DB_PW=$(openssl rand -hex 24)
+printf %s "$APP_DB_PW" > calbooker.dbpw
+cat > calbooker.env <<EOF
+CALBOOKER_DATABASE_URL=postgres://calbooker:$APP_DB_PW@127.0.0.1:5432/calbooker?sslmode=disable
+CALBOOKER_SESSION_SECRET=$(openssl rand -hex 32)
+CALBOOKER_RESEND_API_KEY=$RESEND_API_KEY
+$(cat /tmp/calbooker.creds)
+EOF
+enc calbooker.dbpw
+enc calbooker.env
+shred -u /tmp/calbooker.creds
+ls
+
+
+# ===== 3. NixOS module file =====
+cd $FLAKE_DIR
+cat > calbooker.nix <<'EOF'
+{ config, ... }:
+let
+  secret = file: { sopsFile = ./secrets/calbooker/${file}.enc; format = "binary"; };
+in
+{
+  sops.secrets.calbooker-env = secret "calbooker.env";
+  sops.secrets.calbooker-dbpw = secret "calbooker.dbpw";
+
+  # issuerUrl, providerUrl, and mailFrom default to the services.goweb values.
+  services.calbooker = {
+    enable = true;
+    image = "ghcr.io/tewecske/calbooker:CALBOOKER_TAG";
+    publicUrl = "https://APP_HOST";
+    environmentFile = config.sops.secrets.calbooker-env.path;
+    database = {
+      manage = true;
+      passwordFile = config.sops.secrets.calbooker-dbpw.path;
+    };
+    cloudflared.tunnelId = "TUNNEL_ID";
+  };
+}
+EOF
+sed -i "s#CALBOOKER_TAG#$CALBOOKER_TAG#; s#APP_HOST#$APP_HOST#; s#TUNNEL_ID#$TUNNEL_ID#" calbooker.nix
+
+
+# ===== 4. EDIT the server flake.nix: add these two lines =====
+# inputs:   calbooker.url = "github:tewecske/calbooker";
+# modules:  calbooker.nixosModules.default  ./calbooker.nix
+# (and add calbooker to the outputs function arguments)
+
+
+# ===== 5. Build and switch =====
+cd $FLAKE_DIR
+git add -A
+nix flake update calbooker
+nixos-rebuild switch --flake .#$HOST --target-host $SERVER_HOST --sudo
+# on the server itself instead: sudo nixos-rebuild switch --flake .#$HOST
+
+
+# ===== 6. Check calbooker =====
+ssh $SERVER_HOST 'systemctl is-active calbooker-db-init podman-calbooker'
+ssh $SERVER_HOST "curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:28090/healthz"
+curl -s -o /dev/null -w '%{http_code}\n' https://$APP_HOST/healthz
+# expected: active x2, 200, 200
+
+
+# ===== 7. First administrator =====
+echo https://$APP_HOST/en/sign-in
+# open that URL, click sign in, sign in at the provider as $ADMIN_EMAIL, you land back in calbooker
+ssh $SERVER_HOST "sudo -u postgres psql -X -v ON_ERROR_STOP=1 -d calbooker -c \"UPDATE users SET is_admin = TRUE, version = version + 1 WHERE email = lower(btrim('$ADMIN_EMAIL')) AND is_admin = FALSE;\""
+# expected: UPDATE 1
+
+
+# ===== 8. Logs =====
+ssh $SERVER_HOST 'sudo journalctl -u podman-calbooker -n 20 --no-pager'
+
+
+# ===== UPDATE TO A NEW IMAGE =====
+# EDIT:
+export CALBOOKER_TAG=NEW_COMMIT_SHA
+cd $FLAKE_DIR
+sed -i "s#ghcr.io/tewecske/calbooker:[0-9a-f]*#ghcr.io/tewecske/calbooker:$CALBOOKER_TAG#" calbooker.nix
+git add -A
+nixos-rebuild switch --flake .#$HOST --target-host $SERVER_HOST --sudo

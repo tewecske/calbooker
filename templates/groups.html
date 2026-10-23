@@ -1,0 +1,187 @@
+{{define "groups"}}
+  {{template "layout" .}}
+{{end}}
+
+{{define "groups-fragment"}}
+  {{template "alerts-oob" .}}
+  <section id="page-content" aria-labelledby="page-heading">
+    <h1 id="page-heading" class="text-3xl font-semibold tracking-tight">{{.Heading}}</h1>
+    {{template "groups-content" .}}
+  </section>
+{{end}}
+
+{{define "groups-content"}}
+  {{if .Group}}
+    {{template "group-detail-content" .}}
+  {{else}}
+    {{template "group-list-content" .}}
+  {{end}}
+{{end}}
+
+{{define "group-list-content"}}
+  <div class="grid gap-6 mt-6 w-full max-w-3xl">
+    {{with .Groups}}
+      {{if .Creating}}
+        <section class="card card-border bg-base-100 shadow-sm" aria-labelledby="group-create-heading">
+          <div class="card-body">
+            <h2 id="group-create-heading" class="card-title">{{$.Labels.groups_create}}</h2>
+            <form class="grid gap-4" method="post" action="{{.CreateURL}}" hx-post="{{.CreateURL}}" hx-target="#page-content" hx-swap="outerHTML" hx-disabled-elt="this" hx-indicator=".htmx-indicator">
+              <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
+              <fieldset class="fieldset">
+                <label class="fieldset-legend" for="group-name">{{$.Labels.groups_name}}</label>
+                <input id="group-name" class="input w-full" name="name" required maxlength="64" value="{{$.Form.Value "name"}}" aria-describedby="group-name-error">
+                {{with $.Form.Error "name"}}<p id="group-name-error" class="text-sm text-error" role="alert">{{.}}</p>{{end}}
+              </fieldset>
+              <div>
+                <button class="btn btn-primary" type="submit">{{$.Groups.CreateLabel}}</button>
+                <span class="htmx-indicator loading loading-spinner" aria-hidden="true"></span>
+              </div>
+            </form>
+          </div>
+        </section>
+      {{else}}
+        <section class="card card-border bg-base-100 shadow-sm" aria-labelledby="groups-mine-heading">
+          <div class="card-body">
+            <h2 id="groups-mine-heading" class="card-title">{{$.Groups.MineLabel}}</h2>
+            {{if .Summaries}}
+              <div class="overflow-x-auto">
+                <table class="table">
+                  <thead><tr><th scope="col">{{$.Labels.groups_name}}</th><th scope="col">{{$.Labels.groups_members}}</th><th scope="col">{{$.Labels.groups_role}}</th><th scope="col"></th></tr></thead>
+                  <tbody>
+                    {{range .Summaries}}
+                    <tr>
+                      <td><a class="link" href="{{$.Groups.ListURL}}/{{.Group.ID}}">{{.Group.Name}}</a></td>
+                      <td>{{.MemberCount}}</td>
+                      <td>{{.RoleLabel}}</td>
+                      <td class="text-right"><a class="btn btn-sm" href="{{$.Groups.ListURL}}/{{.Group.ID}}">{{$.Labels.groups_view}}</a></td>
+                    </tr>
+                    {{end}}
+                  </tbody>
+                </table>
+              </div>
+            {{else}}
+              <p class="text-sm opacity-70">{{$.Labels.groups_empty}}</p>
+            {{end}}
+          </div>
+        </section>
+        <section class="card card-border bg-base-100 shadow-sm" aria-labelledby="groups-join-heading">
+          <div class="card-body">
+            <h2 id="groups-join-heading" class="card-title">{{$.Labels.groups_join}}</h2>
+            <form class="grid gap-4" method="post" action="{{.JoinURL}}" hx-post="{{.JoinURL}}" hx-target="#page-content" hx-swap="outerHTML" hx-disabled-elt="this" hx-indicator=".htmx-indicator">
+              <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
+              <fieldset class="fieldset">
+                <label class="fieldset-legend" for="group-invite-code">{{$.Labels.groups_invite_code}}</label>
+                <input id="group-invite-code" class="input w-full tracking-[0.2em]" name="code" required autocomplete="one-time-code" aria-describedby="group-invite-error">
+                {{with $.Form.Error "code"}}<p id="group-invite-error" class="text-sm text-error" role="alert">{{.}}</p>{{end}}
+              </fieldset>
+              <div>
+                <button class="btn btn-primary" type="submit">{{.JoinLabel}}</button>
+                <span class="htmx-indicator loading loading-spinner" aria-hidden="true"></span>
+              </div>
+            </form>
+          </div>
+        </section>
+        <section class="card card-border bg-base-100 shadow-sm" aria-labelledby="groups-create-heading">
+          <div class="card-body">
+            <h2 id="groups-create-heading" class="card-title">{{$.Labels.groups_create}}</h2>
+            <form class="grid gap-4" method="post" action="{{.CreateURL}}" hx-post="{{.CreateURL}}" hx-target="#page-content" hx-swap="outerHTML" hx-disabled-elt="this" hx-indicator=".htmx-indicator">
+              <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
+              <fieldset class="fieldset">
+                <label class="fieldset-legend" for="group-new-name">{{$.Labels.groups_name}}</label>
+                <input id="group-new-name" class="input w-full" name="name" required maxlength="64" value="{{$.Form.Value "name"}}" aria-describedby="group-new-name-error">
+                {{with $.Form.Error "name"}}<p id="group-new-name-error" class="text-sm text-error" role="alert">{{.}}</p>{{end}}
+              </fieldset>
+              <div>
+                <button class="btn btn-primary" type="submit">{{.CreateLabel}}</button>
+                <span class="htmx-indicator loading loading-spinner" aria-hidden="true"></span>
+              </div>
+            </form>
+          </div>
+        </section>
+      {{end}}
+    {{end}}
+  </div>
+{{end}}
+
+{{define "group-detail-content"}}
+  <div class="grid gap-6 mt-6 w-full max-w-3xl">
+    {{with .Group}}
+      <p><a class="link" href="{{.ListURL}}">{{$.Labels.groups_back}}</a></p>
+      <section class="card card-border bg-base-100 shadow-sm" aria-labelledby="group-summary-heading">
+        <div class="card-body">
+          <h2 id="group-summary-heading" class="card-title">{{.Name}}</h2>
+          <p class="text-sm opacity-70">{{$.Labels.groups_members}}: {{.MemberCount}} · {{$.Labels.groups_role}}: {{if .IsAdmin}}{{$.Labels.groups_role_admin}}{{else}}{{$.Labels.groups_role_member}}{{end}}</p>
+          {{if .IsAdmin}}
+            <form class="grid gap-4" method="post" action="{{.RenameURL}}" hx-post="{{.RenameURL}}" hx-target="#page-content" hx-swap="outerHTML" hx-disabled-elt="this">
+              <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
+              <input type="hidden" name="version" value="{{.Version}}">
+              <fieldset class="fieldset">
+                <label class="fieldset-legend" for="group-rename">{{$.Labels.groups_rename}}</label>
+                <input id="group-rename" class="input w-full" name="name" required maxlength="64" value="{{$.Form.Value "name" | or .Name}}">
+              </fieldset>
+              <div><button class="btn" type="submit">{{$.Labels.save}}</button></div>
+            </form>
+            <div class="divider"></div>
+            <h3 class="font-semibold">{{$.Labels.groups_invite}}</h3>
+            {{if .InviteCode}}
+              <div class="flex items-center gap-3">
+                <code data-testid="group-invite-code" class="rounded-box bg-base-200 p-3 tracking-[0.2em]">{{.InviteCode}}</code>
+                <form method="post" action="{{.InviteURL}}" hx-post="{{.InviteURL}}" hx-target="#page-content" hx-swap="outerHTML" hx-disabled-elt="this">
+                  <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
+                  <button class="btn btn-sm" type="submit">{{$.Labels.groups_rotate}}</button>
+                </form>
+              </div>
+            {{end}}
+          {{end}}
+          {{if .IsMember}}
+            <div class="divider"></div>
+            <form method="post" action="{{.LeaveURL}}" hx-post="{{.LeaveURL}}" hx-target="#page-content" hx-swap="outerHTML" hx-disabled-elt="this"
+                  hx-confirm="{{$.Labels.groups_leave_confirm}}">
+              <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
+              <button class="btn btn-outline btn-error" type="submit">{{$.Labels.groups_leave}}</button>
+            </form>
+          {{end}}
+        </div>
+      </section>
+
+      <section class="card card-border bg-base-100 shadow-sm" aria-labelledby="group-roster-heading">
+        <div class="card-body">
+          <h2 id="group-roster-heading" class="card-title">{{$.Labels.groups_roster}}</h2>
+          <div class="overflow-x-auto">
+            <table class="table">
+              <thead><tr><th scope="col">{{$.Labels.groups_member}}</th><th scope="col">{{$.Labels.groups_role}}</th><th scope="col"></th></tr></thead>
+              <tbody>
+                {{range .Members}}
+                <tr data-member-id="{{.UserID}}">
+                  <td>{{.Label}}{{if .IsSelf}} <span class="badge badge-ghost">{{$.Labels.groups_you}}</span>{{end}}</td>
+                  <td>{{if .IsAdmin}}{{$.Labels.groups_role_admin}}{{else}}{{$.Labels.groups_role_member}}{{end}}</td>
+                  <td class="text-right">
+                    {{if $.Group.IsAdmin}}
+                      <div class="flex justify-end gap-2">
+                        <form method="post" action="{{.PromoteURL}}" hx-post="{{.PromoteURL}}" hx-target="#page-content" hx-swap="outerHTML" hx-disabled-elt="this">
+                          <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
+                          <input type="hidden" name="version" value="{{.Version}}">
+                          <input type="hidden" name="role" value="{{if .IsAdmin}}member{{else}}admin{{end}}">
+                          <button class="btn btn-xs" type="submit">{{.RoleLabel}}</button>
+                        </form>
+                        {{if not .IsSelf}}
+                        <form method="post" action="{{.RemoveURL}}" hx-post="{{.RemoveURL}}" hx-target="#page-content" hx-swap="outerHTML" hx-disabled-elt="this"
+                              hx-confirm="{{$.Labels.groups_remove_confirm}}">
+                          <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
+                          <input type="hidden" name="version" value="{{.Version}}">
+                          <button class="btn btn-xs btn-error btn-outline" type="submit">{{$.Labels.groups_remove}}</button>
+                        </form>
+                        {{end}}
+                      </div>
+                    {{end}}
+                  </td>
+                </tr>
+                {{end}}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    {{end}}
+  </div>
+{{end}}

@@ -1,0 +1,16 @@
+{{define "state"}}
+  {{template "layout" .}}
+{{end}}
+
+{{define "state-content"}}
+  <p class="mt-4 max-w-2xl text-base-content/70">{{.Message}}</p>
+  {{with .SignInURL}}<p class="mt-6"><a class="btn btn-primary" href="{{.}}">{{$.Labels.back_sign_in}}</a></p>{{end}}
+{{end}}
+
+{{define "state-fragment"}}
+  {{template "alerts-oob" .}}
+  <section id="page-content" aria-labelledby="page-heading">
+    <h1 id="page-heading" class="text-3xl font-semibold tracking-tight">{{.Heading}}</h1>
+    {{template "state-content" .}}
+  </section>
+{{end}}

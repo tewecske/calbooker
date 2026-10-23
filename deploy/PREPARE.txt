@@ -1,0 +1,68 @@
+# PREPARE.txt - run before SETUP-nix.txt (or SETUP.txt).
+# Requires the goweb deployment (Hydra, provider, Cloudflare Tunnel) to be up:
+# goweb's deploy/PREPARE.txt and SETUP-nix.txt (or SETUP.txt) done.
+# Run in ONE shell on your workstation unless a step says [server].
+# Lines starting with "# EDIT" need your value. Everything else: paste as is.
+
+
+# ===== 1. Tools =====
+nix shell nixpkgs#cloudflared nixpkgs#jq nixpkgs#sops nixpkgs#age nixpkgs#ssh-to-age nixpkgs#openssl nixpkgs#openssh nixpkgs#curl nixpkgs#git
+
+
+# ===== 2. Variables =====
+# EDIT:
+export BASE_DOMAIN=example.com
+export SERVER_HOST=server.example.com
+export CALBOOKER_REPO=$HOME/calbooker
+export TUNNEL_NAME=goweb
+export APP_HOST=calbooker.$BASE_DOMAIN
+# no edit needed:
+export SSO_HOST=sso.$BASE_DOMAIN
+export AUTH_HOST=auth.$BASE_DOMAIN
+
+
+# ===== 3. The goweb stack is reachable =====
+curl -sS https://$SSO_HOST/.well-known/openid-configuration | jq -r .issuer
+curl -s -o /dev/null -w '%{http_code}\n' https://$AUTH_HOST/healthz
+# expected: https://sso.<your domain> and 200
+
+
+# ===== 4. Publish the image =====
+cd $CALBOOKER_REPO
+git push origin master
+# GitHub > Actions > CI > wait until the "image" job is green
+# GitHub > Profile > Packages > calbooker > Package settings > Change visibility > Public
+export CALBOOKER_TAG=$(git rev-parse HEAD)
+echo ghcr.io/tewecske/calbooker:$CALBOOKER_TAG
+# [server] verify the image can be pulled:
+# sudo podman pull ghcr.io/tewecske/calbooker:<the tag printed above>
+
+
+# ===== 5. Cloudflare DNS for calbooker on the existing tunnel =====
+export TUNNEL_ID=$(cloudflared tunnel list -o json | jq -r ".[] | select(.name==\"$TUNNEL_NAME\") | .id")
+echo $TUNNEL_ID
+cloudflared tunnel route dns $TUNNEL_NAME $APP_HOST
+
+
+# ===== 6. Resend =====
+# The domain is already verified for goweb. Reuse goweb's sending key, or:
+# resend.com/api-keys > Create API Key > Permission "Sending access" > Domain $BASE_DOMAIN
+# EDIT:
+export RESEND_API_KEY=re_xxxxxxxxxxxxxxxxxxxxxxxxxxxx
+
+
+# ===== 7. sops recipients (the same as for goweb) =====
+export AGE_ADMIN=$(age-keygen -y ~/.config/sops/age/keys.txt)
+export AGE_SERVER=$(ssh-keyscan -t ed25519 $SERVER_HOST 2>/dev/null | ssh-to-age)
+export AGE_RECIPIENTS="$AGE_ADMIN,$AGE_SERVER"
+echo $AGE_RECIPIENTS
+
+
+# ===== 8. [server] Checks =====
+ssh $SERVER_HOST 'ss -ltn | grep -E ":28090 " || echo "port free"'
+ssh $SERVER_HOST 'sudo podman ps --format "{{.Names}}" | grep -x goweb-hydra'
+# expected: port free, goweb-hydra
+
+
+# ===== 9. Keep for SETUP-nix.txt =====
+echo "CALBOOKER_TAG=$CALBOOKER_TAG TUNNEL_ID=$TUNNEL_ID AGE_RECIPIENTS=$AGE_RECIPIENTS"

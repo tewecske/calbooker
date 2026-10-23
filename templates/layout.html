@@ -1,0 +1,113 @@
+{{define "layout"}}
+<!doctype html>
+<html lang="{{.Language}}" data-theme="light" data-account-theme="{{if .Account}}{{.Account.Theme}}{{end}}" data-theme-url="{{if .Account}}{{.Account.ThemeURL}}{{end}}">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="csrf-token" content="{{.CSRFToken}}">
+    <link rel="stylesheet" href="/static/app.css">
+    <!-- Validation responses (422) swap so server-rendered field errors replace
+         the content region. Indicator styles live in app.css because the
+         Content-Security-Policy forbids injected inline styles. -->
+    <meta name="htmx-config" content='{"includeIndicatorStyles":false,"responseHandling":[{"code":"204","swap":false},{"code":"[23]..","swap":true},{"code":"422","swap":true},{"code":"[45]..","swap":false,"error":true}]}'>
+    <script src="/static/app.js"></script>
+    <script src="/static/htmx.min.js" defer></script>
+    <title>{{.Title}}</title>
+  </head>
+  <body class="min-h-screen bg-base-100 text-base-content">
+    <header class="navbar border-b border-base-300 px-4" aria-label="Site header">
+      <div class="navbar-start">
+        <a class="btn btn-ghost text-xl" href="/">Calbooker</a>
+      </div>
+      <nav class="navbar-center hidden gap-2 md:flex" aria-label="Primary navigation">
+        {{range .Navigation}}
+          <a class="btn btn-ghost" href="{{.URL}}">{{.Label}}</a>
+        {{end}}
+      </nav>
+      <div class="navbar-end">
+        {{if .Languages}}
+          <details class="dropdown dropdown-end">
+            <summary class="btn btn-ghost btn-circle" aria-label="Choose language" title="Choose language">
+              <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 21a9 9 0 100-18 9 9 0 000 18zM3.6 9h16.8M3.6 15h16.8M12 3a14.98 14.98 0 013 9 14.98 14.98 0 01-3 9 14.98 14.98 0 01-3-9 14.98 14.98 0 013-9z"/>
+              </svg>
+            </summary>
+            <ul class="menu dropdown-content z-10 mt-2 w-40 rounded-box bg-base-200 p-2 shadow" role="menu">
+              {{range .Languages}}
+                <li role="none"><a role="menuitem" aria-current="{{if .Current}}true{{else}}false{{end}}" class="{{if .Current}}menu-active{{end}}" href="{{.URL}}">{{.Label}}</a></li>
+              {{end}}
+            </ul>
+          </details>
+        {{end}}
+        <label class="swap swap-rotate btn btn-ghost" title="Toggle theme">
+          <input id="theme-toggle" type="checkbox" class="theme-controller" value="dark" aria-label="Toggle dark mode">
+          <svg class="swap-off size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 3V5.25M18.364 5.63604L16.773 7.22703M21 12H18.75M18.364 18.364L16.773 16.773M12 18.75V21M7.22703 16.773L5.63604 18.364M5.25 12H3M7.22703 7.22703L5.63604 5.63604M15.75 12C15.75 14.0711 14.0711 15.75 12 15.75C9.92893 15.75 8.25 14.0711 8.25 12C8.25 9.92893 9.92893 8.25 12 8.25C14.0711 8.25 15.75 9.92893 15.75 12Z"/>
+          </svg>
+          <svg class="swap-on size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M21.7519 15.0021C20.597 15.484 19.3296 15.7501 18 15.7501C12.6152 15.7501 8.25 11.3849 8.25 6.00011C8.25 4.67052 8.51614 3.40308 8.99806 2.24817C5.47566 3.71798 3 7.19493 3 11.2501C3 16.6349 7.36522 21.0001 12.75 21.0001C16.8052 21.0001 20.2821 18.5245 21.7519 15.0021Z"/>
+          </svg>
+        </label>
+        {{if .Account}}
+          <details class="dropdown dropdown-end">
+            <summary class="btn btn-ghost btn-circle avatar avatar-placeholder" aria-label="Account menu" title="{{.Account.Label}}">
+              <div class="bg-neutral text-neutral-content w-10 rounded-full">
+                <svg class="size-5 m-auto" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z"/>
+                </svg>
+              </div>
+            </summary>
+            <ul class="menu dropdown-content z-10 mt-2 w-52 rounded-box bg-base-200 p-2 shadow" role="menu">
+              <li class="menu-title" role="none">{{.Account.Label}}</li>
+              <li role="none"><a role="menuitem" href="{{.Account.SettingsURL}}">Account settings</a></li>
+              {{if .Account.IsAdmin}}
+              <li role="none"><a role="menuitem" href="{{.Account.AdminURL}}">Admin</a></li>
+              {{end}}
+              <li role="none">
+                {{/* The button is the menu item itself (not nested in the form)
+                     so the whole highlighted row is clickable; form= submits it. */}}
+                <form id="sign-out-form" method="post" action="{{.Account.SignOutURL}}" hidden>
+                  <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
+                </form>
+                <button type="submit" form="sign-out-form">Sign out</button>
+              </li>
+            </ul>
+          </details>
+        {{else}}
+          <details class="dropdown dropdown-end">
+            <summary class="btn btn-ghost btn-circle avatar avatar-placeholder" aria-label="Account menu">
+              <div class="bg-neutral text-neutral-content w-10 rounded-full">
+                <svg class="size-5 m-auto" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z"/>
+                </svg>
+              </div>
+            </summary>
+            <ul class="menu dropdown-content z-10 mt-2 w-52 rounded-box bg-base-200 p-2 shadow" role="menu">
+              <li role="none"><a role="menuitem" href="{{.SignInURL}}">Sign in</a></li>
+            </ul>
+          </details>
+        {{end}}
+      </div>
+    </header>
+
+    <main class="mx-auto w-full max-w-5xl px-4 py-8">
+      <div id="alerts" class="mb-6 space-y-2" role="region" aria-live="polite" aria-atomic="true">
+        {{template "alerts-inner" .}}
+      </div>
+      {{if .Form.HasErrors}}
+        <div id="form-errors" class="alert alert-error mb-6" role="alert">
+          <ul class="list-disc pl-5">
+            {{range .Form.Errors}}
+              <li><a class="link" href="#{{.Field}}">{{.Message}}</a></li>
+            {{end}}
+          </ul>
+        </div>
+      {{end}}
+      <section id="page-content"{{if not .Admin}} aria-labelledby="page-heading"{{end}}>
+        {{if not .Admin}}<h1 id="page-heading" class="text-3xl font-semibold tracking-tight">{{.Heading}}</h1>{{end}}
+        {{block "content" .}}{{end}}
+      </section>
+    </main>
+  </body>
+</html>
+{{end}}

@@ -1,0 +1,13 @@
+{{define "alerts-inner"}}
+  {{range .Alerts}}
+    <div class="alert {{if eq .Level "error"}}alert-error{{else if eq .Level "success"}}alert-success{{else if eq .Level "warning"}}alert-warning{{else}}alert-info{{end}}" role="{{if eq .Level "error"}}alert{{else}}status{{end}}">
+      <span>{{.Message}}</span>
+    </div>
+  {{end}}
+{{end}}
+
+{{define "alerts-oob"}}
+  <div id="alerts" class="mb-6 space-y-2" role="region" aria-live="polite" aria-atomic="true" hx-swap-oob="true">
+    {{template "alerts-inner" .}}
+  </div>
+{{end}}

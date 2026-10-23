@@ -1,0 +1,114 @@
+# SETUP.txt - any Linux server with Docker or Podman, PostgreSQL, systemd.
+# Requires the goweb deployment from goweb's deploy/SETUP.txt on this server
+# (containers goweb-hydra and goweb-provider, /etc/cloudflared/config.yml) and
+# everything in PREPARE.txt (image, DNS route).
+# Run in ONE shell on the server. Lines starting with "# EDIT" need your value.
+# Everything else: paste as is.
+
+
+# ===== 0. Variables =====
+# EDIT:
+export BASE_DOMAIN=example.com
+export ADMIN_EMAIL=you@example.com
+export CALBOOKER_IMAGE=ghcr.io/tewecske/calbooker:REPLACE_WITH_COMMIT_SHA
+export RESEND_API_KEY=re_xxxxxxxxxxxxxxxxxxxxxxxxxxxx
+export CONTAINER_ENGINE=docker
+export PSQL="sudo -u postgres psql -X -v ON_ERROR_STOP=1"
+export PG_HOST=127.0.0.1
+export PG_PORT=5432
+# no edit needed:
+export SSO_HOST=sso.$BASE_DOMAIN
+export AUTH_HOST=auth.$BASE_DOMAIN
+export APP_HOST=calbooker.$BASE_DOMAIN
+export APP_PORT=28090
+export MAIL_FROM=no-reply@$BASE_DOMAIN
+export ENV_DIR=$HOME/.calbooker
+
+
+# ===== 1. Code and secret directory =====
+git clone https://github.com/tewecske/calbooker.git $HOME/calbooker
+cd $HOME/calbooker
+install -d -m 700 $ENV_DIR
+umask 077
+
+
+# ===== 2. Generate secrets (run steps 2 to 5 without closing the shell) =====
+export APP_DB_PW=$(openssl rand -hex 24)
+export APP_SESSION_SECRET=$(openssl rand -hex 32)
+
+
+# ===== 3. PostgreSQL role and database =====
+$PSQL -d postgres <<SQL
+CREATE ROLE calbooker LOGIN PASSWORD '$APP_DB_PW';
+CREATE DATABASE calbooker OWNER calbooker;
+REVOKE CONNECT ON DATABASE calbooker FROM PUBLIC;
+SQL
+
+
+# ===== 4. Register calbooker in Hydra =====
+deploy/register-client.sh calbooker "Calbooker" https://$APP_HOST > $ENV_DIR/calbooker.creds
+cat $ENV_DIR/calbooker.creds | sed 's/SECRET=.*/SECRET=(hidden)/'
+
+
+# ===== 5. Environment file =====
+cat > $ENV_DIR/calbooker.env <<EOF
+CALBOOKER_ENV=production
+CALBOOKER_HTTP_ADDR=127.0.0.1:$APP_PORT
+CALBOOKER_PUBLIC_URL=https://$APP_HOST
+CALBOOKER_SESSION_COOKIE_SECURE=true
+CALBOOKER_TRUSTED_PROXY=127.0.0.1
+CALBOOKER_DATABASE_URL=postgres://calbooker:$APP_DB_PW@$PG_HOST:$PG_PORT/calbooker?sslmode=disable
+CALBOOKER_SESSION_SECRET=$APP_SESSION_SECRET
+CALBOOKER_SESSION_LIFETIME=8h
+CALBOOKER_SSO_ISSUER_URL=https://$SSO_HOST
+CALBOOKER_SSO_ACCOUNT_URL=https://$AUTH_HOST/en/account/settings
+CALBOOKER_RESEND_API_KEY=$RESEND_API_KEY
+CALBOOKER_MAIL_FROM=$MAIL_FROM
+$(cat $ENV_DIR/calbooker.creds)
+EOF
+chmod 600 $ENV_DIR/*
+
+
+# ===== 6. Start calbooker =====
+deploy/run-calbooker.sh start $ENV_DIR/calbooker.env
+sleep 5
+curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:$APP_PORT/healthz
+# expected: 200
+
+
+# ===== 7. Cloudflare Tunnel route =====
+sudo sed -i "s#  - service: http_status:404#  - hostname: $APP_HOST\n    service: http://127.0.0.1:$APP_PORT\n  - service: http_status:404#" /etc/cloudflared/config.yml
+sudo grep -A1 "hostname: $APP_HOST" /etc/cloudflared/config.yml
+sudo systemctl restart cloudflared
+sleep 5
+curl -s -o /dev/null -w '%{http_code}\n' https://$APP_HOST/healthz
+# expected: service: http://127.0.0.1:28090 and 200
+
+
+# ===== 8. First administrator =====
+echo https://$APP_HOST/en/sign-in
+# open that URL, click sign in, sign in at the provider as $ADMIN_EMAIL, you land back in calbooker
+$PSQL -d calbooker -c "UPDATE users SET is_admin = TRUE, version = version + 1 WHERE email = lower(btrim('$ADMIN_EMAIL')) AND is_admin = FALSE;"
+# expected: UPDATE 1
+
+
+# ===== 9. Logs =====
+$CONTAINER_ENGINE logs --tail 20 calbooker
+
+
+# ===== UPDATE TO A NEW IMAGE =====
+# EDIT:
+export CALBOOKER_IMAGE=ghcr.io/tewecske/calbooker:NEW_COMMIT_SHA
+cd $HOME/calbooker
+git pull
+deploy/run-calbooker.sh start $HOME/.calbooker/calbooker.env
+curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:28090/healthz
+
+
+# ===== ROTATE THE CLIENT SECRET =====
+# needs the variables from step 0
+cd $HOME/calbooker
+deploy/register-client.sh calbooker "Calbooker" https://$APP_HOST > $ENV_DIR/calbooker.creds
+sed -i '/^CALBOOKER_SSO_CLIENT_/d' $ENV_DIR/calbooker.env
+cat $ENV_DIR/calbooker.creds >> $ENV_DIR/calbooker.env
+deploy/run-calbooker.sh start $ENV_DIR/calbooker.env

@@ -1,0 +1,21 @@
+{{define "auth"}}
+  {{template "layout" .}}
+{{end}}
+
+{{/* Sign-in is one button: credentials live at the single sign-on provider. */}}
+{{define "auth-content"}}
+  <div class="card card-border mt-6 w-full max-w-xl bg-base-100 shadow-sm">
+    <div class="card-body">
+      {{if .Description}}<p class="text-base-content/70">{{.Description}}</p>{{end}}
+      <a class="btn btn-primary mt-4" href="{{.SSOSignInURL}}" data-testid="sso-sign-in">{{.SubmitLabel}}</a>
+    </div>
+  </div>
+{{end}}
+
+{{define "auth-fragment"}}
+  {{template "alerts-oob" .}}
+  <section id="page-content" aria-labelledby="page-heading">
+    <h1 id="page-heading" class="text-3xl font-semibold tracking-tight">{{.Heading}}</h1>
+    {{template "auth-content" .}}
+  </section>
+{{end}}

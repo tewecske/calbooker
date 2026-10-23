@@ -1,0 +1,15 @@
+.git
+.github
+.agents
+.env
+.env.*
+node_modules
+test-results
+bin
+docs
+deploy
+scripts
+tests
+*.md
+nix
+flake.nix

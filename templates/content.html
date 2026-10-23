@@ -1,0 +1,25 @@
+{{define "content"}}
+  {{if eq .Kind "home"}}
+    {{template "home-content" .}}
+  {{else if eq .Kind "about"}}
+    {{template "about-content" .}}
+  {{else if eq .Kind "sign-in"}}
+    {{template "auth-content" .}}
+  {{else if eq .Kind "guest-write"}}
+    {{template "guest-content" .}}
+  {{else if eq .Kind "guest-transfer"}}
+    {{template "guest-content" .}}
+  {{else if eq .Kind "guest-upgrade"}}
+    {{template "guest-content" .}}
+  {{else if eq .Kind "settings"}}
+    {{template "settings-content" .}}
+  {{else if eq .Kind "groups"}}
+    {{template "groups-content" .}}
+  {{else if eq .Kind "group-detail"}}
+    {{template "groups-content" .}}
+  {{else if eq .Kind "admin"}}
+    {{template "admin-content" .}}
+  {{else}}
+    {{template "state-content" .}}
+  {{end}}
+{{end}}

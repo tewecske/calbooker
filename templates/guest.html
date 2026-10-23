@@ -1,0 +1,72 @@
+{{define "guest"}}
+  {{template "layout" .}}
+{{end}}
+
+{{define "guest-content"}}
+  <div class="grid gap-6 mt-6 w-full max-w-2xl">
+    {{if .GuestBanner}}
+      <div data-guest-banner class="alert alert-info" role="status">You are using a guest account. Add credentials to keep it permanently.</div>
+    {{end}}
+    {{if .GuestOwned}}
+      <section data-guest-owned-state class="card card-border bg-base-100 shadow-sm">
+        <div class="card-body"><h2 class="card-title">Saved guest state</h2><p>Your state is connected to this account.</p></div>
+      </section>
+    {{end}}
+    {{if eq .Kind "guest-write"}}
+      <section class="card card-border bg-base-100 shadow-sm">
+        <div class="card-body">
+          <p>Save a first item without creating an account.</p>
+          <form method="post" action="{{.FormAction}}" hx-post="{{.FormAction}}" hx-target="#page-content" hx-swap="outerHTML" hx-disabled-elt="this" hx-indicator=".htmx-indicator">
+            <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
+            <button class="btn btn-primary" type="submit" name="action" value="write">{{.Labels.save}}</button>
+          </form>
+        </div>
+      </section>
+    {{else if eq .Kind "guest-transfer"}}
+      <section class="card card-border bg-base-100 shadow-sm">
+        <div class="card-body">
+          <h2 class="card-title">Transfer this guest account</h2>
+          {{if .GuestTransferCode}}
+            <div class="alert alert-success" role="status">Write this code down before leaving this page.</div>
+            <code data-testid="guest-transfer-code" class="rounded-box bg-base-200 p-4 text-center text-2xl tracking-[0.25em]">{{.GuestTransferCode}}</code>
+          {{else if .GuestBanner}}
+            <form method="post" action="{{.FormAction}}" hx-post="{{.FormAction}}" hx-target="#page-content" hx-swap="outerHTML" hx-indicator=".htmx-indicator">
+              <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
+              <button class="btn btn-primary" type="submit" name="action" value="request">{{.Labels.request_transfer}}</button>
+            </form>
+          {{end}}
+          <div class="divider">On another device</div>
+          <form class="grid gap-4" method="post" action="{{.FormAction}}" hx-post="{{.FormAction}}" hx-target="#page-content" hx-swap="outerHTML" hx-indicator=".htmx-indicator">
+            <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
+            <fieldset class="fieldset">
+              <label class="fieldset-legend" for="transfer-code">{{.Labels.transfer_code}}</label>
+              <input id="transfer-code" class="input w-full" name="code" autocomplete="one-time-code" inputmode="text" aria-describedby="transfer-error">
+              {{with .Form.Error "code"}}<p id="transfer-error" class="text-sm text-error" role="alert">{{.}}</p>{{end}}
+            </fieldset>
+            <button class="btn" type="submit" name="action" value="redeem">{{.Labels.redeem}}</button>
+          </form>
+        </div>
+      </section>
+    {{else if eq .Kind "guest-upgrade"}}
+      <section class="card card-border bg-base-100 shadow-sm">
+        <div class="card-body">
+          <h2 class="card-title">Keep this account</h2>
+          <p>{{.Labels.guest_upgrade_sso_help}}</p>
+          {{/* A plain form: the browser must navigate to the issuer. */}}
+          <form method="post" action="{{.SSOSignInURL}}">
+            <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
+            <button class="btn btn-primary" type="submit" data-testid="guest-upgrade-sso">{{.Labels.guest_upgrade_sso_submit}}</button>
+          </form>
+        </div>
+      </section>
+    {{end}}
+  </div>
+{{end}}
+
+{{define "guest-fragment"}}
+  {{template "alerts-oob" .}}
+  <section id="page-content" aria-labelledby="page-heading">
+    <h1 id="page-heading" class="text-3xl font-semibold tracking-tight">{{.Heading}}</h1>
+    {{template "guest-content" .}}
+  </section>
+{{end}}

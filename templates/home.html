@@ -1,0 +1,15 @@
+{{define "home"}}
+  {{template "layout" .}}
+{{end}}
+
+{{define "home-content"}}
+  <p class="mt-4 max-w-2xl text-base-content/70">A server-rendered Go and HTMX application foundation.</p>
+{{end}}
+
+{{define "home-fragment"}}
+  {{template "alerts-oob" .}}
+  <section id="page-content" aria-labelledby="page-heading">
+    <h1 id="page-heading" class="text-3xl font-semibold tracking-tight">{{.Heading}}</h1>
+    {{template "content" .}}
+  </section>
+{{end}}

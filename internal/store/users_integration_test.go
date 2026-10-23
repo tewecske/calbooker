@@ -40,8 +40,8 @@ func TestUsersSchemaEnforcesIdentityAndGuestRules(t *testing.T) {
 		t.Fatal("username containing @ was accepted")
 	}
 	if _, err := harness.DB.ExecContext(ctx, `
-		INSERT INTO users (email, is_guest, created_at)
-		VALUES ('guest@example.test', TRUE, 103)
+		INSERT INTO users (email, kind, created_at)
+		VALUES ('guest@example.test', 'guest', 103)
 	`); err == nil {
 		t.Fatal("guest credentials were accepted")
 	}

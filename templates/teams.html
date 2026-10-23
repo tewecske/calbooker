@@ -1,0 +1,176 @@
+{{define "team-fields"}}
+  <fieldset class="fieldset">
+    <label class="fieldset-legend" for="{{.Prefix}}-name">{{.L.teams_name}}</label>
+    <input id="{{.Prefix}}-name" class="input w-full" name="name" required maxlength="64" value="{{.Name}}" aria-describedby="{{.Prefix}}-name-error">
+    {{with .NameError}}<p id="{{$.Prefix}}-name-error" class="text-sm text-error" role="alert">{{.}}</p>{{end}}
+  </fieldset>
+  <div class="grid gap-4 sm:grid-cols-2">
+    <fieldset class="fieldset">
+      <label class="fieldset-legend" for="{{.Prefix}}-birth-year-from">{{.L.teams_birth_year_from}}</label>
+      <input id="{{.Prefix}}-birth-year-from" class="input w-full" type="number" name="birth_year_from" required min="1900" max="2200" value="{{.BirthYearFrom}}" aria-describedby="{{.Prefix}}-birth-years-error">
+    </fieldset>
+    <fieldset class="fieldset">
+      <label class="fieldset-legend" for="{{.Prefix}}-birth-year-to">{{.L.teams_birth_year_to}}</label>
+      <input id="{{.Prefix}}-birth-year-to" class="input w-full" type="number" name="birth_year_to" required min="1900" max="2200" value="{{.BirthYearTo}}" aria-describedby="{{.Prefix}}-birth-years-error">
+    </fieldset>
+  </div>
+  {{with .YearsError}}<p id="{{$.Prefix}}-birth-years-error" class="text-sm text-error" role="alert">{{.}}</p>{{end}}
+  <fieldset class="fieldset">
+    <label class="fieldset-legend" for="{{.Prefix}}-description">{{.L.teams_description}}</label>
+    <input id="{{.Prefix}}-description" class="input w-full" name="description" maxlength="255" value="{{.Description}}" aria-describedby="{{.Prefix}}-description-help {{.Prefix}}-description-error">
+    <p id="{{.Prefix}}-description-help" class="label">{{.L.teams_description_help}}</p>
+    {{with .DescriptionError}}<p id="{{$.Prefix}}-description-error" class="text-sm text-error" role="alert">{{.}}</p>{{end}}
+  </fieldset>
+{{end}}
+
+{{define "group-teams"}}
+  {{with .Group}}{{$L := .L}}{{with .Teams}}
+    <section class="card card-border bg-base-100 shadow-sm" aria-labelledby="group-teams-heading">
+      <div class="card-body">
+        <h2 id="group-teams-heading" class="card-title">{{$L.teams_heading}}</h2>
+        {{if .Active}}
+          <div class="overflow-x-auto">
+            <table class="table" data-testid="teams-active">
+              <thead><tr><th scope="col">{{$L.teams_name}}</th><th scope="col">{{$L.teams_birth_years}}</th><th scope="col">{{$L.teams_players}}</th><th scope="col">{{$L.teams_parents}}</th></tr></thead>
+              <tbody>
+                {{range .Active}}
+                  <tr data-team-id="{{.ID}}">
+                    <td><a class="link" href="{{.URL}}">{{.Name}}</a>{{with .Description}} <span class="badge badge-ghost badge-sm">{{.}}</span>{{end}}</td>
+                    <td>{{.Years}}</td>
+                    <td>{{.Players}}</td>
+                    <td>{{.Parents}}</td>
+                  </tr>
+                {{end}}
+              </tbody>
+            </table>
+          </div>
+        {{else}}
+          <p class="text-sm opacity-70">{{$L.teams_empty}}</p>
+        {{end}}
+      </div>
+    </section>
+
+    {{with .CreateForm}}
+      <section class="card card-border bg-base-100 shadow-sm" aria-labelledby="team-create-heading">
+        <div class="card-body">
+          <h2 id="team-create-heading" class="card-title">{{$L.teams_create}}</h2>
+          <form class="grid gap-4" method="post" action="{{.ActionURL}}" hx-post="{{.ActionURL}}" hx-target="#page-content" hx-swap="outerHTML" hx-disabled-elt="this">
+            <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
+            {{template "team-fields" .}}
+            <div><button class="btn btn-primary" type="submit">{{$L.teams_create}}</button></div>
+          </form>
+        </div>
+      </section>
+    {{end}}
+
+    {{if .Archived}}
+      <section class="card card-border bg-base-100 shadow-sm" aria-labelledby="teams-archived-heading">
+        <div class="card-body">
+          <h2 id="teams-archived-heading" class="card-title">{{$L.teams_archived}}</h2>
+          <ul class="list" data-testid="teams-archived">
+            {{range .Archived}}<li class="list-row"><a class="link" href="{{.URL}}">{{.Name}}</a><span class="opacity-70">{{.Years}}</span></li>{{end}}
+          </ul>
+        </div>
+      </section>
+    {{end}}
+  {{end}}{{end}}
+{{end}}
+
+{{define "team-roster-rows"}}
+  {{if .Rows}}
+    <ul class="list rounded-box border border-base-300">
+      {{range .Rows}}
+        <li class="list-row items-center" data-roster-user="{{.UserID}}" data-roster-role="{{.Role}}">
+          <div class="list-col-grow">
+            <div>{{.Label}}</div>
+            {{if .Email}}<div class="text-sm opacity-70">{{.Email}}</div>{{end}}
+          </div>
+          {{if $.CanManage}}
+            <form method="post" action="{{$.RemoveURL}}" hx-post="{{$.RemoveURL}}" hx-target="#page-content" hx-swap="outerHTML" hx-disabled-elt="this">
+              <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
+              <input type="hidden" name="entry" value="{{.UserID}}:{{.Role}}">
+              <button class="btn btn-xs btn-outline btn-error" type="submit" aria-label="{{$.RemoveLabel}}: {{.Label}}">{{$.RemoveLabel}}</button>
+            </form>
+          {{end}}
+        </li>
+      {{end}}
+    </ul>
+  {{else}}
+    <p class="text-sm opacity-70">{{.EmptyLabel}}</p>
+  {{end}}
+{{end}}
+
+{{define "group-team"}}
+  {{with .Group}}{{$L := .L}}{{with .Team}}
+    <p><a class="link" href="{{.TeamsURL}}">{{$L.teams_back}}</a></p>
+    <section class="card card-border bg-base-100 shadow-sm" aria-labelledby="team-heading">
+      <div class="card-body">
+        <h2 id="team-heading" class="card-title">{{.Name}}{{if .Archived}} <span class="badge badge-warning badge-soft">{{$L.teams_archived_badge}}</span>{{end}}</h2>
+        <dl class="grid grid-cols-1 gap-2 text-sm sm:grid-cols-[auto_1fr]">
+          <dt class="opacity-70">{{$L.teams_birth_years}}</dt><dd data-testid="team-birth-years">{{.Years}}</dd>
+          {{with .Description}}<dt class="opacity-70">{{$L.teams_description}}</dt><dd>{{.}}</dd>{{end}}
+        </dl>
+      </div>
+    </section>
+
+    <section class="card card-border bg-base-100 shadow-sm" aria-labelledby="team-roster-heading">
+      <div class="card-body">
+        <h2 id="team-roster-heading" class="card-title">{{$L.teams_roster}}</h2>
+        <div class="grid gap-6 md:grid-cols-2">
+          <div data-testid="team-players">
+            <h3 class="font-semibold mb-2">{{$L.teams_players}}</h3>
+            {{template "team-roster-rows" .PlayerList}}
+          </div>
+          <div data-testid="team-parents">
+            <h3 class="font-semibold mb-2">{{$L.teams_parents}}</h3>
+            {{template "team-roster-rows" .ParentList}}
+          </div>
+        </div>
+        {{if .CanManageRoster}}
+          <div class="divider"></div>
+          {{if .Candidates}}
+            <form class="grid gap-4 sm:grid-cols-[1fr_auto] sm:items-end" method="post" action="{{.RosterAddURL}}" hx-post="{{.RosterAddURL}}" hx-target="#page-content" hx-swap="outerHTML" hx-disabled-elt="this">
+              <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
+              <fieldset class="fieldset">
+                <label class="fieldset-legend" for="team-roster-entry">{{$L.teams_roster_add_label}}</label>
+                <select id="team-roster-entry" class="select w-full" name="entry" required>
+                  {{range .Candidates}}<option value="{{.Value}}">{{.Label}}</option>{{end}}
+                </select>
+              </fieldset>
+              <div><button class="btn" type="submit">{{$L.teams_roster_add}}</button></div>
+            </form>
+          {{else}}
+            <p class="text-sm opacity-70">{{$L.teams_roster_no_candidates}}</p>
+          {{end}}
+        {{end}}
+      </div>
+    </section>
+
+    {{if .CanEdit}}
+      <section class="card card-border bg-base-100 shadow-sm" aria-labelledby="team-edit-heading">
+        <div class="card-body">
+          <h2 id="team-edit-heading" class="card-title">{{$L.teams_edit}}</h2>
+          <form class="grid gap-4" method="post" action="{{.EditForm.ActionURL}}" hx-post="{{.EditForm.ActionURL}}" hx-target="#page-content" hx-swap="outerHTML" hx-disabled-elt="this">
+            <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
+            <input type="hidden" name="version" value="{{.Version}}">
+            {{template "team-fields" .EditForm}}
+            <div><button class="btn btn-primary" type="submit">{{$L.teams_save}}</button></div>
+          </form>
+          <div class="divider"></div>
+          <form method="post" action="{{.ArchiveURL}}" hx-post="{{.ArchiveURL}}" hx-target="#page-content" hx-swap="outerHTML" hx-disabled-elt="this"
+                {{if not .Archived}}hx-confirm="{{$L.teams_archive_confirm}}"{{end}}>
+            <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
+            <input type="hidden" name="version" value="{{.Version}}">
+            {{if .Archived}}
+              <input type="hidden" name="archived" value="false">
+              <button class="btn btn-outline" type="submit">{{$L.teams_restore}}</button>
+            {{else}}
+              <input type="hidden" name="archived" value="true">
+              <button class="btn btn-outline btn-warning" type="submit">{{$L.teams_archive}}</button>
+            {{end}}
+          </form>
+        </div>
+      </section>
+    {{end}}
+  {{end}}{{end}}
+{{end}}

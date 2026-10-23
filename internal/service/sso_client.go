@@ -140,7 +140,7 @@ func (s *SSOClientService) StartUpgrade(ctx context.Context, guestID int64) (str
 		return "", "", ErrInvalidUserID
 	}
 	guest, err := s.users.FindUserByID(ctx, guestID)
-	if err != nil || guest.ID != guestID || !guest.IsGuest {
+	if err != nil || guest.ID != guestID || !guest.IsGuest() {
 		return "", "", ErrGuestUpgradeRequiresGuest
 	}
 	return s.start(ctx, oauthActionLink, guestID)
@@ -233,7 +233,7 @@ func (s *SSOClientService) Callback(ctx context.Context, actorUserID int64, code
 // a new session bound to the issuer.
 func (s *SSOClientService) upgradeGuest(ctx context.Context, guestID int64, identity SSOIdentity, now int64) (SSOCallbackResult, error) {
 	guest, err := s.users.FindUserByID(ctx, guestID)
-	if err != nil || guest.ID != guestID || !guest.IsGuest {
+	if err != nil || guest.ID != guestID || !guest.IsGuest() {
 		return SSOCallbackResult{}, ErrGuestUpgradeRequiresGuest
 	}
 	if _, err := s.identities.FindOAuthIdentity(ctx, SSOProviderName, identity.Subject); err == nil {
@@ -246,7 +246,7 @@ func (s *SSOClientService) upgradeGuest(ctx context.Context, guestID int64, iden
 		email = ""
 	}
 	upgraded := guest
-	upgraded.IsGuest = false
+	upgraded.Kind = UserKindAccount
 	if email != "" {
 		if existing, err := s.users.FindUserByEmail(ctx, email); err == nil && existing.ID > 0 {
 			return SSOCallbackResult{}, ErrOAuthEmailConflict
@@ -271,7 +271,7 @@ func (s *SSOClientService) upgradeGuest(ctx context.Context, guestID int64, iden
 	case err != nil:
 		return SSOCallbackResult{}, fmt.Errorf("upgrade guest: %w", err)
 	}
-	if saved.ID != guestID || saved.IsGuest {
+	if saved.ID != guestID || saved.IsGuest() {
 		return SSOCallbackResult{}, ErrInvalidUpgradedUser
 	}
 	if err := s.sessions.RevokeUser(ctx, guestID); err != nil {
@@ -336,7 +336,7 @@ func (s *SSOClientService) account(ctx context.Context, identity SSOIdentity, no
 		case err == nil && found.ID > 0:
 			// A local account from before this app used single sign-on is
 			// linked only when both sides vouch for the address.
-			if !identity.EmailVerified || found.EmailVerifiedAt == nil || found.IsGuest {
+			if !identity.EmailVerified || found.EmailVerifiedAt == nil || found.IsGuest() {
 				return User{}, ErrOAuthEmailConflict
 			}
 			user = found

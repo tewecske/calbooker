@@ -19,11 +19,11 @@ func TestMembershipRoleUpdateDistinguishesStaleFromMissing(t *testing.T) {
 
 	group, _, err := memberships.CreateGroupWithAdmin(ctx, service.Group{
 		Name: "Locked Roles", NameNorm: "locked roles", InviteCode: "INVITE000010", CreatedBy: &adminID, CreatedAt: 100,
-	}, adminID, service.GroupRoleAdmin)
+	}, adminID)
 	if err != nil {
 		t.Fatalf("CreateGroupWithAdmin() error = %v", err)
 	}
-	if _, err := memberships.CreateMembership(ctx, service.GroupMembership{GroupID: group.ID, UserID: memberID, Role: service.GroupRoleMember, CreatedAt: 101}); err != nil {
+	if _, err := memberships.CreateMembership(ctx, service.GroupMembership{GroupID: group.ID, UserID: memberID, Roles: []string{service.GroupRolePlayer}, CreatedAt: 101}); err != nil {
 		t.Fatalf("CreateMembership() error = %v", err)
 	}
 
@@ -32,24 +32,19 @@ func TestMembershipRoleUpdateDistinguishesStaleFromMissing(t *testing.T) {
 		t.Fatalf("FindMembership() error = %v", err)
 	}
 
-	member.Role = service.GroupRoleAdmin
-	if _, err := memberships.UpdateMembershipRole(ctx, member, member.Version+1); !errors.Is(err, service.ErrOptimisticLockConflict) {
+	if _, err := memberships.AddMemberRole(ctx, group.ID, memberID, service.GroupRoleAdmin, member.Version+1); !errors.Is(err, service.ErrOptimisticLockConflict) {
 		t.Fatalf("stale role update error = %v, want ErrOptimisticLockConflict", err)
 	}
-	if errors.Is(err, service.ErrMembershipNotFound) {
-		t.Fatalf("stale role update reported not-found: %v", err)
-	}
 
-	updated, err := memberships.UpdateMembershipRole(ctx, member, member.Version)
+	updated, err := memberships.AddMemberRole(ctx, group.ID, memberID, service.GroupRoleAdmin, member.Version)
 	if err != nil {
-		t.Fatalf("UpdateMembershipRole() error = %v", err)
+		t.Fatalf("AddMemberRole() error = %v", err)
 	}
-	if updated.Version != member.Version+1 || updated.Role != service.GroupRoleAdmin {
+	if updated.Version != member.Version+1 || updated.Roles[0] != service.GroupRoleAdmin {
 		t.Fatalf("updated = %+v, want incremented version and admin role", updated)
 	}
 
-	vanished := service.GroupMembership{GroupID: group.ID, UserID: 999_999, Role: service.GroupRoleMember}
-	if _, err := memberships.UpdateMembershipRole(ctx, vanished, 0); !errors.Is(err, service.ErrMembershipNotFound) {
+	if _, err := memberships.RemoveMemberRole(ctx, group.ID, 999_999, service.GroupRolePlayer, 0); !errors.Is(err, service.ErrMembershipNotFound) {
 		t.Fatalf("missing membership role update error = %v, want ErrMembershipNotFound", err)
 	} else if errors.Is(err, service.ErrOptimisticLockConflict) {
 		t.Fatalf("missing membership reported a conflict: %v", err)
@@ -65,11 +60,11 @@ func TestMembershipDeleteDistinguishesStaleFromMissing(t *testing.T) {
 
 	group, _, err := memberships.CreateGroupWithAdmin(ctx, service.Group{
 		Name: "Locked Deletes", NameNorm: "locked deletes", InviteCode: "INVITE000011", CreatedBy: &adminID, CreatedAt: 100,
-	}, adminID, service.GroupRoleAdmin)
+	}, adminID)
 	if err != nil {
 		t.Fatalf("CreateGroupWithAdmin() error = %v", err)
 	}
-	if _, err := memberships.CreateMembership(ctx, service.GroupMembership{GroupID: group.ID, UserID: memberID, Role: service.GroupRoleMember, CreatedAt: 101}); err != nil {
+	if _, err := memberships.CreateMembership(ctx, service.GroupMembership{GroupID: group.ID, UserID: memberID, Roles: []string{service.GroupRolePlayer}, CreatedAt: 101}); err != nil {
 		t.Fatalf("CreateMembership() error = %v", err)
 	}
 

@@ -99,12 +99,12 @@ func adminUserConditions(query service.AdminUserQuery) ([]string, []any) {
 		args = append(args, false)
 	}
 	if query.Guest == service.AdminFilterYes {
-		conditions = append(conditions, fmt.Sprintf("is_guest = $%d", len(args)+1))
-		args = append(args, true)
+		conditions = append(conditions, fmt.Sprintf("kind = $%d", len(args)+1))
+		args = append(args, string(service.UserKindGuest))
 	}
 	if query.Guest == service.AdminFilterNo {
-		conditions = append(conditions, fmt.Sprintf("is_guest = $%d", len(args)+1))
-		args = append(args, false)
+		conditions = append(conditions, fmt.Sprintf("kind <> $%d", len(args)+1))
+		args = append(args, string(service.UserKindGuest))
 	}
 	if query.Confirmed == service.AdminFilterYes {
 		conditions = append(conditions, "email_verified_at IS NOT NULL")

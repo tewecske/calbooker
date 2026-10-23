@@ -27,6 +27,21 @@ issues build on. Change it in the same PR when a decision changes.
 | Visibility | Admins and managers see everything in the group. Coaches see their teams' events and rosters. Players see their teams' events; parents see their teams' and children's teams' events. On their teams, players and parents see display names of players and coaches and who signed up; emails and the full member list are for admins and managers (coaches: their teams). |
 | Calendar UI | Own server-rendered CSS-grid week view (DaisyUI, HTMX). Drag-and-drop through SortableJS, vendored into `static/` (MIT, no dependencies, works on touch). No calendar library. |
 
+Refinements made in #2 (smallest choices, waiting for the owner's
+confirmation):
+
+- Only admins grant or remove the `admin` role and remove an admin; managers
+  handle every other role and member.
+- Until invites carry a role (#3), joining with the group's invite code makes
+  the new member a `player`.
+- Site administrators (calbooker operators) keep access to every group, as
+  before #2; their group actions are audited and marked as such.
+- A team roster entry needs the matching group role (a player on a team holds
+  the `player` role in the group); removing the role takes the member off the
+  rosters.
+- A member may hold no roles; such a member sees only the group overview.
+- New groups default to the `Europe/Budapest` time zone.
+
 ## Data model
 
 All tables carry `group_id` (directly or through their parent) so every query

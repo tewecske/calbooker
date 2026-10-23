@@ -148,7 +148,7 @@ func TestAuthenticatedHomeRedirectsAnonymousVisitor(t *testing.T) {
 
 func TestGuestWriteCreatesAccountOnlyOnPost(t *testing.T) {
 	dependencies := newHTTPTestDependencies(t)
-	guest := service.User{ID: 73, IsGuest: true, Username: stringPointer("guest-73"), Theme: "light"}
+	guest := service.User{ID: 73, Kind: service.UserKindGuest, Username: stringPointer("guest-73"), Theme: "light"}
 	creator := &httpGuestCreatorStub{result: service.GuestSessionResult{User: guest, Session: service.Session{ID: "guest-session"}}}
 	dependencies.GuestCreator = creator
 	handler := NewRouterWithServices(dependencies)
@@ -172,7 +172,7 @@ func TestGuestWriteCreatesAccountOnlyOnPost(t *testing.T) {
 
 func TestGuestTransferCodeOnlyAppearsAfterExplicitRequest(t *testing.T) {
 	dependencies := newHTTPTestDependencies(t)
-	guest := service.User{ID: 73, IsGuest: true, Username: stringPointer("guest-73"), Theme: "light"}
+	guest := service.User{ID: 73, Kind: service.UserKindGuest, Username: stringPointer("guest-73"), Theme: "light"}
 	dependencies.Users = httpUserStub{user: guest}
 	dependencies.Sessions = httpSessionStub{session: service.Session{ID: "opaque-session", UserID: 73, CreatedAt: 1, ExpiresAt: time.Now().Add(time.Hour).Unix()}}
 	dependencies.GuestClaimer = httpGuestClaimerStub{claim: service.GuestClaimCode{UserID: 73, Code: "ABCDEFGHJK"}}

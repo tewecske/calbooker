@@ -40,8 +40,8 @@ func TestDeletionRulesPreserveHistoryAndCascadeOwnedRows(t *testing.T) {
 		t.Fatalf("insert group to delete: %v", err)
 	}
 	if _, err := harness.DB.ExecContext(ctx, `
-		INSERT INTO group_members (group_id, user_id, role, created_at)
-		VALUES ($1, $2, 'admin', 100), ($3, $2, 'admin', 100)
+		INSERT INTO group_members (group_id, user_id, created_at)
+		VALUES ($1, $2, 100), ($3, $2, 100)
 	`, groupID, userID, groupToDeleteID); err != nil {
 		t.Fatalf("insert memberships: %v", err)
 	}

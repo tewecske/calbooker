@@ -23,7 +23,7 @@ func TestRateLimitedGroupJoinerAllowsThenRejects(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewRateLimiter() error = %v", err)
 	}
-	inner := &groupJoinServiceStub{membership: GroupMembership{GroupID: 4, UserID: 7, Role: GroupRoleMember}}
+	inner := &groupJoinServiceStub{membership: GroupMembership{GroupID: 4, UserID: 7, Roles: []string{GroupRolePlayer}}}
 	service, err := NewRateLimitedGroupJoiner(inner, limiter)
 	if err != nil {
 		t.Fatalf("NewRateLimitedGroupJoiner() error = %v", err)

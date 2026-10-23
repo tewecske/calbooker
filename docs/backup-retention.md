@@ -9,7 +9,7 @@ the expectations for datastore backups. See the
 
 | Data | Table | Retention setting | Cleanup behavior |
 | --- | --- | --- | --- |
-| Empty abandoned guests | `users` (`is_guest`) | `CALBOOKER_GUEST_RETENTION` (`720h`) | `guest_cleanup` removes guests older than the cutoff that own no group membership. |
+| Empty abandoned guests | `users` (`kind = 'guest'`; profiles and accounts are never removed) | `CALBOOKER_GUEST_RETENTION` (`720h`) | `guest_cleanup` removes guests older than the cutoff that own no group membership. |
 | Sign-in flow states | `oauth_states` | not age-based | `token_retention` removes consumed or expired states. |
 | Usage events | `usage_events` | `CALBOOKER_USAGE_RETENTION` (`2160h`) | `usage_retention` removes events older than the cutoff. |
 | Rate-limit windows | `rate_limit_buckets` | live for one window | `rate_limit_retention` removes expired windows. Keys are stored only as hashes. Not worth backing up. |

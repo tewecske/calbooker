@@ -37,14 +37,17 @@ func (r *UserRepository) CreateUser(ctx context.Context, user service.User) (ser
 	if user.Locale == "" {
 		user.Locale = "en"
 	}
+	if user.Kind == "" {
+		user.Kind = service.UserKindAccount
+	}
 	created, err := scanUser(db.QueryRowContext(ctx, `
 		INSERT INTO users (
-			email, username, display_name, is_guest, is_admin,
+			email, username, display_name, kind, is_admin,
 			theme, locale, created_at, email_verified_at, version
 		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-		RETURNING id, email, username, display_name, is_guest,
+		RETURNING id, email, username, display_name, kind,
 			is_admin, theme, locale, created_at, email_verified_at, version
-	`, user.Email, user.Username, user.DisplayName, user.IsGuest,
+	`, user.Email, user.Username, user.DisplayName, string(user.Kind),
 		user.IsAdmin, user.Theme, user.Locale, user.CreatedAt, user.EmailVerifiedAt, user.Version))
 	if err != nil {
 		return service.User{}, mapUserError(err)
@@ -101,7 +104,7 @@ func (r *UserRepository) UpdateUser(ctx context.Context, user service.User, expe
 		return service.User{}, mapUserError(err)
 	}
 	defer func() { _ = tx.Rollback() }()
-	if !user.IsAdmin || user.IsGuest {
+	if !user.IsAdmin || !user.IsFullUser() {
 		if err := keepAnotherAdministrator(ctx, tx, user.ID); err != nil {
 			return service.User{}, err
 		}
@@ -109,12 +112,12 @@ func (r *UserRepository) UpdateUser(ctx context.Context, user service.User, expe
 	updated, scanErr := scanUser(tx.QueryRowContext(ctx, `
 		UPDATE users
 		SET email = $1, username = $2, display_name = $3,
-			is_guest = $4, is_admin = $5, theme = $6, locale = $7,
+			kind = $4, is_admin = $5, theme = $6, locale = $7,
 			email_verified_at = $8, version = version + 1
 		WHERE id = $9 AND version = $10
-		RETURNING id, email, username, display_name, is_guest,
+		RETURNING id, email, username, display_name, kind,
 			is_admin, theme, locale, created_at, email_verified_at, version
-	`, user.Email, user.Username, user.DisplayName, user.IsGuest,
+	`, user.Email, user.Username, user.DisplayName, string(user.Kind),
 		user.IsAdmin, user.Theme, user.Locale, user.EmailVerifiedAt,
 		user.ID, expectedVersion))
 	if scanErr == nil {
@@ -167,7 +170,7 @@ func (r *UserRepository) DeleteUser(ctx context.Context, id, expectedVersion int
 // accounts that are not administrators take no lock.
 func keepAnotherAdministrator(ctx context.Context, tx *sql.Tx, id int64) error {
 	var isAdmin bool
-	err := tx.QueryRowContext(ctx, "SELECT is_admin AND NOT is_guest FROM users WHERE id = $1", id).Scan(&isAdmin)
+	err := tx.QueryRowContext(ctx, "SELECT is_admin AND kind = 'account' FROM users WHERE id = $1", id).Scan(&isAdmin)
 	if errors.Is(err, sql.ErrNoRows) || (err == nil && !isAdmin) {
 		return nil
 	}
@@ -181,11 +184,11 @@ func keepAnotherAdministrator(ctx context.Context, tx *sql.Tx, id int64) error {
 	// target or the other administrators.
 	var others int
 	if err := tx.QueryRowContext(ctx, `
-		SELECT COUNT(*) FROM users WHERE is_admin AND NOT is_guest AND id <> $1
+		SELECT COUNT(*) FROM users WHERE is_admin AND kind = 'account' AND id <> $1
 	`, id).Scan(&others); err != nil {
 		return mapUserError(err)
 	}
-	if err := tx.QueryRowContext(ctx, "SELECT is_admin AND NOT is_guest FROM users WHERE id = $1", id).Scan(&isAdmin); err != nil && !errors.Is(err, sql.ErrNoRows) {
+	if err := tx.QueryRowContext(ctx, "SELECT is_admin AND kind = 'account' FROM users WHERE id = $1", id).Scan(&isAdmin); err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return mapUserError(err)
 	}
 	if isAdmin && others == 0 {
@@ -195,7 +198,7 @@ func keepAnotherAdministrator(ctx context.Context, tx *sql.Tx, id int64) error {
 }
 
 const userSelect = `
-	SELECT id, email, username, display_name, is_guest,
+	SELECT id, email, username, display_name, kind,
 		is_admin, theme, locale, created_at, email_verified_at, version
 	FROM users`
 
@@ -242,15 +245,17 @@ func scanUser(row rowScanner) (service.User, error) {
 		email, username sql.NullString
 		displayName     sql.NullString
 		emailVerifiedAt sql.NullInt64
+		kind            string
 	)
 	if err := row.Scan(
 		&user.ID, &email, &username, &displayName,
-		&user.IsGuest, &user.IsAdmin, &user.Theme, &user.Locale,
+		&kind, &user.IsAdmin, &user.Theme, &user.Locale,
 		&user.CreatedAt, &emailVerifiedAt, &user.Version,
 	); err != nil {
 		return service.User{}, err
 	}
-	if user.ID <= 0 || user.Version < 0 {
+	user.Kind = service.UserKind(kind)
+	if user.ID <= 0 || user.Version < 0 || !user.Kind.Valid() {
 		return service.User{}, ErrInvalidData
 	}
 	user.Email = nullableString(email)
@@ -297,7 +302,7 @@ func (r *UserRepository) UpgradeGuestWithIdentity(ctx context.Context, guest ser
 		return service.User{}, err
 	}
 	identity.Provider = canonicalProvider(identity.Provider)
-	if guest.ID <= 0 || guest.IsGuest || identity.UserID != guest.ID || identity.Provider == "" || identity.Subject == "" || len(identity.Subject) > 255 {
+	if guest.ID <= 0 || !guest.IsFullUser() || identity.UserID != guest.ID || identity.Provider == "" || identity.Subject == "" || len(identity.Subject) > 255 {
 		return service.User{}, ErrInvalidData
 	}
 	tx, err := db.BeginTx(ctx, nil)
@@ -313,9 +318,9 @@ func (r *UserRepository) UpgradeGuestWithIdentity(ctx context.Context, guest ser
 	}
 	updated, err := scanUser(tx.QueryRowContext(ctx, `
 		UPDATE users
-		SET email = $1, display_name = $2, is_guest = FALSE, email_verified_at = $3, version = version + 1
-		WHERE id = $4 AND version = $5 AND is_guest
-		RETURNING id, email, username, display_name, is_guest,
+		SET email = $1, display_name = $2, kind = 'account', email_verified_at = $3, version = version + 1
+		WHERE id = $4 AND version = $5 AND kind = 'guest'
+		RETURNING id, email, username, display_name, kind,
 			is_admin, theme, locale, created_at, email_verified_at, version
 	`, guest.Email, guest.DisplayName, guest.EmailVerifiedAt, guest.ID, expectedVersion))
 	if errors.Is(err, sql.ErrNoRows) {

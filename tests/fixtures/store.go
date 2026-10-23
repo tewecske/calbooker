@@ -14,10 +14,11 @@ type RowQuerier interface {
 
 // User contains explicit values for every users column.
 type User struct {
-	Email           *string
-	Username        *string
-	DisplayName     *string
-	IsGuest         bool
+	Email       *string
+	Username    *string
+	DisplayName *string
+	// Kind is account, guest, or profile; empty inserts an account.
+	Kind            string
 	IsAdmin         bool
 	Theme           string
 	Locale          string
@@ -42,11 +43,11 @@ func InsertUser(ctx context.Context, db RowQuerier, user User) (int64, error) {
 	var id int64
 	err := db.QueryRowContext(ctx, `
 		INSERT INTO users (
-			email, username, display_name, is_guest, is_admin,
+			email, username, display_name, kind, is_admin,
 			theme, locale, created_at, email_verified_at, version
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+		) VALUES ($1, $2, $3, COALESCE(NULLIF($4, ''), 'account'), $5, $6, $7, $8, $9, $10)
 		RETURNING id
-	`, user.Email, user.Username, user.DisplayName, user.IsGuest, user.IsAdmin, user.Theme, user.Locale, user.CreatedAt, user.EmailVerifiedAt, user.Version).Scan(&id)
+	`, user.Email, user.Username, user.DisplayName, user.Kind, user.IsAdmin, user.Theme, user.Locale, user.CreatedAt, user.EmailVerifiedAt, user.Version).Scan(&id)
 	return id, err
 }
 
@@ -55,6 +56,7 @@ type Group struct {
 	Name       string
 	NameNorm   string
 	InviteCode string
+	TimeZone   string
 	CreatedBy  *int64
 	CreatedAt  int64
 	Version    int64
@@ -66,6 +68,7 @@ func NewGroup(createdBy int64) Group {
 		Name:       "Fixture Group",
 		NameNorm:   "fixture group",
 		InviteCode: "fixture-invite",
+		TimeZone:   "Europe/Budapest",
 		CreatedBy:  Int64(createdBy),
 		CreatedAt:  1,
 	}
@@ -75,19 +78,32 @@ func NewGroup(createdBy int64) Group {
 func InsertGroup(ctx context.Context, db RowQuerier, group Group) (int64, error) {
 	var id int64
 	err := db.QueryRowContext(ctx, `
-		INSERT INTO groups (name, name_norm, invite_code, created_by, created_at, version)
-		VALUES ($1, $2, $3, $4, $5, $6)
+		INSERT INTO groups (name, name_norm, invite_code, time_zone, created_by, created_at, version)
+		VALUES ($1, $2, $3, COALESCE(NULLIF($4, ''), 'Europe/Budapest'), $5, $6, $7)
 		RETURNING id
-	`, group.Name, group.NameNorm, group.InviteCode, group.CreatedBy, group.CreatedAt, group.Version).Scan(&id)
+	`, group.Name, group.NameNorm, group.InviteCode, group.TimeZone, group.CreatedBy, group.CreatedAt, group.Version).Scan(&id)
 	return id, err
 }
 
-// InsertMembership inserts an explicit group membership row.
+// InsertMembership inserts an explicit group membership row and, when role
+// is not empty, one group role for it.
 func InsertMembership(ctx context.Context, db RowQuerier, groupID, userID int64, role string, createdAt, version int64) error {
+	if role == "" {
+		return db.QueryRowContext(ctx, `
+			INSERT INTO group_members (group_id, user_id, created_at, version)
+			VALUES ($1, $2, $3, $4)
+			RETURNING id
+		`, groupID, userID, createdAt, version).Scan(new(int64))
+	}
 	return db.QueryRowContext(ctx, `
-		INSERT INTO group_members (group_id, user_id, role, created_at, version)
-		VALUES ($1, $2, $3, $4, $5)
-		RETURNING id
+		WITH member AS (
+			INSERT INTO group_members (group_id, user_id, created_at, version)
+			VALUES ($1, $2, $4, $5)
+			RETURNING group_id, user_id
+		)
+		INSERT INTO group_member_roles (group_id, user_id, role, created_at)
+		SELECT group_id, user_id, $3, $4 FROM member
+		RETURNING 1
 	`, groupID, userID, role, createdAt, version).Scan(new(int64))
 }
 

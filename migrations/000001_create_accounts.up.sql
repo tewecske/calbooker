@@ -5,15 +5,19 @@ CREATE TABLE users (
     email VARCHAR(255),
     username VARCHAR(32),
     display_name VARCHAR(255),
-    is_guest BOOLEAN NOT NULL DEFAULT FALSE,
+    -- account: signs in through single sign-on; guest: local account without
+    -- an identity, removed by guest retention; profile: never signs in (a
+    -- child created by a parent or staff) and is never removed by retention.
+    kind VARCHAR(16) NOT NULL DEFAULT 'account',
     is_admin BOOLEAN NOT NULL DEFAULT FALSE,
     theme VARCHAR(20) NOT NULL DEFAULT 'light',
     locale VARCHAR(10) NOT NULL DEFAULT 'en',
     created_at BIGINT NOT NULL,
     email_verified_at BIGINT,
     version BIGINT NOT NULL DEFAULT 0,
+    CONSTRAINT users_kind_allowed CHECK (kind IN ('account', 'guest', 'profile')),
     CONSTRAINT users_guest_credentials CHECK (
-        NOT is_guest OR (email IS NULL AND email_verified_at IS NULL)
+        kind = 'account' OR (email IS NULL AND email_verified_at IS NULL)
     ),
     CONSTRAINT users_email_normalized CHECK (
         email IS NULL OR email = lower(btrim(email))

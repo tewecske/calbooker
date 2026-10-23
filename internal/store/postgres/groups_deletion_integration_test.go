@@ -24,14 +24,14 @@ func TestAccountDeletionPreservesSharedGroup(t *testing.T) {
 
 	group, _, err := memberships.CreateGroupWithAdmin(ctx, service.Group{
 		Name: "Shared", NameNorm: "shared", InviteCode: "INVITE000071", CreatedBy: &creatorID, CreatedAt: 100,
-	}, creatorID, service.GroupRoleAdmin)
+	}, creatorID)
 	if err != nil {
 		t.Fatalf("CreateGroupWithAdmin() error = %v", err)
 	}
-	if _, err := memberships.CreateMembership(ctx, service.GroupMembership{GroupID: group.ID, UserID: secondAdminID, Role: service.GroupRoleAdmin, CreatedAt: 101}); err != nil {
+	if _, err := memberships.CreateMembership(ctx, service.GroupMembership{GroupID: group.ID, UserID: secondAdminID, Roles: []string{service.GroupRoleAdmin}, CreatedAt: 101}); err != nil {
 		t.Fatalf("CreateMembership(second admin) error = %v", err)
 	}
-	if _, err := memberships.CreateMembership(ctx, service.GroupMembership{GroupID: group.ID, UserID: memberID, Role: service.GroupRoleMember, CreatedAt: 102}); err != nil {
+	if _, err := memberships.CreateMembership(ctx, service.GroupMembership{GroupID: group.ID, UserID: memberID, Roles: []string{service.GroupRolePlayer}, CreatedAt: 102}); err != nil {
 		t.Fatalf("CreateMembership(member) error = %v", err)
 	}
 

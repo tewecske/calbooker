@@ -66,7 +66,7 @@ func (s *GuestRedemptionService) Redeem(ctx context.Context, rawCode string) (Gu
 		}
 		return GuestSessionResult{}, fmt.Errorf("find guest for claim redemption: %w", err)
 	}
-	if user.ID != claim.UserID || !user.IsGuest || user.Email != nil {
+	if user.ID != claim.UserID || !user.IsGuest() || user.Email != nil {
 		return GuestSessionResult{}, ErrInvalidGuestClaimCode
 	}
 

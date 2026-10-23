@@ -64,7 +64,7 @@ func (s *GuestService) createWithTheme(ctx context.Context, username, theme stri
 	}
 
 	guest := User{
-		IsGuest:   true,
+		Kind:      UserKindGuest,
 		Theme:     theme,
 		Locale:    defaultUserLocale,
 		CreatedAt: time.Now().Unix(),
@@ -76,7 +76,7 @@ func (s *GuestService) createWithTheme(ctx context.Context, username, theme stri
 	if err != nil {
 		return User{}, fmt.Errorf("create guest user: %w", err)
 	}
-	if created.ID <= 0 || !created.IsGuest || created.Email != nil || created.EmailVerifiedAt != nil {
+	if created.ID <= 0 || !created.IsGuest() || created.Email != nil || created.EmailVerifiedAt != nil {
 		return User{}, ErrInvalidCreatedGuest
 	}
 	return created, nil

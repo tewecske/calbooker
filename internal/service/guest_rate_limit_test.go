@@ -98,7 +98,7 @@ type guestCreatorStub struct {
 
 func (s *guestCreatorStub) CreateWithTheme(context.Context, string) (GuestSessionResult, error) {
 	s.calls++
-	return GuestSessionResult{User: User{ID: 1, IsGuest: true}}, nil
+	return GuestSessionResult{User: User{ID: 1, Kind: UserKindGuest}}, nil
 }
 
 type guestRedeemerStub struct {
@@ -107,7 +107,7 @@ type guestRedeemerStub struct {
 
 func (s *guestRedeemerStub) Redeem(context.Context, string) (GuestSessionResult, error) {
 	s.calls++
-	return GuestSessionResult{User: User{ID: 1, IsGuest: true}}, nil
+	return GuestSessionResult{User: User{ID: 1, Kind: UserKindGuest}}, nil
 }
 
 type guestCleanupRepositoryStub struct {

@@ -68,14 +68,14 @@ func TestPostgresRepositoryContractsExerciseGuestServices(t *testing.T) {
 	}
 	email := "upgraded@example.test"
 	upgradedGuest := guest
-	upgradedGuest.IsGuest = false
+	upgradedGuest.Kind = service.UserKindAccount
 	upgradedGuest.Email = &email
 	upgraded, err := users.UpgradeGuestWithIdentity(context.Background(), upgradedGuest, guest.Version,
 		service.OAuthIdentity{UserID: guest.ID, Provider: service.SSOProviderName, Subject: "issuer-subject", Email: email, CreatedAt: 200}, 200)
 	if err != nil {
 		t.Fatalf("UpgradeGuestWithIdentity() error = %v", err)
 	}
-	if upgraded.ID != guest.ID || upgraded.IsGuest || upgraded.Email == nil || *upgraded.Email != email {
+	if upgraded.ID != guest.ID || upgraded.IsGuest() || upgraded.Email == nil || *upgraded.Email != email {
 		t.Fatalf("upgraded account = %+v, want the same account with the issuer email", upgraded)
 	}
 	identities, err := NewOAuthIdentityRepository(harness.DB)

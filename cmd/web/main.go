@@ -100,6 +100,7 @@ func main() {
 		SSOClient:           applicationGraph.SSOClient,
 		SSOAccountURL:       appConfig.SSOAccountURL,
 		TrustedProxy:        appConfig.TrustedProxy,
+		DevelopmentRoutes:   appConfig.DevelopmentRoutes(),
 	}
 	router := httpadapter.NewLoggedRouterWithServices(logger, dependencies)
 

@@ -16,7 +16,9 @@ npm run check:assets
 `src/app.css` is the CSS-first Tailwind 4 entry point. `app.css` and the pinned
 HTMX runtime are generated/copied into `static/`, embedded by Go, and served
 locally; do not use a CDN in templates. `app.js` is hand-written page behavior
-(theme and the HTMX CSRF header).
+(theme, the HTMX CSRF header, and week grid drag and drop).
+`sortable.min.js` is SortableJS, vendored at an exact version; its version,
+source, and SHA-256 are in `docs/dependency-policy.md`.
 
 The Content-Security-Policy forbids inline scripts, inline styles, and `style`
 attributes. Put scripts in `app.js` and styles in `src/app.css`; HTMX settings

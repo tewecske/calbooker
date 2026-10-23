@@ -19,6 +19,8 @@
     {{template "groups-content" .}}
   {{else if eq .Kind "admin"}}
     {{template "admin-content" .}}
+  {{else if eq .Kind "weekgrid-demo"}}
+    {{template "weekgrid-demo-content" .}}
   {{else}}
     {{template "state-content" .}}
   {{end}}

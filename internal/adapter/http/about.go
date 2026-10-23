@@ -25,6 +25,9 @@ func about(renderer *PageRenderer, auth *authHandler) http.HandlerFunc {
 			"about.icons_heading",
 			"about.icons_credit",
 			"about.license_summary",
+			"about.sortable_heading",
+			"about.sortable_credit",
+			"about.sortable_license_summary",
 		}
 		messages := make(map[string]string, len(messageIDs))
 		for _, id := range messageIDs {
@@ -45,9 +48,12 @@ func about(renderer *PageRenderer, auth *authHandler) http.HandlerFunc {
 			FragmentTemplate: "about-fragment",
 			SignInURL:        mustLocalePath(language, "/sign-in"),
 			Labels: map[string]string{
-				"about_icons_heading":   messages["about.icons_heading"],
-				"about_icons_credit":    messages["about.icons_credit"],
-				"about_license_summary": messages["about.license_summary"],
+				"about_icons_heading":    messages["about.icons_heading"],
+				"about_icons_credit":     messages["about.icons_credit"],
+				"about_license_summary":  messages["about.license_summary"],
+				"about_sortable_heading": messages["about.sortable_heading"],
+				"about_sortable_credit":  messages["about.sortable_credit"],
+				"about_sortable_summary": messages["about.sortable_license_summary"],
 			},
 		}
 		page.CSRFToken, _ = middleware.CSRFTokenFromContext(request.Context())

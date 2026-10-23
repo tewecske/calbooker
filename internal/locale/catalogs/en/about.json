@@ -5,6 +5,9 @@
     "about.description": {"text": "A server-rendered Go and HTMX application foundation."},
     "about.icons_heading": {"text": "Icons"},
     "about.icons_credit": {"text": "Theme icons use Heroicons by Tailwind Labs, licensed under the MIT License. Copyright (c) Tailwind Labs, Inc."},
-    "about.license_summary": {"text": "Heroicons MIT License"}
+    "about.license_summary": {"text": "Heroicons MIT License"},
+    "about.sortable_heading": {"text": "Drag and drop"},
+    "about.sortable_credit": {"text": "Drag and drop in the week grid uses SortableJS 1.15.7, licensed under the MIT License. Copyright (c) 2019 All contributors to Sortable."},
+    "about.sortable_license_summary": {"text": "SortableJS MIT License"}
   }
 }

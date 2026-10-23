@@ -3,7 +3,7 @@
   "private": true,
   "scripts": {
     "build:css": "tailwindcss -i ./static/src/app.css -o ./static/app.css --minify && cp ./node_modules/htmx.org/dist/htmx.min.js ./static/htmx.min.js",
-    "check:assets": "test -s ./static/app.css && test -s ./static/app.js && test -s ./static/htmx.min.js",
+    "check:assets": "test -s ./static/app.css && test -s ./static/app.js && test -s ./static/htmx.min.js && test -s ./static/sortable.min.js",
     "test:browser": "playwright test"
   },
   "devDependencies": {

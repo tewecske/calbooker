@@ -63,6 +63,7 @@ func newRouterWithServices(recoveryLogger *slog.Logger, requestLogger middleware
 	registerSettingsRoutes(mux, newSettingsHandler(renderer, dependencies))
 	registerGroupRoutes(mux, newGroupHandler(renderer, dependencies))
 	registerAdminRoutes(mux, newAdminHandler(renderer, dependencies))
+	registerWeekGridDemoRoutes(mux, renderer, dependencies.DevelopmentRoutes)
 
 	shared := []middleware.Middleware{
 		middleware.WithRequestID(nil),

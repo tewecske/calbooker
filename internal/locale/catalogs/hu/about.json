@@ -5,6 +5,9 @@
     "about.description": {"text": "Szerveroldali Go és HTMX alkalmazás-alap."},
     "about.icons_heading": {"text": "Ikonok"},
     "about.icons_credit": {"text": "A témaikonok a Tailwind Labs Heroicons készletét használják, MIT licenc alatt. Copyright (c) Tailwind Labs, Inc."},
-    "about.license_summary": {"text": "Heroicons MIT licenc"}
+    "about.license_summary": {"text": "Heroicons MIT licenc"},
+    "about.sortable_heading": {"text": "Húzd és vidd"},
+    "about.sortable_credit": {"text": "A heti naptár húzd és vidd funkciója a SortableJS 1.15.7 könyvtárat használja, MIT licenc alatt. Copyright (c) 2019 All contributors to Sortable."},
+    "about.sortable_license_summary": {"text": "SortableJS MIT licenc"}
   }
 }

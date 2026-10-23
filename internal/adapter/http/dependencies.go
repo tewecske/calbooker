@@ -64,6 +64,10 @@ type Dependencies struct {
 	// TrustedProxy is the reverse proxy address or network whose
 	// X-Forwarded-For header identifies the client for rate limits and audit.
 	TrustedProxy string
+
+	// DevelopmentRoutes registers development-only pages such as the week
+	// grid demo. cmd/web sets it only for CALBOOKER_ENV=development.
+	DevelopmentRoutes bool
 }
 
 // AdminAccountLister lists accounts for the administrator area.

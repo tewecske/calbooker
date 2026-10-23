@@ -127,6 +127,20 @@ pins it. Never run `npx playwright install`.
 - Merge with a merge commit or squash (keep the `Closes #N`), then update the
   status column below and tell lanes waiting on it to rebase.
 
+## Next step
+
+Nothing has been started. The milestones and issues #1 to #15 exist on
+GitHub; no branches, worktrees, or agents yet. The first session in this
+folder should:
+
+1. Ask the owner the open questions below (they affect #7 and #9 only, so
+   they do not block M1).
+2. Ask the owner to start goweb's stack, or for an explicit yes to start it.
+3. Brief one subagent for #1 (`isolation: "worktree"`, lane solo/A
+   environment), review and merge its PR.
+4. Then #2 and #6 in parallel (#6 in lane B), then #3, then lanes A, B, and C
+   as the table allows.
+
 ## Status
 
 | # | State | PR |

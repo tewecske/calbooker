@@ -9,6 +9,17 @@ import (
 	"github.com/tewecske/calbooker/internal/service"
 )
 
+// registerGuestRoutes registers the guest write and transfer pages. The guest
+// upgrade belongs to the sign-on flow (registerAuthRoutes).
+func registerGuestRoutes(mux *http.ServeMux, auth *authHandler) {
+	for _, prefix := range localizedPrefixes() {
+		mux.HandleFunc("GET "+prefix+"/guest/write", auth.guestWrite)
+		mux.HandleFunc("POST "+prefix+"/guest/write", auth.guestWrite)
+		mux.HandleFunc("GET "+prefix+"/guest/transfer", auth.guestTransfer)
+		mux.HandleFunc("POST "+prefix+"/guest/transfer", auth.guestTransfer)
+	}
+}
+
 func (h *authHandler) guestWrite(writer http.ResponseWriter, request *http.Request) {
 	language := recoveryLanguage(request)
 	user, authenticated := h.currentUser(request)

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"path"
 	"sort"
 	"strconv"
 	"strings"
@@ -35,7 +36,7 @@ type Catalogs struct {
 	messages        map[Code]map[string]Message
 }
 
-//go:embed catalogs/*.json
+//go:embed catalogs/*/*.json
 var embeddedCatalogs embed.FS
 
 // LoadEmbeddedCatalogs loads the catalogs shipped with the application.
@@ -44,39 +45,44 @@ func LoadEmbeddedCatalogs() (*Catalogs, error) {
 }
 
 // LoadCatalogs reads and validates JSON catalogs from fileSystem.
+//
+// Catalogs live in one directory per language, each holding one JSON file
+// per feature area: <lang>/<area>.json, optionally below a "catalogs"
+// directory. The area files of a language are merged; a message ID defined
+// in two files of the same language is an error.
 func LoadCatalogs(fileSystem fs.FS) (*Catalogs, error) {
 	if fileSystem == nil {
 		return nil, fmt.Errorf("%w: nil filesystem", ErrInvalidCatalog)
+	}
+	if info, err := fs.Stat(fileSystem, "catalogs"); err == nil && info.IsDir() {
+		sub, err := fs.Sub(fileSystem, "catalogs")
+		if err != nil {
+			return nil, fmt.Errorf("%w: open catalog directory: %v", ErrInvalidCatalog, err)
+		}
+		fileSystem = sub
 	}
 	catalogs := &Catalogs{
 		defaultLanguage: Default,
 		messages:        map[Code]map[string]Message{},
 	}
-	entries, err := fs.ReadDir(fileSystem, "catalogs")
-	if err != nil {
-		entries, err = fs.ReadDir(fileSystem, ".")
-	}
+	entries, err := fs.ReadDir(fileSystem, ".")
 	if err != nil {
 		return nil, fmt.Errorf("%w: read catalog directory: %v", ErrInvalidCatalog, err)
 	}
 	for _, entry := range entries {
-		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".json") {
+		if !entry.IsDir() {
+			if strings.HasSuffix(entry.Name(), ".json") {
+				return nil, fmt.Errorf("%w: catalog file %q must be inside a language directory", ErrInvalidCatalog, entry.Name())
+			}
 			continue
 		}
-		language := Code(strings.TrimSuffix(entry.Name(), ".json"))
+		language := Code(entry.Name())
 		if !Supported(language) {
 			return nil, fmt.Errorf("%w: unsupported language %q", ErrInvalidCatalog, language)
 		}
-		path := entry.Name()
-		if _, err := fs.Stat(fileSystem, "catalogs/"+entry.Name()); err == nil {
-			path = "catalogs/" + entry.Name()
-		}
-		catalog, err := readCatalog(fileSystem, path)
+		catalog, err := readLanguage(fileSystem, entry.Name())
 		if err != nil {
 			return nil, fmt.Errorf("load %s: %w", language, err)
-		}
-		if _, exists := catalogs.messages[language]; exists {
-			return nil, fmt.Errorf("%w: duplicate language %q", ErrInvalidCatalog, language)
 		}
 		catalogs.messages[language] = catalog
 	}
@@ -153,6 +159,36 @@ func (c *Catalogs) ValidateCompleteness() error {
 		}
 	}
 	return nil
+}
+
+// readLanguage merges the area files in directory into one message map.
+func readLanguage(fileSystem fs.FS, directory string) (map[string]Message, error) {
+	entries, err := fs.ReadDir(fileSystem, directory)
+	if err != nil {
+		return nil, fmt.Errorf("%w: read language directory: %v", ErrInvalidCatalog, err)
+	}
+	merged := map[string]Message{}
+	origin := map[string]string{}
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".json") {
+			continue
+		}
+		messages, err := readCatalog(fileSystem, path.Join(directory, entry.Name()))
+		if err != nil {
+			return nil, fmt.Errorf("%s: %w", entry.Name(), err)
+		}
+		for id, message := range messages {
+			if previous, exists := origin[id]; exists {
+				return nil, fmt.Errorf("%w: message %q is defined in both %s and %s", ErrInvalidCatalog, id, previous, entry.Name())
+			}
+			origin[id] = entry.Name()
+			merged[id] = message
+		}
+	}
+	if len(merged) == 0 {
+		return nil, fmt.Errorf("%w: no json area files", ErrInvalidCatalog)
+	}
+	return merged, nil
 }
 
 func readCatalog(fileSystem fs.FS, path string) (map[string]Message, error) {

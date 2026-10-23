@@ -13,9 +13,9 @@ Package responsibilities:
 - `cmd/web` owns process startup and dependency wiring. Keep business logic out.
 - `internal/app` owns explicit application graph composition; it does not own resource lifecycle.
 - `internal/config` loads typed environment configuration (`CALBOOKER_*`) and redacts secrets.
-- `internal/locale` owns supported language codes (en, hu), canonical localized paths, and translation catalogs.
+- `internal/locale` owns supported language codes (en, hu), canonical localized paths, and translation catalogs. Catalogs are split per area in `internal/locale/catalogs/<lang>/<area>.json` (`common`, `auth`, `guest`, `settings`, `groups`, `admin`, `about`, ...) and merged at load; a message ID defined in two files is a load error. Keep a message in the same area file for every language.
 - `internal/service` contains application use cases.
-- `internal/adapter/http` owns routes, page rendering, full-page/HTMX responses, and transport adapters.
+- `internal/adapter/http` owns routes, page rendering, full-page/HTMX responses, and transport adapters. Each area registers its routes in a `register<Area>Routes` function beside its handlers (`<area>.go`, looping over `localizedPrefixes()`); `handler.go` keeps one call per area.
 - `internal/adapter/http/middleware` owns request context, recovery, logging, tracing, authentication, and CSRF boundaries.
 - `internal/adapter/mail` owns mail delivery adapters (SMTP relay, Resend); mail ports stay in consuming services.
 - `internal/adapter/oidc` owns the OpenID Connect relying party for Hydra (discovery, JWKS, RS256-only ID and logout token verification, standard library only); the `SSORelyingParty` port and account mapping stay in `internal/service`.
@@ -24,10 +24,10 @@ Package responsibilities:
 - `migrations/` stores ordered database schema changes. Calbooker's history starts at `000001`; never edit an installed migration.
 - `templates/` stores server-rendered HTML templates.
 - `static/` stores browser assets.
-- `tests/browser` contains opt-in Playwright specs; do not commit browser credentials or bearer-token fixtures.
+- `tests/browser` contains opt-in Playwright specs (`<area>.spec.ts`) built on the shared helpers in `tests/browser/support/` (sign up, sign in, become a guest, unique names, settings from the environment and `.env.local`); do not commit browser credentials or bearer-token fixtures. `@playwright/test` is pinned to the release matching the Nix `PLAYWRIGHT_BROWSERS_PATH` revisions; never run `npx playwright install`.
 - `deploy/` stores container run scripts, the Hydra client registration script, the env template, and copy-paste runbooks (`PREPARE.txt`, `SETUP.txt`, `SETUP-nix.txt`; commands and values only). Keep them in step with the scripts, env template, and the NixOS module. They assume goweb's deployment (Hydra, provider, tunnel) is already up.
 - `flake.nix` and `nix/module.nix` are the NixOS module (`services.calbooker`); it defaults issuer, provider, and mail settings from `services.goweb` and adds its host to goweb's Cloudflare Tunnel.
-- `scripts/dev-setup.sh` prepares local development against goweb's containers (`make dev-setup`).
+- `scripts/dev-setup.sh` prepares local development against goweb's containers (`make dev-setup`). `CALBOOKER_DEV_URL`, `CALBOOKER_DEV_DATABASE`, `CALBOOKER_DEV_CLIENT_ID`, and `CALBOOKER_DEV_RELAY_PORT` give each checkout or worktree its own port, database, Hydra client, and back-channel relay (container `<client ID>-backchannel-relay`).
 - Keep tests beside packages they cover. Use `tests/` for cross-package or integration support.
 
 ## Go development
@@ -88,7 +88,7 @@ Run `make test-integration` (needs `make dev-setup` and goweb's PostgreSQL) when
 - Before writing HTML or JSX, load the `daisyui` skill and follow its component, usage, configuration, and color guidance.
 - Keep templates semantic and accessible. Preserve stable accessible names and test hooks when adding controls.
 - The Content-Security-Policy forbids inline scripts, inline styles, and `style` attributes. Put scripts in `static/app.js` and styles in `static/src/app.css`.
-- Keep localized URLs explicit and catalog IDs stable; validate catalog completeness and placeholders in tests. Every new message needs both `en` and `hu` entries.
+- Keep localized URLs explicit and catalog IDs stable; validate catalog completeness and placeholders in tests. Every new message needs both `en` and `hu` entries, in the same `<area>.json` file of each language.
 - Anonymous theme preference may use browser storage; authenticated theme preference must persist through a server-side use case and revert UI state when rejected.
 
 ## Documentation

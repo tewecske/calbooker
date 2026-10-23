@@ -23,6 +23,27 @@ type adminHandler struct {
 	authenticator *SessionAuthenticator
 }
 
+// registerAdminRoutes registers the administrator pages. Every handler passes
+// the shared admin authorization guard.
+func registerAdminRoutes(mux *http.ServeMux, admin *adminHandler) {
+	for _, prefix := range localizedPrefixes() {
+		mux.HandleFunc("GET "+prefix+"/admin", admin.index)
+		mux.HandleFunc("GET "+prefix+"/admin/users", admin.list)
+		mux.HandleFunc("GET "+prefix+"/admin/audit", admin.audit)
+		mux.HandleFunc("GET "+prefix+"/admin/system", admin.system)
+		mux.HandleFunc("POST "+prefix+"/admin/system/maintenance/run", admin.runMaintenance)
+		mux.HandleFunc("GET "+prefix+"/admin/ratelimits", admin.rateLimits)
+		mux.HandleFunc("POST "+prefix+"/admin/ratelimits/clear", admin.clearRateLimit)
+		mux.HandleFunc("GET "+prefix+"/admin/usage", admin.usage)
+		mux.HandleFunc("GET "+prefix+"/admin/suspicious", admin.suspicious)
+		mux.HandleFunc("GET "+prefix+"/admin/users/{id}", admin.detail)
+		mux.HandleFunc("GET "+prefix+"/admin/users/{id}/edit", admin.editAccount)
+		mux.HandleFunc("POST "+prefix+"/admin/users/{id}/edit", admin.editAccount)
+		mux.HandleFunc("POST "+prefix+"/admin/users/{id}/delete", admin.deleteAccount)
+		mux.HandleFunc("POST "+prefix+"/admin/users/{id}/sessions/revoke", admin.revokeSessions)
+	}
+}
+
 func newAdminHandler(renderer *PageRenderer, dependencies Dependencies) *adminHandler {
 	authenticator, _ := NewSessionAuthenticator(dependencies.Users, dependencies.Sessions, dependencies.SessionCookie)
 	return &adminHandler{

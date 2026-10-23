@@ -18,8 +18,9 @@ Runtime code uses the standard library plus the PostgreSQL driver (`github.com/j
 Browser acceptance tests use Playwright as development-only tooling because a
 real browser engine is required to verify redirects, cookies, accessibility,
 and full-page versus HTMX behavior. Pin `@playwright/test` to an exact npm
-version and keep browser tests opt-in until a complete application fixture is
-available.
+version, the one whose browser revisions match the Nix-provided
+`PLAYWRIGHT_BROWSERS_PATH` (see `docs/local-development.md`), and keep browser
+tests opt-in until a complete application fixture is available.
 
 Use standard-library functionality when it meets requirements. Do not add a package only to shorten small amounts of code.
 

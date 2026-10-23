@@ -6,6 +6,13 @@ import (
 	"github.com/tewecske/calbooker/internal/adapter/http/middleware"
 )
 
+// registerAboutRoutes registers the public about page.
+func registerAboutRoutes(mux *http.ServeMux, renderer *PageRenderer, auth *authHandler) {
+	for _, prefix := range localizedPrefixes() {
+		mux.HandleFunc("GET "+prefix+"/about", about(renderer, auth))
+	}
+}
+
 // about renders the public about page. It credits bundled third-party assets
 // and reproduces their license notices.
 func about(renderer *PageRenderer, auth *authHandler) http.HandlerFunc {

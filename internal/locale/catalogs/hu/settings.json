@@ -1,0 +1,17 @@
+{
+  "messages": {
+    "settings.sso.heading": {"text": "Fiók"},
+    "settings.sso.help": {"text": "Az e-mail-címét, nevét és jelszavát a szervezet bejelentkezési szolgáltatása kezeli."},
+    "settings.sso.manage": {"text": "Fiók kezelése"},
+    "settings.title": {"text": "Fiókbeállítások | Calbooker"},
+    "settings.heading": {"text": "Fiókbeállítások"},
+    "settings.preferences.heading": {"text": "Nyelv és téma"},
+    "settings.preferences.language": {"text": "Nyelv"},
+    "settings.preferences.theme": {"text": "Téma"},
+    "settings.preferences.theme_toggle": {"text": "Sötét téma használata"},
+    "settings.error.generic": {"text": "A beállítások nem menthetők. Próbálja újra."},
+    "settings.error.not_found": {"text": "Ez a fiók már nem érhető el."},
+    "settings.error.conflict": {"text": "A fiók időközben megváltozott. Töltse újra az oldalt."},
+    "settings.error.invalid_locale": {"text": "Válassza az elérhető nyelvek egyikét."}
+  }
+}

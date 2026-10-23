@@ -32,10 +32,39 @@ The addresses follow goweb's `.env`: when goweb is set up for a tailnet
 `SSO_DEV_CLIENT_URL`), `make dev-setup` uses the same issuer and provider,
 puts calbooker on the goweb client's host with port 8082, and binds to
 `SSO_DEV_BIND`. Hydra refuses back-channel calls to tailnet addresses, so in
-that case the script also starts a loopback relay container
-(`calbooker-backchannel-relay`, `127.0.0.1:4447`). Override any of this with
-`CALBOOKER_DEV_URL`, `CALBOOKER_DEV_BIND`, `CALBOOKER_DEV_ISSUER_URL`, and
-`CALBOOKER_DEV_PROVIDER_URL` (see `scripts/dev-setup.sh`).
+that case the script also starts a loopback relay container named after the
+client ID (`calbooker-dev-backchannel-relay` on `127.0.0.1:4447` by default).
+Override any of this with `CALBOOKER_DEV_URL`, `CALBOOKER_DEV_BIND`,
+`CALBOOKER_DEV_ISSUER_URL`, and `CALBOOKER_DEV_PROVIDER_URL` (see
+`scripts/dev-setup.sh`).
+
+## Several checkouts at once
+
+Each checkout (the main one and every git worktree) needs its own port,
+database, Hydra client, and relay port so they can run and run browser specs
+side by side. `make dev-setup` takes them from:
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `CALBOOKER_DEV_URL` | goweb client host, port 8082 | where browsers reach this checkout; the port is also the listen port |
+| `CALBOOKER_DEV_DATABASE` | `calbooker` | database in goweb's PostgreSQL |
+| `CALBOOKER_DEV_CLIENT_ID` | `calbooker-dev` | Hydra client; also names the relay container `<client ID>-backchannel-relay` |
+| `CALBOOKER_DEV_CLIENT_NAME` | `Calbooker (development)` | client name the provider shows |
+| `CALBOOKER_DEV_RELAY_PORT` | `4447` | loopback port of the back-channel relay (tailnet layout only) |
+
+For example, a worktree in the lane table of `docs/plan.md`:
+
+```sh
+cp .env.example .env
+CALBOOKER_DEV_URL=http://<tailnet host>:8083 CALBOOKER_DEV_DATABASE=calbooker_a \
+  CALBOOKER_DEV_CLIENT_ID=calbooker-dev-a CALBOOKER_DEV_RELAY_PORT=4448 \
+  make dev-setup GOWEB_DIR=/path/to/goweb
+make run
+```
+
+Re-running `make dev-setup` replaces only that checkout's client and relay
+container. Remove a worktree's relay with `docker rm -f
+<client ID>-backchannel-relay` when the worktree goes away.
 
 ## First run
 
@@ -46,7 +75,7 @@ make sso-up
 make run-provider          # keep running
 
 # in calbooker
-npm install
+PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npm ci
 npm run build:css
 cp .env.example .env
 make dev-setup             # creates the calbooker database, registers calbooker-dev in Hydra, writes .env.local
@@ -84,11 +113,38 @@ make e2e                                # browser specs against the running stac
 in `.env.local`; every test works in its own throwaway schema. CI runs the same
 tests against a throwaway PostgreSQL.
 
-`make e2e` runs `tests/browser/sso.spec.ts` with Playwright (`npx playwright
-install chromium` once). It signs up new accounts at the provider; the
-revocation scenario also needs a provider administrator in
-`CALBOOKER_BROWSER_PROVIDER_ADMIN_EMAIL` and `_PASSWORD` (goweb's bootstrap
-administrator).
+`make e2e` runs the Playwright specs in `tests/browser/` against the running
+stack. They sign up new accounts at the provider; the revocation scenario also
+needs a provider administrator in `CALBOOKER_BROWSER_PROVIDER_ADMIN_EMAIL` and
+`_PASSWORD` (goweb's bootstrap administrator). The calbooker URL, provider URL,
+and client name come from the environment or `.env.local` (written by
+`make dev-setup`); see `tests/README.md`.
+
+### Playwright browsers
+
+Browsers come from Nix, never from Playwright's downloader: home-manager sets
+`PLAYWRIGHT_BROWSERS_PATH` to nixpkgs' `playwright-driver.browsers`. Never run
+`npx playwright install`; install npm packages with
+`PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npm ci`.
+
+`@playwright/test` is pinned exactly (`package.json`, currently `1.63.0`) to
+the release whose bundled browser revisions match the directories in
+`$PLAYWRIGHT_BROWSERS_PATH` (`chromium-1243`, `chromium_headless_shell-1243`,
+`firefox-1543`, `webkit-2359`). The nixpkgs `playwright-driver` version number
+can differ from the matching npm release, so compare revisions, not version
+numbers. After a Nix update, re-check without downloading browsers:
+
+```sh
+ls "$PLAYWRIGHT_BROWSERS_PATH"
+# browser revisions a candidate release expects (downloads only the npm tarball)
+dir=$(mktemp -d) && (cd "$dir" && npm pack playwright-core@1.63.0 --silent >/dev/null \
+  && tar -xzf playwright-core-*.tgz package/browsers.json && cat package/browsers.json)
+```
+
+Pick the release whose `chromium`, `chromium-headless-shell`, `firefox`, and
+`webkit` revisions equal the directory suffixes, set it exactly in
+`package.json`, and run `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npm install`. A
+mismatch shows up as "Executable doesn't exist" when the specs start.
 
 ## Reading mail locally
 
@@ -104,3 +160,9 @@ goweb's `make db-up`, inbox at `http://127.0.0.1:8025`).
 - Templates use DaisyUI 5 components; the Content-Security-Policy forbids
   inline scripts and styles, so scripts go in `static/app.js` and styles in
   `static/src/app.css` (rebuild with `npm run build:css`).
+- Each feature area owns its files: routes in a `register<Area>Routes`
+  function beside its handlers in `internal/adapter/http/<area>.go` (one call
+  in `handler.go`), messages in `internal/locale/catalogs/<lang>/<area>.json`,
+  and browser specs in `tests/browser/<area>.spec.ts` using
+  `tests/browser/support/`. The catalog files of a language are merged at
+  load; a message ID defined in two files fails startup and the tests.

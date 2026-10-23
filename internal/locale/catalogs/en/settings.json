@@ -1,0 +1,17 @@
+{
+  "messages": {
+    "settings.sso.heading": {"text": "Account"},
+    "settings.sso.help": {"text": "Your email address, name, and password are managed by your organization's sign-in service."},
+    "settings.sso.manage": {"text": "Manage your account"},
+    "settings.title": {"text": "Account settings | Calbooker"},
+    "settings.heading": {"text": "Account settings"},
+    "settings.preferences.heading": {"text": "Language and theme"},
+    "settings.preferences.language": {"text": "Language"},
+    "settings.preferences.theme": {"text": "Theme"},
+    "settings.preferences.theme_toggle": {"text": "Use dark theme"},
+    "settings.error.generic": {"text": "Your settings could not be saved. Try again."},
+    "settings.error.not_found": {"text": "This account is no longer available."},
+    "settings.error.conflict": {"text": "This account changed elsewhere. Reload the page and try again."},
+    "settings.error.invalid_locale": {"text": "Choose one of the available languages."}
+  }
+}

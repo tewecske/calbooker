@@ -111,8 +111,10 @@ from it; check its printed `.env.local` values.
 
 Playwright browsers come from Nix: home-manager sets
 `PLAYWRIGHT_BROWSERS_PATH` from nixpkgs `playwright-driver`, and
-`@playwright/test` must match `playwright-driver`'s version (1.64.1 on
-2026-10-23; check with `nix eval nixpkgs#playwright-driver.version`). Issue #1
+`@playwright/test` must match the browser revisions in
+`$PLAYWRIGHT_BROWSERS_PATH` (on 2026-10-23: chromium-1243; `nix eval
+nixpkgs#playwright-driver.version` printed 1.59.1, which may not be the
+nixpkgs home-manager uses, so trust the revisions). Issue #1
 pins it. Never run `npx playwright install`.
 
 ## Review checklist for the manager
@@ -133,8 +135,7 @@ Nothing has been started. The milestones and issues #1 to #15 exist on
 GitHub; no branches, worktrees, or agents yet. The first session in this
 folder should:
 
-1. Ask the owner the open questions below (they affect #7 and #9 only, so
-   they do not block M1).
+1. ~~Ask the owner the open questions~~ (answered, see below).
 2. Ask the owner to start goweb's stack, or for an explicit yes to start it.
 3. Brief one subagent for #1 (`isolation: "worktree"`, lane solo/A
    environment), review and merge its PR.
@@ -147,10 +148,11 @@ folder should:
 | --- | --- | --- |
 | 1–15 | open | |
 
-## Open questions for the owner
+## Owner answers (2026-10-23)
 
-- Optional participant limit and sign-up deadline per event (#9): wanted?
-- Coach qualification as an age range in years (design doc): confirm, or use
-  birth-year ranges instead.
-- Should the season plan ever be visible to coaches (read only), or only the
-  generated events?
+- Optional participant limit and sign-up deadline per event: yes (#9; the
+  columns go into `events` in #8).
+- Coach qualification is an age range in years: confirmed (#7).
+- Coaches see the season plan read only (#12, #14). They influence it only by
+  changing their availability; the plan does not update itself, an admin or
+  manager re-runs the suggestion and regenerates events if they want to.

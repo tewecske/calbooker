@@ -157,7 +157,7 @@ func (r *GuestClaimCodeRepository) DeleteEmptyAbandonedGuests(ctx context.Contex
 	rows, err := tx.QueryContext(ctx, `
 		SELECT id
 		FROM users
-		WHERE is_guest = TRUE AND created_at < $1
+		WHERE kind = 'guest' AND created_at < $1
 		FOR UPDATE
 	`, cutoff)
 	if err != nil {

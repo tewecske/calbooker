@@ -94,7 +94,7 @@ func TestSettingsMutationAuthenticationParity(t *testing.T) {
 func TestGroupMutationParity(t *testing.T) {
 	t.Run("create redirect", func(t *testing.T) {
 		dependencies := settingsStubDependencies(t)
-		dependencies.Groups = &groupsUseCaseStub{summary: service.GroupSummary{Group: service.Group{ID: 3, Name: "Team"}, Role: service.GroupRoleAdmin}}
+		dependencies.Groups = &groupsUseCaseStub{summary: service.GroupSummary{Group: service.Group{ID: 3, Name: "Team"}, Roles: []string{service.GroupRoleAdmin}}}
 		handler, _ := newGroupsTestHandler(t, dependencies)
 
 		full, htmx := runBothModes(handler.create, func(htmx bool) *http.Request {
@@ -125,26 +125,23 @@ func TestGroupMutationParity(t *testing.T) {
 		assertMutationParity(t, "create validation", full, htmx, "64")
 	})
 
-	t.Run("rename conflict", func(t *testing.T) {
-		dependencies := settingsStubDependencies(t)
-		dependencies.Groups = &groupsUseCaseStub{
-			detail:    service.GroupDetail{Group: service.Group{ID: 3, Name: "Team", Version: 2}, IsMember: true, IsAdmin: true},
-			renameErr: service.ErrOptimisticLockConflict,
+	t.Run("settings conflict", func(t *testing.T) {
+		dependencies, groups, _ := groupTestDependencies(t, groupMemberAs(service.GroupRoleAdmin))
+		groups.writeErr = service.ErrOptimisticLockConflict
+		full := serveGroups(t, dependencies, http.MethodPost, "/en/groups/3/settings", "name=New&time_zone=UTC&version=1", false)
+		htmx := serveGroups(t, dependencies, http.MethodPost, "/en/groups/3/settings", "name=New&time_zone=UTC&version=1", true)
+		// Full pages keep the specific status; HTMX gets 422 so the layout
+		// swaps the fragment and its alert in.
+		if full.Code != http.StatusConflict || htmx.Code != http.StatusUnprocessableEntity {
+			t.Fatalf("status full = %d, HTMX = %d; want 409 and 422", full.Code, htmx.Code)
 		}
-		handler, _ := newGroupsTestHandler(t, dependencies)
-
-		full, htmx := runBothModes(handler.rename, func(htmx bool) *http.Request {
-			return mutationRequest(http.MethodPost, "/en/groups/3/rename", "name=New&version=1", htmx, nil)
-		})
-		if full.Code != http.StatusConflict {
-			t.Fatalf("status = %d, want %d", full.Code, http.StatusConflict)
-		}
-		assertMutationParity(t, "rename conflict", full, htmx, "changed elsewhere")
+		htmx.Code = full.Code
+		assertMutationParity(t, "settings conflict", full, htmx, "changed elsewhere")
 	})
 
 	t.Run("not-found", func(t *testing.T) {
-		dependencies := settingsStubDependencies(t)
-		dependencies.Groups = &groupsUseCaseStub{detailErr: service.ErrGroupNotFound, leaveErr: service.ErrGroupNotFound}
+		dependencies, _, _ := groupTestDependencies(t, nil)
+		dependencies.GroupAccess = &groupAccessStub{err: service.ErrGroupNotFound}
 		handler, _ := newGroupsTestHandler(t, dependencies)
 
 		full, htmx := runBothModes(handler.leave, func(htmx bool) *http.Request {
@@ -157,8 +154,7 @@ func TestGroupMutationParity(t *testing.T) {
 	})
 
 	t.Run("leave redirect", func(t *testing.T) {
-		dependencies := settingsStubDependencies(t)
-		dependencies.Groups = &groupsUseCaseStub{}
+		dependencies, _, _ := groupTestDependencies(t, groupMemberAs(service.GroupRolePlayer))
 		handler, _ := newGroupsTestHandler(t, dependencies)
 
 		full, htmx := runBothModes(handler.leave, func(htmx bool) *http.Request {

@@ -38,7 +38,7 @@ Assets to protect:
 | Services → mail delivery | Message content | Plain-text messages; never logged |
 | Browser → `/{language}/oauth/sso/callback` | Authorization code and state | Single-use hashed state bound to the starting browser by the `HttpOnly` state cookie; PKCE S256; the code is redeemed server to server with `client_secret_basic`; the ID token is verified (RS256 only, key by `kid` from the issuer's JWKS or its only key when `kid` is absent, exact `iss`, `aud`/`azp`, `exp`/`iat` with one minute of skew, `nonce` equal to the PKCE challenge, no `events`) before any account is touched |
 | Hydra → `POST /oauth/sso/backchannel-logout` | Signed logout token | Exempt from the browser CSRF token (server to server) but authenticated by the token: RS256 signature, exact `iss`, `aud`, `iat` within five minutes, `jti`, the back-channel `events` member, `sid`, and no `nonce` (Back-Channel Logout 1.0 §2.6); it only revokes sessions bound to that `sid`; without a configured issuer the route answers 404 |
-| Operators → administrator surface | Administrative authority | Shared admin authorization guard, per-action audit records mirrored to a separate security log stream with actor and target IDs; privilege grants and revocations have their own action codes; site administrators' changes to groups they do not administer are audited; a record that cannot be stored is still reported to the security stream as failed |
+| Operators → administrator surface | Administrative authority | Shared admin authorization guard, per-action audit records mirrored to a separate security log stream with actor and target IDs; privilege grants and revocations have their own action codes; site administrators may manage any group (their group actions are marked as such in the audit detail); a record that cannot be stored is still reported to the security stream as failed |
 | Application → logs/traces/usage | Diagnostic output | Stable low-cardinality fields; no sessions, tokens, issuer subjects, query strings, or credentials |
 
 ## Bearer credentials
@@ -49,7 +49,7 @@ Assets to protect:
 | CSRF token | `calbooker_csrf` cookie plus `_csrf` field / `X-CSRF-Token` header | Per browser session | Double-submit, constant-time compare, `HttpOnly`, `SameSite=Strict`, `Secure` whenever session cookies are, malformed cookies replaced; required on every state-changing request after `http.CrossOriginProtection` rejects cross-origin and sibling-subdomain browser requests |
 | Sign-in flow state | 32-byte random state stored as its SHA-256 digest in `oauth_states`, mirrored in the `calbooker_oauth_state` browser cookie | Single use, ten minutes | Action allowlist (`sign-in`, guest upgrade `link`), atomic consumption with a single winner; the callback must present the matching `HttpOnly` cookie; a guest upgrade completes only for the guest that started it; a per-state PKCE S256 verifier is required to redeem the code |
 | Guest transfer code | Single active code per guest, partial unique index | Until revoked or used | One active code per guest; revocable; redeemed atomically; rate limited; never logged |
-| Group invite code | 12-character code, unique per group | Until rotated | Group administrators can rotate; unique constraint; join is rate limited and idempotent |
+| Group invite code | 12-character code, unique per group | Until rotated | Shown only to group admins and managers, who can rotate it; unique constraint; join is rate limited and idempotent and grants only the player role |
 | Issuer subject | `oauth_identities` unique `(provider, subject)`, provider `sso` | Stored with the account | Never rendered or logged; removed with the account |
 | ID token hint | ID token in `sessions.sso_id_token` | Until the session row is removed | Never accepted as authentication; read only to build the issuer logout URL; never rendered or logged |
 | SSO binding (`sso_sid`) | Hydra session ID on the session row | Session lifetime | Identifier only; lets a verified logout token revoke exactly those sessions |
@@ -92,7 +92,10 @@ state, and revision-checked writes. None are trusted from the client.
 - The administrator audit log is preserved deliberately; retention cleanup does
   not remove it.
 - Old, empty abandoned guests are deleted only when they own no group
-  membership.
+  membership. Retention removes only `users.kind = 'guest'` rows, never
+  `profile` (children without a login) or `account` rows.
+- Removing a member cascades their roles and team roster entries; removing a
+  group role removes the roster entries that depended on it.
 - See [backup and retention](backup-retention.md) for periods and schedules.
 
 ## Operational assumptions
@@ -128,6 +131,9 @@ state, and revision-checked writes. None are trusted from the client.
 | Administrator action repudiation | Admin surface | Per-action audit records with actor, target, time, origin, mirrored to the security stream | Audit store compromise |
 | Database compromise | Services → PostgreSQL | Own least-privilege role, encrypted backups, parameterized queries; sessions and flow state stored only as digests | Exposes guest transfer codes and ID token hints of live sessions |
 | Denial of service | Browser → adapter | Bounded queues, clamped inputs, graceful shutdown | No in-app WAF; rely on the edge |
+| Cross-group data exposure | Adapter → group services | Every group-scoped route builds a `GroupAccess` for the account first and answers 404 to non-members (tested per route), every query filters by `group_id`, team rows are reached only through `(group_id, team_id)`, roster entries reference the member's group role by foreign key | A site administrator sees every group by design |
+| Privilege escalation inside a group | Member → group writes | Authorization only through `GroupAccess`, re-checked in the service; only admins grant or remove the admin role or remove an admin; admin, manager, and coach need a full account (guests and profiles are refused); the last admin cannot lose the role or leave; role writes are revision checked under a per-group advisory lock; every admin and manager action is audited with the group as target | A compromised admin account controls its group |
+| Member data exposure | Members page, team pages | Emails and the full member list only for admins and managers (coaches: their teams); players and parents see names on their own and children's teams only | Display names are visible to teammates |
 | Development pages in production | Browser → adapter | The week grid demo (`/{language}/dev/weekgrid`, unauthenticated, in-memory state) is registered only when `Dependencies.DevelopmentRoutes` is set, which `cmd/web` derives from `CALBOOKER_ENV=development`; tests prove production and test configuration serve 404 | A deployment started with `CALBOOKER_ENV=development` would serve it (and skip the production safety checks); the deploy env template, runbook, and NixOS module set `production` |
 | Forged grid changes | Browser → week grid handlers | Drag-and-drop only proposes a change: the HTMX POST carries the CSRF token, `ParseWeekGridChange` validates weekday, resource, week, and times against the grid and snaps to its step, and the handler re-renders the grid from server state | Feature handlers must still authorize the item itself |
 

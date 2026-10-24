@@ -5,6 +5,7 @@ package postgres
 import (
 	"context"
 	"errors"
+	"slices"
 	"testing"
 
 	"github.com/tewecske/calbooker/internal/service"
@@ -23,16 +24,16 @@ func TestGroupRepositoryCreateAndList(t *testing.T) {
 	ownerID := insertIntegrationUser(t, harness, "owner@example.test")
 	otherID := insertIntegrationUser(t, harness, "other@example.test")
 
-	group := service.Group{Name: "Example", NameNorm: "example", InviteCode: "INVITE000001", CreatedBy: &ownerID, CreatedAt: 100}
-	created, membership, err := memberships.CreateGroupWithAdmin(ctx, group, ownerID, service.GroupRoleAdmin)
+	group := service.Group{Name: "Example", NameNorm: "example", InviteCode: "INVITE000001", TimeZone: "Europe/Vienna", CreatedBy: &ownerID, CreatedAt: 100}
+	created, membership, err := memberships.CreateGroupWithAdmin(ctx, group, ownerID)
 	if err != nil {
 		t.Fatalf("CreateGroupWithAdmin() error = %v", err)
 	}
-	if created.ID <= 0 || membership.Role != service.GroupRoleAdmin || membership.UserID != ownerID {
-		t.Fatalf("created = %+v membership = %+v, want owner admin", created, membership)
+	if created.ID <= 0 || created.TimeZone != "Europe/Vienna" || !slices.Equal(membership.Roles, []string{service.GroupRoleAdmin}) || membership.UserID != ownerID {
+		t.Fatalf("created = %+v membership = %+v, want owner admin in Vienna", created, membership)
 	}
 
-	if _, _, err := memberships.CreateGroupWithAdmin(ctx, group, otherID, service.GroupRoleAdmin); !errors.Is(err, service.ErrGroupInviteTaken) {
+	if _, _, err := memberships.CreateGroupWithAdmin(ctx, group, otherID); !errors.Is(err, service.ErrGroupInviteTaken) {
 		t.Fatalf("duplicate invite code error = %v, want ErrGroupInviteTaken", err)
 	}
 
@@ -40,32 +41,27 @@ func TestGroupRepositoryCreateAndList(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ListGroupsForUser() error = %v", err)
 	}
-	if len(summaries) != 1 || summaries[0].Group.ID != created.ID || summaries[0].MemberCount != 1 || summaries[0].Role != service.GroupRoleAdmin {
+	if len(summaries) != 1 || summaries[0].Group.ID != created.ID || summaries[0].MemberCount != 1 || !slices.Equal(summaries[0].Roles, []string{service.GroupRoleAdmin}) {
 		t.Fatalf("summaries = %+v, want one admin group with one member", summaries)
 	}
 
 	empty, err := groups.ListGroupsForUser(ctx, otherID)
-	if err != nil {
-		t.Fatalf("ListGroupsForUser(other) error = %v", err)
-	}
-	if len(empty) != 0 {
-		t.Fatalf("other summaries = %+v, want none", empty)
-	}
-
-	allForOwner, err := groups.ListAllGroupsForUser(ctx, ownerID)
-	if err != nil {
-		t.Fatalf("ListAllGroupsForUser(owner) error = %v", err)
-	}
-	if len(allForOwner) != 1 || allForOwner[0].Group.ID != created.ID || allForOwner[0].Role != service.GroupRoleAdmin {
-		t.Fatalf("owner all groups = %+v, want one group with the real admin role", allForOwner)
+	if err != nil || len(empty) != 0 {
+		t.Fatalf("other summaries = %+v, %v; want none", empty, err)
 	}
 
 	allForOther, err := groups.ListAllGroupsForUser(ctx, otherID)
 	if err != nil {
 		t.Fatalf("ListAllGroupsForUser(other) error = %v", err)
 	}
-	if len(allForOther) != 1 || allForOther[0].Group.ID != created.ID || allForOther[0].Role != "" {
-		t.Fatalf("other all groups = %+v, want the group with an empty non-member role", allForOther)
+	if len(allForOther) != 1 || allForOther[0].Group.ID != created.ID || len(allForOther[0].Roles) != 0 {
+		t.Fatalf("other all groups = %+v, want the group without roles", allForOther)
+	}
+
+	// A group created without a time zone gets the default.
+	defaulted, _, err := memberships.CreateGroupWithAdmin(ctx, service.Group{Name: "Default", NameNorm: "default", InviteCode: "INVITE000005", CreatedAt: 100}, otherID)
+	if err != nil || defaulted.TimeZone != service.DefaultGroupTimeZone {
+		t.Fatalf("defaulted group = %+v, %v; want %s", defaulted, err, service.DefaultGroupTimeZone)
 	}
 }
 
@@ -78,13 +74,14 @@ func TestGroupRepositoryOptimisticLockDistinguishesMissing(t *testing.T) {
 
 	created, _, err := memberships.CreateGroupWithAdmin(ctx, service.Group{
 		Name: "Locked", NameNorm: "locked", InviteCode: "INVITE000002", CreatedBy: &ownerID, CreatedAt: 100,
-	}, ownerID, service.GroupRoleAdmin)
+	}, ownerID)
 	if err != nil {
 		t.Fatalf("CreateGroupWithAdmin() error = %v", err)
 	}
 
 	created.Name = "Renamed"
 	created.NameNorm = "renamed"
+	created.TimeZone = "UTC"
 	if _, err := groups.UpdateGroup(ctx, created, created.Version+1); !errors.Is(err, service.ErrOptimisticLockConflict) {
 		t.Fatalf("stale update error = %v, want ErrOptimisticLockConflict", err)
 	}
@@ -92,15 +89,15 @@ func TestGroupRepositoryOptimisticLockDistinguishesMissing(t *testing.T) {
 	if err != nil {
 		t.Fatalf("UpdateGroup() error = %v", err)
 	}
-	if updated.Version != created.Version+1 || updated.Name != "Renamed" {
-		t.Fatalf("updated = %+v, want incremented version and new name", updated)
+	if updated.Version != created.Version+1 || updated.Name != "Renamed" || updated.TimeZone != "UTC" {
+		t.Fatalf("updated = %+v, want incremented version, new name and time zone", updated)
 	}
-	if _, err := groups.UpdateGroup(ctx, service.Group{ID: 999999, Name: "x", NameNorm: "x"}, 0); !errors.Is(err, service.ErrGroupNotFound) {
+	if _, err := groups.UpdateGroup(ctx, service.Group{ID: 999999, Name: "x", NameNorm: "x", TimeZone: "UTC"}, 0); !errors.Is(err, service.ErrGroupNotFound) {
 		t.Fatalf("missing update error = %v, want ErrGroupNotFound", err)
 	}
 }
 
-func TestMembershipRoleChangePreservesLastAdmin(t *testing.T) {
+func TestMembershipRolesAndLastAdmin(t *testing.T) {
 	ctx := context.Background()
 	harness := migratedHarness(t)
 	memberships := mustMembershipRepository(t, harness)
@@ -109,87 +106,184 @@ func TestMembershipRoleChangePreservesLastAdmin(t *testing.T) {
 
 	group, _, err := memberships.CreateGroupWithAdmin(ctx, service.Group{
 		Name: "Team", NameNorm: "team", InviteCode: "INVITE000003", CreatedBy: &adminID, CreatedAt: 100,
-	}, adminID, service.GroupRoleAdmin)
+	}, adminID)
 	if err != nil {
 		t.Fatalf("CreateGroupWithAdmin() error = %v", err)
 	}
-	if _, err := memberships.CreateMembership(ctx, service.GroupMembership{GroupID: group.ID, UserID: memberID, Role: service.GroupRoleMember, CreatedAt: 101}); err != nil {
+	if _, err := memberships.CreateMembership(ctx, service.GroupMembership{GroupID: group.ID, UserID: memberID, Roles: []string{service.GroupRolePlayer}, CreatedAt: 101}); err != nil {
 		t.Fatalf("CreateMembership() error = %v", err)
+	}
+	if _, err := memberships.CreateMembership(ctx, service.GroupMembership{GroupID: group.ID, UserID: memberID, CreatedAt: 101}); !errors.Is(err, service.ErrMembershipExists) {
+		t.Fatalf("duplicate membership error = %v, want ErrMembershipExists", err)
+	}
+
+	// Several roles per member, each change bumps the revision.
+	withCoach, err := memberships.AddMemberRole(ctx, group.ID, memberID, service.GroupRoleCoach, 0)
+	if err != nil {
+		t.Fatalf("AddMemberRole() error = %v", err)
+	}
+	if !slices.Equal(withCoach.Roles, []string{service.GroupRoleCoach, service.GroupRolePlayer}) || withCoach.Version != 1 {
+		t.Fatalf("membership = %+v, want coach and player at version 1", withCoach)
+	}
+	if _, err := memberships.AddMemberRole(ctx, group.ID, memberID, service.GroupRoleParent, 0); !errors.Is(err, service.ErrOptimisticLockConflict) {
+		t.Fatalf("stale AddMemberRole() error = %v, want ErrOptimisticLockConflict", err)
+	}
+	if _, err := memberships.AddMemberRole(ctx, group.ID, 999999, service.GroupRoleParent, 0); !errors.Is(err, service.ErrMembershipNotFound) {
+		t.Fatalf("missing member AddMemberRole() error = %v, want ErrMembershipNotFound", err)
 	}
 
 	admin, err := memberships.FindMembership(ctx, group.ID, adminID)
 	if err != nil {
 		t.Fatalf("FindMembership(admin) error = %v", err)
 	}
-	admin.Role = service.GroupRoleMember
-	if _, err := memberships.UpdateMembershipRole(ctx, admin, admin.Version); !errors.Is(err, service.ErrLastGroupAdmin) {
-		t.Fatalf("demoting last admin error = %v, want ErrLastGroupAdmin", err)
+	if _, err := memberships.RemoveMemberRole(ctx, group.ID, adminID, service.GroupRoleAdmin, admin.Version); !errors.Is(err, service.ErrLastGroupAdmin) {
+		t.Fatalf("removing the last admin role error = %v, want ErrLastGroupAdmin", err)
 	}
 	if err := memberships.DeleteMembership(ctx, group.ID, adminID, admin.Version); !errors.Is(err, service.ErrLastGroupAdmin) {
-		t.Fatalf("removing last admin error = %v, want ErrLastGroupAdmin", err)
+		t.Fatalf("removing the last admin error = %v, want ErrLastGroupAdmin", err)
 	}
 
-	member, err := memberships.FindMembership(ctx, group.ID, memberID)
+	promoted, err := memberships.AddMemberRole(ctx, group.ID, memberID, service.GroupRoleAdmin, withCoach.Version)
 	if err != nil {
-		t.Fatalf("FindMembership(member) error = %v", err)
-	}
-	member.Role = service.GroupRoleAdmin
-	if _, err := memberships.UpdateMembershipRole(ctx, member, member.Version); err != nil {
 		t.Fatalf("promote member error = %v", err)
 	}
-	if err := memberships.DeleteMembership(ctx, group.ID, adminID, admin.Version); err != nil {
-		t.Fatalf("removing admin after promotion error = %v", err)
+	demoted, err := memberships.RemoveMemberRole(ctx, group.ID, adminID, service.GroupRoleAdmin, admin.Version)
+	if err != nil || len(demoted.Roles) != 0 || demoted.Version != admin.Version+1 {
+		t.Fatalf("demote former last admin = %+v, %v; want no roles at the next version", demoted, err)
 	}
-
-	count, err := memberships.CountMembers(ctx, group.ID)
-	if err != nil {
-		t.Fatalf("CountMembers() error = %v", err)
-	}
-	if count != 1 {
-		t.Fatalf("member count = %d, want 1", count)
-	}
-
-	secondAdminID := insertIntegrationUser(t, harness, "second-admin@example.test")
-	if _, err := memberships.CreateMembership(ctx, service.GroupMembership{GroupID: group.ID, UserID: secondAdminID, Role: service.GroupRoleMember, CreatedAt: 102}); err != nil {
-		t.Fatalf("CreateMembership(second) error = %v", err)
-	}
-	if err := memberships.DeleteMembership(ctx, group.ID, secondAdminID, 99); !errors.Is(err, service.ErrOptimisticLockConflict) {
+	if err := memberships.DeleteMembership(ctx, group.ID, adminID, admin.Version); !errors.Is(err, service.ErrOptimisticLockConflict) {
 		t.Fatalf("stale delete error = %v, want ErrOptimisticLockConflict", err)
 	}
+	if err := memberships.DeleteMembership(ctx, group.ID, adminID, demoted.Version); err != nil {
+		t.Fatalf("DeleteMembership() error = %v", err)
+	}
+	if err := memberships.DeleteMembership(ctx, group.ID, adminID, demoted.Version); !errors.Is(err, service.ErrMembershipNotFound) {
+		t.Fatalf("delete vanished member error = %v, want ErrMembershipNotFound", err)
+	}
+	if count, err := memberships.CountMembers(ctx, group.ID); err != nil || count != 1 {
+		t.Fatalf("member count = %d, %v; want 1", count, err)
+	}
+	var orphanRoles int
+	if err := harness.DB.QueryRowContext(ctx, "SELECT count(*) FROM group_member_roles WHERE user_id = $1", adminID).Scan(&orphanRoles); err != nil || orphanRoles != 0 {
+		t.Fatalf("roles left after removal = %d, %v", orphanRoles, err)
+	}
+	_ = promoted
 }
 
-func TestGroupRepositoryRosterVisibilityData(t *testing.T) {
+func TestMembershipAccessAndMemberList(t *testing.T) {
 	ctx := context.Background()
 	harness := migratedHarness(t)
 	memberships := mustMembershipRepository(t, harness)
-	groups := mustGroupRepository(t, harness)
+	teams := mustTeamRepository(t, harness)
 	adminID := insertIntegrationUser(t, harness, "admin@example.test")
-	memberID := insertIntegrationUser(t, harness, "member@example.test")
+	guestID := insertIntegrationGuest(t, harness)
+	outsiderID := insertIntegrationUser(t, harness, "outsider@example.test")
 
-	group, _, err := memberships.CreateGroupWithAdmin(ctx, service.Group{
-		Name: "Roster", NameNorm: "roster", InviteCode: "INVITE000004", CreatedBy: &adminID, CreatedAt: 100,
-	}, adminID, service.GroupRoleAdmin)
+	group, _, err := memberships.CreateGroupWithAdmin(ctx, service.Group{Name: "Access", NameNorm: "access", InviteCode: "INVITE000004", CreatedAt: 100}, adminID)
 	if err != nil {
 		t.Fatalf("CreateGroupWithAdmin() error = %v", err)
 	}
-	if _, err := memberships.CreateMembership(ctx, service.GroupMembership{GroupID: group.ID, UserID: memberID, Role: service.GroupRoleMember, CreatedAt: 101}); err != nil {
+	if _, err := memberships.CreateMembership(ctx, service.GroupMembership{GroupID: group.ID, UserID: guestID, Roles: []string{service.GroupRoleParent, service.GroupRolePlayer}, CreatedAt: 101}); err != nil {
 		t.Fatalf("CreateMembership() error = %v", err)
+	}
+	team, err := teams.CreateTeam(ctx, service.Team{GroupID: group.ID, Name: "U10", BirthYearFrom: 2015, BirthYearTo: 2016, CreatedAt: 102})
+	if err != nil {
+		t.Fatalf("CreateTeam() error = %v", err)
+	}
+	if err := teams.AddRosterEntry(ctx, group.ID, team.ID, guestID, service.GroupRolePlayer, 103); err != nil {
+		t.Fatalf("AddRosterEntry() error = %v", err)
+	}
+
+	access, err := memberships.FindMemberAccess(ctx, group.ID, guestID)
+	if err != nil {
+		t.Fatalf("FindMemberAccess() error = %v", err)
+	}
+	if !slices.Equal(access.Roles, []string{service.GroupRolePlayer, service.GroupRoleParent}) || !slices.Equal(access.OwnTeams, []service.TeamRole{{TeamID: team.ID, Role: service.GroupRolePlayer}}) {
+		t.Fatalf("access = %+v, want player and parent on U10", access)
+	}
+	if _, err := memberships.FindMemberAccess(ctx, group.ID, outsiderID); !errors.Is(err, service.ErrMembershipNotFound) {
+		t.Fatalf("outsider access error = %v, want ErrMembershipNotFound", err)
+	}
+	if exists, err := memberships.GroupExists(ctx, group.ID); err != nil || !exists {
+		t.Fatalf("GroupExists() = %v, %v", exists, err)
+	}
+	if exists, err := memberships.GroupExists(ctx, 999999); err != nil || exists {
+		t.Fatalf("GroupExists(missing) = %v, %v", exists, err)
 	}
 
 	members, err := memberships.ListMembers(ctx, group.ID)
 	if err != nil {
 		t.Fatalf("ListMembers() error = %v", err)
 	}
-	if len(members) != 2 || members[0].Role != service.GroupRoleAdmin || members[0].Version != 0 {
-		t.Fatalf("members = %+v, want admin first with version", members)
+	if len(members) != 2 || members[0].UserID != adminID || !members[0].HasRole(service.GroupRoleAdmin) {
+		t.Fatalf("members = %+v, want admin first", members)
 	}
+	if members[1].Kind != service.UserKindGuest || !slices.Equal(members[1].TeamIDs, []int64{team.ID}) || members[1].Email != nil {
+		t.Fatalf("guest member = %+v, want guest kind and team", members[1])
+	}
+}
 
-	found, err := groups.FindGroupByInviteCode(ctx, "INVITE000004")
+func TestGroupRepositoryInviteLookup(t *testing.T) {
+	ctx := context.Background()
+	harness := migratedHarness(t)
+	memberships := mustMembershipRepository(t, harness)
+	groups := mustGroupRepository(t, harness)
+	adminID := insertIntegrationUser(t, harness, "admin@example.test")
+
+	group, _, err := memberships.CreateGroupWithAdmin(ctx, service.Group{
+		Name: "Roster", NameNorm: "roster", InviteCode: "INVITE000006", CreatedBy: &adminID, CreatedAt: 100,
+	}, adminID)
+	if err != nil {
+		t.Fatalf("CreateGroupWithAdmin() error = %v", err)
+	}
+	found, err := groups.FindGroupByInviteCode(ctx, "INVITE000006")
 	if err != nil || found.ID != group.ID {
 		t.Fatalf("FindGroupByInviteCode() = %+v, %v", found, err)
 	}
 	if _, err := groups.FindGroupByInviteCode(ctx, "UNKNOWN00000"); !errors.Is(err, service.ErrGroupNotFound) {
 		t.Fatalf("unknown invite error = %v, want ErrGroupNotFound", err)
+	}
+}
+
+func TestGroupServiceRotateInviteChangesCode(t *testing.T) {
+	ctx := context.Background()
+	harness := migratedHarness(t)
+	groups := mustGroupRepository(t, harness)
+	memberships := mustMembershipRepository(t, harness)
+	users, err := NewUserRepository(harness.DB)
+	if err != nil {
+		t.Fatalf("NewUserRepository() error = %v", err)
+	}
+	ownerID := insertIntegrationUser(t, harness, "rotate@example.test")
+
+	group, _, err := memberships.CreateGroupWithAdmin(ctx, service.Group{
+		Name: "Rotate", NameNorm: "rotate", InviteCode: "INVITE000099", CreatedBy: &ownerID, CreatedAt: 100,
+	}, ownerID)
+	if err != nil {
+		t.Fatalf("CreateGroupWithAdmin() error = %v", err)
+	}
+	accessService, err := service.NewGroupAccessService(memberships, users)
+	if err != nil {
+		t.Fatalf("NewGroupAccessService() error = %v", err)
+	}
+	access, err := accessService.For(ctx, ownerID, group.ID)
+	if err != nil || !access.CanRotateInvite() {
+		t.Fatalf("For() = %+v, %v; want the owner's admin access", access, err)
+	}
+	serviceGroups, err := service.NewGroupService(groups, memberships, users)
+	if err != nil {
+		t.Fatalf("NewGroupService() error = %v", err)
+	}
+	before := group.InviteCode
+	after, err := serviceGroups.RotateInvite(ctx, service.GroupActor{Access: access, Origin: "192.0.2.1"})
+	if err != nil {
+		t.Fatalf("RotateInvite() error = %v", err)
+	}
+	if after == before || after == "" {
+		t.Fatalf("rotated code = %q, want a new code different from %q", after, before)
+	}
+	if _, err := groups.FindGroupByInviteCode(ctx, before); err == nil {
+		t.Fatal("previous invite code is still redeemable")
 	}
 }
 
@@ -224,6 +318,15 @@ func mustMembershipRepository(t *testing.T, harness *postgres.Harness) *GroupMem
 	return repository
 }
 
+func mustTeamRepository(t *testing.T, harness *postgres.Harness) *TeamRepository {
+	t.Helper()
+	repository, err := NewTeamRepository(harness.DB)
+	if err != nil {
+		t.Fatalf("NewTeamRepository() error = %v", err)
+	}
+	return repository
+}
+
 func insertIntegrationUser(t *testing.T, harness *postgres.Harness, email string) int64 {
 	t.Helper()
 	user := fixtures.NewUser()
@@ -236,63 +339,15 @@ func insertIntegrationUser(t *testing.T, harness *postgres.Harness, email string
 	return id
 }
 
-func TestGroupServiceRotateInviteChangesCode(t *testing.T) {
-	ctx := context.Background()
-	harness := migratedHarness(t)
-	groups := mustGroupRepository(t, harness)
-	memberships := mustMembershipRepository(t, harness)
-	ownerID := insertIntegrationUser(t, harness, "rotate@example.test")
-
-	group, _, err := memberships.CreateGroupWithAdmin(ctx, service.Group{
-		Name: "Rotate", NameNorm: "rotate", InviteCode: "INVITE000099", CreatedBy: &ownerID, CreatedAt: 100,
-	}, ownerID, service.GroupRoleAdmin)
+func insertIntegrationGuest(t *testing.T, harness *postgres.Harness) int64 {
+	t.Helper()
+	user := fixtures.NewUser()
+	user.Email = nil
+	user.Username = nil
+	user.Kind = string(service.UserKindGuest)
+	id, err := fixtures.InsertUser(context.Background(), harness.DB, user)
 	if err != nil {
-		t.Fatalf("CreateGroupWithAdmin() error = %v", err)
+		t.Fatalf("InsertUser(guest) error = %v", err)
 	}
-	serviceGroups, err := service.NewGroupService(groups, memberships, &singleUserRepository{userID: ownerID})
-	if err != nil {
-		t.Fatalf("NewGroupService() error = %v", err)
-	}
-	before := group.InviteCode
-	after, err := serviceGroups.RotateInvite(ctx, ownerID, group.ID)
-	if err != nil {
-		t.Fatalf("RotateInvite() error = %v", err)
-	}
-	if after == before || after == "" {
-		t.Fatalf("rotated code = %q, want a new code different from %q", after, before)
-	}
-	persisted, err := groups.FindGroupByID(ctx, group.ID)
-	if err != nil {
-		t.Fatalf("FindGroupByID() error = %v", err)
-	}
-	if persisted.InviteCode != after {
-		t.Fatalf("persisted invite code = %q, want %q", persisted.InviteCode, after)
-	}
-	if _, err := groups.FindGroupByInviteCode(ctx, before); err == nil {
-		t.Fatal("previous invite code is still redeemable")
-	}
+	return id
 }
-
-type singleUserRepository struct{ userID int64 }
-
-func (r *singleUserRepository) CreateUser(context.Context, service.User) (service.User, error) {
-	return service.User{}, nil
-}
-
-func (r *singleUserRepository) FindUserByID(context.Context, int64) (service.User, error) {
-	return service.User{ID: r.userID}, nil
-}
-
-func (r *singleUserRepository) FindUserByEmail(context.Context, string) (service.User, error) {
-	return service.User{}, service.ErrUserNotFound
-}
-
-func (r *singleUserRepository) FindUserByUsername(context.Context, string) (service.User, error) {
-	return service.User{}, service.ErrUserNotFound
-}
-
-func (r *singleUserRepository) UpdateUser(context.Context, service.User, int64) (service.User, error) {
-	return service.User{}, service.ErrUserNotFound
-}
-
-func (r *singleUserRepository) DeleteUser(context.Context, int64, int64) error { return nil }

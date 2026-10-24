@@ -33,9 +33,9 @@ func (r *DatastoreStatsRepository) CountAccounts(ctx context.Context) (service.A
 	if err := db.QueryRowContext(ctx, `
 		SELECT
 			COUNT(*),
-			COUNT(*) FILTER (WHERE is_guest),
+			COUNT(*) FILTER (WHERE kind = 'guest'),
 			COUNT(*) FILTER (WHERE is_admin),
-			COUNT(*) FILTER (WHERE is_guest = FALSE AND email IS NOT NULL AND email_verified_at IS NULL)
+			COUNT(*) FILTER (WHERE kind = 'account' AND email IS NOT NULL AND email_verified_at IS NULL)
 		FROM users
 	`).Scan(&counts.Total, &counts.Guests, &counts.Administrators, &counts.Unconfirmed); err != nil {
 		return service.AccountCounts{}, wrapOperation("count accounts", err)

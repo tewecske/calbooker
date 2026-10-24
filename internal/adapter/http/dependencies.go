@@ -31,9 +31,10 @@ type Dependencies struct {
 	LocaleSettings LocaleSettingsUpdater
 	ThemeUpdater   AccountThemeUpdater
 
-	Groups       GroupUseCases
-	GroupInvites GroupInviter
-	JoinGroup    JoinRateLimitedGroupJoiner
+	Groups      GroupUseCases
+	GroupAccess GroupAccessProvider
+	Teams       TeamUseCases
+	JoinGroup   JoinRateLimitedGroupJoiner
 
 	AdminAccounts       AdminAccountLister
 	AdminAccountEditor  AdminAccountEditor

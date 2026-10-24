@@ -80,7 +80,7 @@ func (h *authHandler) ssoCallback(writer http.ResponseWriter, request *http.Requ
 	// A guest reaches the issuer only through the upgrade flow, so failures
 	// for a guest browser return to the upgrade page.
 	actor, signedIn := h.currentUser(request)
-	guest := signedIn && actor.IsGuest
+	guest := signedIn && actor.IsGuest()
 	if !bound || query.Get("error") != "" {
 		h.ssoCallbackFailure(writer, request, guest, nil)
 		return
@@ -99,7 +99,7 @@ func (h *authHandler) ssoCallback(writer http.ResponseWriter, request *http.Requ
 func (h *authHandler) ssoGuestUpgrade(writer http.ResponseWriter, request *http.Request) {
 	language := recoveryLanguage(request)
 	user, authenticated := h.currentUser(request)
-	isGuest := authenticated && user.IsGuest
+	isGuest := authenticated && user.IsGuest()
 	if request.Method == http.MethodGet {
 		var alerts []Alert
 		switch request.URL.Query().Get("sso") {

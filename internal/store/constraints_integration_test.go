@@ -108,8 +108,8 @@ func TestSchemaUniqueConstraintsRejectDuplicates(t *testing.T) {
 		{"INSERT INTO oauth_identities (user_id, provider, subject, created_at) VALUES ($1, 'example', 'dup-subject', 100)", []any{userA}},
 		{"INSERT INTO guest_claim_codes (user_id, code, created_at) VALUES ($1, 'dup-claim', 100)", []any{userA}},
 		{"INSERT INTO oauth_states (state, provider, action, created_at, expires_at) VALUES ('dup-state', 'google', 'sign-in', 100, 200)", nil},
-		{"INSERT INTO group_members (group_id, user_id, role, created_at) VALUES ($1, $2, 'admin', 100)", []any{groupA, userA}},
-		{"INSERT INTO group_members (group_id, user_id, role, created_at) VALUES ($1, $2, 'member', 100)", []any{groupA, userB}},
+		{"INSERT INTO group_members (group_id, user_id, created_at) VALUES ($1, $2, 100)", []any{groupA, userA}},
+		{"INSERT INTO group_members (group_id, user_id, created_at) VALUES ($1, $2, 100)", []any{groupA, userB}},
 	}
 	for _, insert := range baseline {
 		if _, err := harness.DB.ExecContext(ctx, insert.statement, insert.args...); err != nil {
@@ -127,8 +127,8 @@ func TestSchemaUniqueConstraintsRejectDuplicates(t *testing.T) {
 
 	t.Run("duplicate membership", func(t *testing.T) {
 		if _, err := harness.DB.ExecContext(ctx, `
-			INSERT INTO group_members (group_id, user_id, role, created_at)
-			VALUES ($1, $2, 'member', 200)
+			INSERT INTO group_members (group_id, user_id, created_at)
+			VALUES ($1, $2, 200)
 		`, groupA, userA); err == nil {
 			t.Fatal("duplicate group membership was accepted")
 		}
@@ -187,16 +187,16 @@ func TestSchemaForeignKeysRejectOrphans(t *testing.T) {
 
 	t.Run("membership group", func(t *testing.T) {
 		if _, err := harness.DB.ExecContext(ctx, `
-			INSERT INTO group_members (group_id, user_id, role, created_at)
-			VALUES ($1, $2, 'member', 100)
+			INSERT INTO group_members (group_id, user_id, created_at)
+			VALUES ($1, $2, 100)
 		`, missingID, userID); err == nil {
 			t.Fatal("membership with missing group was accepted")
 		}
 	})
 	t.Run("membership user", func(t *testing.T) {
 		if _, err := harness.DB.ExecContext(ctx, `
-			INSERT INTO group_members (group_id, user_id, role, created_at)
-			VALUES ($1, $2, 'member', 100)
+			INSERT INTO group_members (group_id, user_id, created_at)
+			VALUES ($1, $2, 100)
 		`, groupID, missingID); err == nil {
 			t.Fatal("membership with missing user was accepted")
 		}
@@ -218,7 +218,7 @@ func TestSchemaCascadesOwnedRowsAndDetachesHistory(t *testing.T) {
 		{"INSERT INTO oauth_identities (user_id, provider, subject, created_at) VALUES ($1, 'example', 'cascade-subject', 100)"},
 		{"INSERT INTO guest_claim_codes (user_id, code, created_at) VALUES ($1, 'cascade-claim', 100)"},
 		{"INSERT INTO oauth_states (state, provider, action, user_id, created_at, expires_at) VALUES ('cascade-state', 'google', 'link', $1, 100, 200)"},
-		{"INSERT INTO group_members (group_id, user_id, role, created_at) VALUES ($1, $2, 'admin', 100)"},
+		{"INSERT INTO group_members (group_id, user_id, created_at) VALUES ($1, $2, 100)"},
 	}
 	for i, insert := range owned {
 		args := []any{owner}
@@ -295,8 +295,8 @@ func TestSchemaGroupDeletionCascadesMemberships(t *testing.T) {
 	keepGroup := seedConstraintGroup(t, harness.DB, "invite-keep", owner)
 	deleteGroup := seedConstraintGroup(t, harness.DB, "invite-remove", owner)
 	if _, err := harness.DB.ExecContext(ctx, `
-		INSERT INTO group_members (group_id, user_id, role, created_at)
-		VALUES ($1, $2, 'admin', 100), ($3, $2, 'admin', 100)
+		INSERT INTO group_members (group_id, user_id, created_at)
+		VALUES ($1, $2, 100), ($3, $2, 100)
 	`, keepGroup, owner, deleteGroup); err != nil {
 		t.Fatalf("insert memberships: %v", err)
 	}
@@ -392,8 +392,8 @@ func TestSchemaWritesAreAtomic(t *testing.T) {
 		owner := seedConstraintUser(t, harness.DB, "atomic-owner@example.test")
 		groupID := seedConstraintGroup(t, harness.DB, "invite-atomic", owner)
 		result, err := harness.DB.ExecContext(ctx, `
-			INSERT INTO group_members (group_id, user_id, role, created_at)
-			VALUES ($1, $2, 'admin', 100)
+			INSERT INTO group_members (group_id, user_id, created_at)
+			VALUES ($1, $2, 100)
 			ON CONFLICT (group_id, user_id) DO NOTHING
 		`, groupID, owner)
 		if err != nil {
@@ -403,8 +403,8 @@ func TestSchemaWritesAreAtomic(t *testing.T) {
 			t.Fatalf("first insert rows = %d, want 1", inserted)
 		}
 		result, err = harness.DB.ExecContext(ctx, `
-			INSERT INTO group_members (group_id, user_id, role, created_at)
-			VALUES ($1, $2, 'member', 101)
+			INSERT INTO group_members (group_id, user_id, created_at)
+			VALUES ($1, $2, 101)
 			ON CONFLICT (group_id, user_id) DO NOTHING
 		`, groupID, owner)
 		if err != nil {

@@ -63,7 +63,7 @@ func (s *GuestClaimService) Issue(ctx context.Context, userID int64) (GuestClaim
 	if err != nil {
 		return GuestClaimCode{}, fmt.Errorf("find guest for claim code: %w", err)
 	}
-	if user.ID != userID || !user.IsGuest {
+	if user.ID != userID || !user.IsGuest() {
 		return GuestClaimCode{}, ErrNotGuest
 	}
 

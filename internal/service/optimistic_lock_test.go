@@ -101,23 +101,28 @@ func TestOptimisticLockOutcomesForAdministratorDelete(t *testing.T) {
 func TestOptimisticLockOutcomesForGroupEditors(t *testing.T) {
 	conflict := ErrOptimisticLockConflict
 
+	newService := func(groups *groupRepositoryStub, memberships *groupMembershipRepositoryStub) *GroupService {
+		service, err := NewGroupService(groups, memberships, usersWith(User{ID: 7}))
+		if err != nil {
+			t.Fatalf("NewGroupService() error = %v", err)
+		}
+		return service
+	}
+	withMember := func() *groupMembershipRepositoryStub {
+		memberships := newMembershipStub()
+		memberships.memberships[8] = GroupMembership{GroupID: 5, UserID: 8, Roles: []string{GroupRolePlayer}, Version: 1}
+		return memberships
+	}
 	tests := []struct {
 		name    string
 		run     func(writeErr error) error
 		missing error
 	}{
 		{
-			name: "group rename",
+			name: "group settings",
 			run: func(writeErr error) error {
-				groups := &groupRepositoryStub{
-					group:     Group{ID: 5, Name: "Old", NameNorm: "old", Version: 1},
-					updateErr: writeErr,
-				}
-				service, err := NewGroupService(groups, &groupMembershipRepositoryStub{member: true, role: GroupRoleAdmin}, &groupUserRepositoryStub{user: User{ID: 7}})
-				if err != nil {
-					t.Fatalf("NewGroupService() error = %v", err)
-				}
-				_, err = service.Rename(context.Background(), 7, 5, 1, "Renamed")
+				groups := &groupRepositoryStub{group: Group{ID: 5, Name: "Old", NameNorm: "old", TimeZone: "UTC", Version: 1}, updateErr: writeErr}
+				_, err := newService(groups, newMembershipStub()).UpdateSettings(context.Background(), adminActor(), 1, "Renamed", "UTC")
 				return err
 			},
 			missing: ErrGroupNotFound,
@@ -125,28 +130,28 @@ func TestOptimisticLockOutcomesForGroupEditors(t *testing.T) {
 		{
 			name: "group invite rotation",
 			run: func(writeErr error) error {
-				groups := &groupRepositoryStub{
-					group:     Group{ID: 5, InviteCode: "OLDCODE12345", Version: 1},
-					updateErr: writeErr,
-				}
-				service, err := NewGroupService(groups, &groupMembershipRepositoryStub{member: true, role: GroupRoleAdmin}, &groupUserRepositoryStub{user: User{ID: 7}})
-				if err != nil {
-					t.Fatalf("NewGroupService() error = %v", err)
-				}
-				_, err = service.RotateInvite(context.Background(), 7, 5)
+				groups := &groupRepositoryStub{group: Group{ID: 5, InviteCode: "OLDCODE12345", Version: 1}, updateErr: writeErr}
+				_, err := newService(groups, newMembershipStub()).RotateInvite(context.Background(), adminActor())
 				return err
 			},
 			missing: ErrGroupNotFound,
 		},
 		{
-			name: "membership role change",
+			name: "role added",
 			run: func(writeErr error) error {
-				memberships := &groupMembershipRepositoryStub{member: true, role: GroupRoleAdmin, updateErr: writeErr}
-				service, err := NewGroupService(&groupRepositoryStub{group: Group{ID: 5, Version: 1}}, memberships, &groupUserRepositoryStub{user: User{ID: 7}})
-				if err != nil {
-					t.Fatalf("NewGroupService() error = %v", err)
-				}
-				_, err = service.ChangeRole(context.Background(), 7, 5, 8, 1, GroupRoleMember)
+				memberships := withMember()
+				memberships.addErr = writeErr
+				_, err := newService(&groupRepositoryStub{}, memberships).AddRole(context.Background(), adminActor(), 8, 1, GroupRoleParent)
+				return err
+			},
+			missing: ErrMembershipNotFound,
+		},
+		{
+			name: "role removed",
+			run: func(writeErr error) error {
+				memberships := withMember()
+				memberships.removeErr = writeErr
+				_, err := newService(&groupRepositoryStub{}, memberships).RemoveRole(context.Background(), adminActor(), 8, 1, GroupRolePlayer)
 				return err
 			},
 			missing: ErrMembershipNotFound,
@@ -154,12 +159,9 @@ func TestOptimisticLockOutcomesForGroupEditors(t *testing.T) {
 		{
 			name: "membership removal",
 			run: func(writeErr error) error {
-				memberships := &groupMembershipRepositoryStub{member: true, role: GroupRoleAdmin, deleteErr: writeErr}
-				service, err := NewGroupService(&groupRepositoryStub{group: Group{ID: 5, Version: 1}}, memberships, &groupUserRepositoryStub{user: User{ID: 7}})
-				if err != nil {
-					t.Fatalf("NewGroupService() error = %v", err)
-				}
-				return service.RemoveMember(context.Background(), 7, 5, 8, 1)
+				memberships := withMember()
+				memberships.deleteErr = writeErr
+				return newService(&groupRepositoryStub{}, memberships).RemoveMember(context.Background(), adminActor(), 8, 1)
 			},
 			missing: ErrMembershipNotFound,
 		},
@@ -182,7 +184,7 @@ func TestWriteConflictPredicateMatchesOnlyConflictSentinels(t *testing.T) {
 	if !IsWriteConflict(ErrOptimisticLockConflict) || !IsWriteConflict(ErrRecordNotFound) {
 		t.Fatal("write conflict sentinels must report a conflict")
 	}
-	for _, err := range []error{ErrInvalidSettings, ErrNotGroupAdmin, nil} {
+	for _, err := range []error{ErrInvalidSettings, ErrGroupForbidden, nil} {
 		if IsWriteConflict(err) {
 			t.Errorf("IsWriteConflict(%v) = true, want false", err)
 		}

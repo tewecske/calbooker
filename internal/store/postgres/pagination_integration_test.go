@@ -19,13 +19,13 @@ const paginationUserCount = 257
 func seedPaginationUsers(t *testing.T, db *sql.DB) {
 	t.Helper()
 	if _, err := db.ExecContext(context.Background(), `
-		INSERT INTO users (email, username, display_name, is_admin, is_guest, theme, locale, created_at, email_verified_at)
+		INSERT INTO users (email, username, display_name, is_admin, kind, theme, locale, created_at, email_verified_at)
 		SELECT
 			'pagination-' || lpad(series.i::text, 4, '0') || '@example.test',
 			'pagination-' || lpad(series.i::text, 4, '0'),
 			'Pagination User ' || series.i,
 			(series.i % 5 = 0),
-			FALSE,
+			'account',
 			'light',
 			'en',
 			1000 + (series.i % 10),
@@ -265,7 +265,9 @@ func TestDatastorePerformanceIndexesExist(t *testing.T) {
 		"guest_claim_codes_user_id_idx",
 		"guest_claim_codes_active_user_idx",
 		"groups_name_norm_idx",
-		"group_members_group_id_idx",
+		"group_member_roles_role_idx",
+		"teams_group_id_idx",
+		"team_members_member_idx",
 		"group_members_user_id_idx",
 		"audit_log_occurred_at_idx",
 		"audit_log_actor_user_id_idx",

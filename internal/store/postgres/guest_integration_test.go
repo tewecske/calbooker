@@ -144,7 +144,7 @@ func TestGuestCleanupDeletesOnlyOldEmptyGuests(t *testing.T) {
 	if err := harness.DB.QueryRowContext(context.Background(), "SELECT id FROM groups WHERE invite_code = 'member-invite'").Scan(&groupID); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := harness.DB.ExecContext(context.Background(), "INSERT INTO group_members (group_id, user_id, role, created_at) VALUES ($1, $2, 'member', 100)", groupID, memberGuest); err != nil {
+	if _, err := harness.DB.ExecContext(context.Background(), "INSERT INTO group_members (group_id, user_id, created_at) VALUES ($1, $2, 100)", groupID, memberGuest); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := harness.DB.ExecContext(context.Background(), "INSERT INTO groups (name, name_norm, invite_code, created_by, created_at) VALUES ('Creator Group', 'creator group', 'creator-invite', $1, 100)", groupCreator); err != nil {
@@ -200,7 +200,7 @@ func TestGuestCleanupWaitsForConcurrentMembershipInsert(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := tx.ExecContext(context.Background(), "INSERT INTO group_members (group_id, user_id, role, created_at) VALUES ($1, $2, 'member', 100)", groupID, guestID); err != nil {
+	if _, err := tx.ExecContext(context.Background(), "INSERT INTO group_members (group_id, user_id, created_at) VALUES ($1, $2, 100)", groupID, guestID); err != nil {
 		_ = tx.Rollback()
 		t.Fatal(err)
 	}
@@ -283,7 +283,7 @@ func insertGuest(t *testing.T, db interface {
 }, createdAt int64) int64 {
 	t.Helper()
 	var userID int64
-	if err := db.QueryRowContext(context.Background(), "INSERT INTO users (is_guest, theme, locale, created_at) VALUES (TRUE, 'light', 'en', $1) RETURNING id", createdAt).Scan(&userID); err != nil {
+	if err := db.QueryRowContext(context.Background(), "INSERT INTO users (kind, theme, locale, created_at) VALUES ('guest', 'light', 'en', $1) RETURNING id", createdAt).Scan(&userID); err != nil {
 		t.Fatalf("insert guest: %v", err)
 	}
 	return userID

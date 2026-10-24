@@ -24,7 +24,7 @@ func (h *authHandler) guestWrite(writer http.ResponseWriter, request *http.Reque
 	language := recoveryLanguage(request)
 	user, authenticated := h.currentUser(request)
 	if request.Method == http.MethodGet {
-		h.renderGuest(writer, request, "guest-write", user, authenticated && user.IsGuest, false, "", FormData{})
+		h.renderGuest(writer, request, "guest-write", user, authenticated && user.IsGuest(), false, "", FormData{})
 		return
 	}
 	if request.Method != http.MethodPost {
@@ -33,7 +33,7 @@ func (h *authHandler) guestWrite(writer http.ResponseWriter, request *http.Reque
 		return
 	}
 	if authenticated {
-		h.renderGuest(writer, request, "guest-write", user, user.IsGuest, true, "", FormData{})
+		h.renderGuest(writer, request, "guest-write", user, user.IsGuest(), true, "", FormData{})
 		return
 	}
 	if h.dependencies.GuestCreator == nil || h.dependencies.SessionCookie == nil {
@@ -60,7 +60,7 @@ func (h *authHandler) guestWrite(writer http.ResponseWriter, request *http.Reque
 func (h *authHandler) guestTransfer(writer http.ResponseWriter, request *http.Request) {
 	language := recoveryLanguage(request)
 	user, authenticated := h.currentUser(request)
-	isGuest := authenticated && user.IsGuest
+	isGuest := authenticated && user.IsGuest()
 	if request.Method == http.MethodGet {
 		h.renderGuest(writer, request, "guest-transfer", user, isGuest, false, "", FormData{})
 		return

@@ -3,23 +3,47 @@ package service
 import (
 	"context"
 	"errors"
+	"slices"
 	"strings"
 	"testing"
 )
 
 var errGroupCreateBoom = errors.New("boom")
 
+func adminActor() GroupActor {
+	return GroupActor{Access: accessFor(memberWith(GroupRoleAdmin)), Origin: "192.0.2.1"}
+}
+
+func actorWith(grants GroupAccessGrants) GroupActor {
+	return GroupActor{Access: accessFor(grants), Origin: "192.0.2.1"}
+}
+
+func newTestGroupService(t *testing.T, groups *groupRepositoryStub, memberships *groupMembershipRepositoryStub, users *groupUserRepositoryStub) (*GroupService, *auditRecorderStub) {
+	t.Helper()
+	service, err := NewGroupService(groups, memberships, users)
+	if err != nil {
+		t.Fatalf("NewGroupService() error = %v", err)
+	}
+	auditor := &auditRecorderStub{}
+	service.SetAuditor(auditor)
+	return service, auditor
+}
+
 func TestGroupServiceCreate(t *testing.T) {
 	tests := []struct {
 		name      string
 		user      User
 		groupName string
+		timeZone  string
 		createErr error
 		wantErr   error
-		wantRole  string
+		wantZone  string
 	}{
-		{name: "creates group with creator as administrator", user: User{ID: 7}, groupName: "  Example Group  ", wantRole: GroupRoleAdmin},
-		{name: "rejects guest creator", user: User{ID: 7, IsGuest: true}, groupName: "Example", wantErr: ErrInvalidGroup},
+		{name: "creates group with creator as administrator", user: User{ID: 7, Email: strPtr("owner@example.test")}, groupName: "  Example Group  ", wantZone: DefaultGroupTimeZone},
+		{name: "uses the chosen time zone", user: User{ID: 7}, groupName: "Example", timeZone: " Europe/Vienna ", wantZone: "Europe/Vienna"},
+		{name: "rejects an unknown time zone", user: User{ID: 7}, groupName: "Example", timeZone: "Mars/Olympus", wantErr: ErrInvalidTimeZone},
+		{name: "rejects guest creator", user: User{ID: 7, Kind: UserKindGuest}, groupName: "Example", wantErr: ErrGroupRequiresAccount},
+		{name: "rejects profile creator", user: User{ID: 7, Kind: UserKindProfile}, groupName: "Example", wantErr: ErrGroupRequiresAccount},
 		{name: "rejects empty name", user: User{ID: 7}, groupName: "   ", wantErr: ErrInvalidGroupName},
 		{name: "rejects oversized name", user: User{ID: 7}, groupName: strings.Repeat("a", maxGroupNameLength+1), wantErr: ErrInvalidGroupName},
 		{name: "propagates non-collision failure", user: User{ID: 7}, groupName: "Example", createErr: errGroupCreateBoom, wantErr: errGroupCreateBoom},
@@ -27,49 +51,43 @@ func TestGroupServiceCreate(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			users := &groupUserRepositoryStub{user: test.user}
-			memberships := &groupMembershipRepositoryStub{}
-			if test.createErr != nil {
-				memberships.createErr = test.createErr
-			}
-			service, err := NewGroupService(&groupRepositoryStub{}, memberships, users)
-			if err != nil {
-				t.Fatalf("NewGroupService() error = %v", err)
-			}
-			summary, err := service.Create(context.Background(), test.user.ID, test.groupName)
+			memberships := newMembershipStub()
+			memberships.createErr = test.createErr
+			service, auditor := newTestGroupService(t, &groupRepositoryStub{}, memberships, usersWith(test.user))
+			summary, err := service.Create(context.Background(), test.user.ID, "192.0.2.1", test.groupName, test.timeZone)
 			if test.wantErr != nil {
 				if !errors.Is(err, test.wantErr) {
 					t.Fatalf("Create() error = %v, want errors.Is(_, %v)", err, test.wantErr)
+				}
+				if len(auditor.records) != 0 {
+					t.Fatalf("failed create audited %d records", len(auditor.records))
 				}
 				return
 			}
 			if err != nil {
 				t.Fatalf("Create() error = %v, want nil", err)
 			}
-			if summary.Role != test.wantRole {
-				t.Fatalf("summary role = %q, want %q", summary.Role, test.wantRole)
+			if !slices.Equal(summary.Roles, []string{GroupRoleAdmin}) || summary.Group.TimeZone != test.wantZone {
+				t.Fatalf("summary = %+v, want admin in %s", summary, test.wantZone)
 			}
 			if len(summary.Group.InviteCode) != groupInviteCodeLength {
 				t.Fatalf("invite code length = %d, want %d", len(summary.Group.InviteCode), groupInviteCodeLength)
 			}
-			if summary.Group.CreatedBy == nil || *summary.Group.CreatedBy != test.user.ID {
-				t.Fatalf("created_by = %v, want %d", summary.Group.CreatedBy, test.user.ID)
+			if summary.Group.CreatedBy == nil || *summary.Group.CreatedBy != test.user.ID || memberships.adminUserID != test.user.ID {
+				t.Fatalf("creator = %v / %d, want %d", summary.Group.CreatedBy, memberships.adminUserID, test.user.ID)
 			}
-			if memberships.adminUserID != test.user.ID || memberships.adminRole != GroupRoleAdmin {
-				t.Fatalf("membership = user %d role %q, want admin", memberships.adminUserID, memberships.adminRole)
+			if len(auditor.records) != 1 || auditor.records[0].Action != AuditActionGroupCreated || auditor.records[0].IP != "192.0.2.1" {
+				t.Fatalf("audit = %+v, want one group.created record with origin", auditor.records)
 			}
 		})
 	}
 }
 
 func TestGroupServiceCreateRetriesInviteCollision(t *testing.T) {
-	users := &groupUserRepositoryStub{user: User{ID: 7}}
-	memberships := &groupMembershipRepositoryStub{collisions: 2}
-	service, err := NewGroupService(&groupRepositoryStub{}, memberships, users)
-	if err != nil {
-		t.Fatalf("NewGroupService() error = %v", err)
-	}
-	if _, err := service.Create(context.Background(), 7, "Example"); err != nil {
+	memberships := newMembershipStub()
+	memberships.collisions = 2
+	service, _ := newTestGroupService(t, &groupRepositoryStub{}, memberships, usersWith(User{ID: 7}))
+	if _, err := service.Create(context.Background(), 7, "", "Example", ""); err != nil {
 		t.Fatalf("Create() error = %v, want nil", err)
 	}
 	if memberships.createCalls != 3 {
@@ -77,206 +95,355 @@ func TestGroupServiceCreateRetriesInviteCollision(t *testing.T) {
 	}
 }
 
-func TestGroupServiceList(t *testing.T) {
-	groups := &groupRepositoryStub{summaries: []GroupSummary{{Group: Group{ID: 1}, MemberCount: 0, Role: GroupRoleMember}}}
-	service, err := NewGroupService(groups, &groupMembershipRepositoryStub{}, &groupUserRepositoryStub{user: User{ID: 7}})
-	if err != nil {
-		t.Fatalf("NewGroupService() error = %v", err)
-	}
-	summaries, err := service.List(context.Background(), 7)
-	if err != nil {
-		t.Fatalf("List() error = %v", err)
-	}
-	if len(summaries) != 1 || summaries[0].MemberCount != 1 {
-		t.Fatalf("List() = %+v, want member count normalized to 1", summaries)
-	}
-}
-
 func TestGroupServiceListIncludesEveryGroupForSiteAdministrator(t *testing.T) {
-	memberGroups := []GroupSummary{{Group: Group{ID: 1}, MemberCount: 1, Role: GroupRoleMember}}
-	allGroups := []GroupSummary{
-		{Group: Group{ID: 1}, MemberCount: 1, Role: GroupRoleMember},
-		{Group: Group{ID: 2}, MemberCount: 3},
-	}
+	memberGroups := []GroupSummary{{Group: Group{ID: 1}, MemberCount: 1, Roles: []string{GroupRolePlayer, GroupRoleAdmin}}}
+	allGroups := []GroupSummary{memberGroups[0], {Group: Group{ID: 2}, MemberCount: 3}}
+	groups := &groupRepositoryStub{summaries: memberGroups, allSummaries: allGroups}
 
-	administrator, err := NewGroupService(
-		&groupRepositoryStub{summaries: memberGroups, allSummaries: allGroups},
-		&groupMembershipRepositoryStub{},
-		&groupUserRepositoryStub{user: User{ID: 7, IsAdmin: true}},
-	)
-	if err != nil {
-		t.Fatalf("NewGroupService() error = %v", err)
-	}
+	administrator, _ := newTestGroupService(t, groups, newMembershipStub(), usersWith(User{ID: 7, IsAdmin: true}))
 	summaries, err := administrator.List(context.Background(), 7)
-	if err != nil {
-		t.Fatalf("List() error = %v", err)
+	if err != nil || len(summaries) != 2 || len(summaries[1].Roles) != 0 {
+		t.Fatalf("site administrator List() = %+v, %v; want every group without invented roles", summaries, err)
 	}
-	if len(summaries) != 2 {
-		t.Fatalf("List() returned %d groups, want every group", len(summaries))
-	}
-	if summaries[1].Role != "" {
-		t.Fatalf("non-member group role = %q, want empty", summaries[1].Role)
+	if !slices.Equal(summaries[0].Roles, []string{GroupRoleAdmin, GroupRolePlayer}) {
+		t.Fatalf("roles = %v, want display order", summaries[0].Roles)
 	}
 
-	ordinary, err := NewGroupService(
-		&groupRepositoryStub{summaries: memberGroups, allSummaries: allGroups},
-		&groupMembershipRepositoryStub{},
-		&groupUserRepositoryStub{user: User{ID: 7}},
-	)
-	if err != nil {
-		t.Fatalf("NewGroupService() error = %v", err)
+	ordinary, _ := newTestGroupService(t, groups, newMembershipStub(), usersWith(User{ID: 7}))
+	if summaries, err := ordinary.List(context.Background(), 7); err != nil || len(summaries) != 1 {
+		t.Fatalf("ordinary List() = %+v, %v; want only memberships", summaries, err)
 	}
-	memberships, err := ordinary.List(context.Background(), 7)
-	if err != nil {
-		t.Fatalf("List() error = %v", err)
-	}
-	if len(memberships) != 1 {
-		t.Fatalf("ordinary List() returned %d groups, want only memberships", len(memberships))
+	if _, err := ordinary.List(context.Background(), 0); !errors.Is(err, ErrInvalidUserID) {
+		t.Fatalf("List(0) error = %v", err)
 	}
 }
 
-func TestGroupServiceDetailVisibility(t *testing.T) {
-	tests := []struct {
-		name            string
-		role            string
-		member          bool
-		wantErr         error
-		wantInvite      bool
-		wantRoster      bool
-		wantOtherEmails bool
+func TestGroupServiceOverviewShowsInviteOnlyToManagers(t *testing.T) {
+	groups := &groupRepositoryStub{group: Group{ID: 5, Name: "Club", InviteCode: "ABCDEFGHJKLM", TimeZone: "Europe/Budapest"}}
+	service, _ := newTestGroupService(t, groups, newMembershipStub(), usersWith(User{ID: 7}))
+	for _, test := range []struct {
+		grants     GroupAccessGrants
+		wantInvite bool
 	}{
-		{name: "administrator sees invite code, roster, and emails", role: GroupRoleAdmin, member: true, wantInvite: true, wantRoster: true, wantOtherEmails: true},
-		{name: "member sees roster without invite code or others' emails", role: GroupRoleMember, member: true, wantRoster: true},
-		{name: "non-member gets not found", member: false, wantErr: ErrGroupNotFound},
+		{memberWith(GroupRoleAdmin), true},
+		{memberWith(GroupRoleManager), true},
+		{memberWith(GroupRoleCoach), false},
+		{memberWith(GroupRolePlayer), false},
+	} {
+		overview, err := service.Overview(context.Background(), accessFor(test.grants))
+		if err != nil {
+			t.Fatalf("Overview() error = %v", err)
+		}
+		if (overview.InviteCode != "") != test.wantInvite {
+			t.Fatalf("roles %v invite = %q, want shown %v", test.grants.Roles, overview.InviteCode, test.wantInvite)
+		}
 	}
+	if _, err := service.Overview(context.Background(), accessFor(GroupAccessGrants{})); !errors.Is(err, ErrGroupNotFound) {
+		t.Fatalf("outsider Overview() error = %v, want ErrGroupNotFound", err)
+	}
+	if _, err := service.Group(context.Background(), nil); !errors.Is(err, ErrGroupNotFound) {
+		t.Fatalf("outsider Group() error = %v, want ErrGroupNotFound", err)
+	}
+}
 
+func TestGroupServiceUpdateSettings(t *testing.T) {
+	tests := []struct {
+		name     string
+		actor    GroupActor
+		version  int64
+		groupNm  string
+		zone     string
+		writeErr error
+		wantErr  error
+	}{
+		{name: "admin saves name and time zone", actor: adminActor(), version: 1, groupNm: "Renamed", zone: "Europe/Vienna"},
+		{name: "manager saves", actor: actorWith(memberWith(GroupRoleManager)), version: 1, groupNm: "Renamed", zone: "UTC"},
+		{name: "coach is forbidden", actor: actorWith(memberWith(GroupRoleCoach)), version: 1, groupNm: "Renamed", zone: "UTC", wantErr: ErrGroupForbidden},
+		{name: "outsider is not found", actor: actorWith(GroupAccessGrants{}), version: 1, groupNm: "Renamed", zone: "UTC", wantErr: ErrGroupNotFound},
+		{name: "invalid time zone", actor: adminActor(), version: 1, groupNm: "Renamed", zone: "Local", wantErr: ErrInvalidTimeZone},
+		{name: "invalid name", actor: adminActor(), version: 1, groupNm: " ", zone: "UTC", wantErr: ErrInvalidGroupName},
+		{name: "negative revision", actor: adminActor(), version: -1, groupNm: "Renamed", zone: "UTC", wantErr: ErrInvalidGroup},
+		{name: "stale revision", actor: adminActor(), version: 1, groupNm: "Renamed", zone: "UTC", writeErr: ErrOptimisticLockConflict, wantErr: ErrOptimisticLockConflict},
+		{name: "vanished group", actor: adminActor(), version: 1, groupNm: "Renamed", zone: "UTC", writeErr: ErrGroupNotFound, wantErr: ErrGroupNotFound},
+	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			members := []GroupMember{{UserID: 7, Role: GroupRoleAdmin, Email: stringPointer("viewer@example.test")}, {UserID: 8, Role: GroupRoleMember, Email: stringPointer("other@example.test")}}
-			memberships := &groupMembershipRepositoryStub{member: test.member, role: test.role, members: members}
-			service, err := NewGroupService(&groupRepositoryStub{group: Group{ID: 5, InviteCode: "ABCDEFGHJKLM"}}, memberships, &groupUserRepositoryStub{user: User{ID: 7}})
-			if err != nil {
-				t.Fatalf("NewGroupService() error = %v", err)
-			}
-			detail, err := service.Detail(context.Background(), 7, 5)
+			groups := &groupRepositoryStub{group: Group{ID: 5, Name: "Old", NameNorm: "old", TimeZone: "Europe/Budapest", Version: 1}, updateErr: test.writeErr}
+			service, auditor := newTestGroupService(t, groups, newMembershipStub(), usersWith(User{ID: 7}))
+			updated, err := service.UpdateSettings(context.Background(), test.actor, test.version, test.groupNm, test.zone)
 			if test.wantErr != nil {
 				if !errors.Is(err, test.wantErr) {
-					t.Fatalf("Detail() error = %v, want %v", err, test.wantErr)
+					t.Fatalf("UpdateSettings() error = %v, want %v", err, test.wantErr)
+				}
+				if len(auditor.records) != 0 {
+					t.Fatal("failed update was audited")
 				}
 				return
 			}
 			if err != nil {
-				t.Fatalf("Detail() error = %v, want nil", err)
+				t.Fatalf("UpdateSettings() error = %v", err)
 			}
-			if (detail.InviteCode != "") != test.wantInvite {
-				t.Errorf("invite code visibility = %v, want %v", detail.InviteCode != "", test.wantInvite)
+			if updated.Name != test.groupNm || updated.TimeZone != test.zone || groups.expectedVersion != test.version {
+				t.Fatalf("updated = %+v (expected version %d)", updated, groups.expectedVersion)
 			}
-			if (len(detail.Members) > 0) != test.wantRoster {
-				t.Errorf("roster visibility = %v, want %v", len(detail.Members) > 0, test.wantRoster)
-			}
-			if len(detail.Members) == 2 {
-				if detail.Members[0].Email == nil {
-					t.Error("viewer's own email hidden from them")
-				}
-				if (detail.Members[1].Email != nil) != test.wantOtherEmails {
-					t.Errorf("other member email visible = %v, want %v", detail.Members[1].Email != nil, test.wantOtherEmails)
-				}
+			if len(auditor.records) != 1 || auditor.records[0].Action != AuditActionGroupSettings || auditor.records[0].TargetID != "5" {
+				t.Fatalf("audit = %+v", auditor.records)
 			}
 		})
 	}
 }
 
-func TestGroupServiceDetailAllowsSiteAdministratorWithoutMembership(t *testing.T) {
-	members := []GroupMember{{UserID: 8, Role: GroupRoleAdmin}}
-	memberships := &groupMembershipRepositoryStub{member: false, members: members}
-	users := &groupUserRepositoryStub{user: User{ID: 7, IsAdmin: true}}
-	service, err := NewGroupService(&groupRepositoryStub{group: Group{ID: 5, InviteCode: "ABCDEFGHJKLM"}}, memberships, users)
-	if err != nil {
-		t.Fatalf("NewGroupService() error = %v", err)
+func TestNormalizeTimeZone(t *testing.T) {
+	for _, valid := range []string{"Europe/Budapest", " UTC ", "America/New_York"} {
+		if _, err := NormalizeTimeZone(valid); err != nil {
+			t.Errorf("NormalizeTimeZone(%q) error = %v", valid, err)
+		}
 	}
-	detail, err := service.Detail(context.Background(), 7, 5)
-	if err != nil {
-		t.Fatalf("Detail() error = %v, want nil", err)
+	for _, invalid := range []string{"", "Local", "Europe/Atlantis", "../etc/passwd", strings.Repeat("a", 65)} {
+		if _, err := NormalizeTimeZone(invalid); !errors.Is(err, ErrInvalidTimeZone) {
+			t.Errorf("NormalizeTimeZone(%q) error = %v, want ErrInvalidTimeZone", invalid, err)
+		}
 	}
-	if detail.IsMember {
-		t.Errorf("IsMember = true, want false for a non-member administrator")
-	}
-	if !detail.IsAdmin {
-		t.Errorf("IsAdmin = false, want true for a site administrator")
-	}
-	if detail.InviteCode != "ABCDEFGHJKLM" {
-		t.Errorf("InviteCode = %q, want the group invite code", detail.InviteCode)
-	}
-	if len(detail.Members) != len(members) {
-		t.Errorf("roster length = %d, want %d", len(detail.Members), len(members))
-	}
-	if detail.ViewerRole != "" {
-		t.Errorf("ViewerRole = %q, want empty without a membership", detail.ViewerRole)
+	for _, zone := range CommonTimeZones() {
+		if _, err := NormalizeTimeZone(zone); err != nil {
+			t.Errorf("offered time zone %q is invalid: %v", zone, err)
+		}
 	}
 }
 
-func TestGroupServiceAdminRightsForSiteAdministrator(t *testing.T) {
-	tests := []struct {
-		name      string
-		user      User
-		member    bool
-		wantErr   error
-		wantAudit bool
-	}{
-		{name: "site administrator without membership is audited", user: User{ID: 7, IsAdmin: true}, wantAudit: true},
-		{name: "group administrator is not audited", user: User{ID: 7}, member: true},
-		{name: "ordinary non-member is refused", user: User{ID: 7}, wantErr: ErrNotGroupAdmin},
-		{name: "guest is never a site administrator", user: User{ID: 7, IsAdmin: true, IsGuest: true}, wantErr: ErrNotGroupAdmin},
+func TestGroupServiceRotateInvite(t *testing.T) {
+	groups := &groupRepositoryStub{group: Group{ID: 5, InviteCode: "OLDCODE12345", Version: 1}}
+	service, auditor := newTestGroupService(t, groups, newMembershipStub(), usersWith(User{ID: 7}))
+	if _, err := service.RotateInvite(context.Background(), actorWith(memberWith(GroupRolePlayer))); !errors.Is(err, ErrGroupForbidden) {
+		t.Fatalf("player RotateInvite() error = %v, want ErrGroupForbidden", err)
+	}
+	code, err := service.RotateInvite(context.Background(), actorWith(memberWith(GroupRoleManager)))
+	if err != nil {
+		t.Fatalf("RotateInvite() error = %v", err)
+	}
+	if len(code) != groupInviteCodeLength || code == "OLDCODE12345" {
+		t.Fatalf("rotated code = %q, want a fresh invite code", code)
+	}
+	if len(auditor.records) != 1 || auditor.records[0].Action != AuditActionGroupInvite || strings.Contains(auditor.records[0].Detail, code) {
+		t.Fatalf("audit = %+v, want one record without the code", auditor.records)
+	}
+}
+
+func TestGroupServiceJoin(t *testing.T) {
+	groups := &groupRepositoryStub{group: Group{ID: 5, InviteCode: "ABCDEFGHJKLM"}}
+	memberships := newMembershipStub()
+	service, _ := newTestGroupService(t, groups, memberships, usersWith(User{ID: 8}))
+	joined, err := service.Join(context.Background(), 8, " abcdefghjklm ")
+	if err != nil {
+		t.Fatalf("Join() error = %v", err)
+	}
+	if joined.GroupID != 5 || !slices.Equal(joined.Roles, []string{GroupRolePlayer}) {
+		t.Fatalf("Join() = %+v, want a player of group 5", joined)
 	}
 
+	memberships.memberships[7] = GroupMembership{GroupID: 5, UserID: 7, Roles: []string{GroupRoleAdmin}}
+	again, err := service.Join(context.Background(), 7, "ABCDEFGHJKLM")
+	if err != nil || !slices.Equal(again.Roles, []string{GroupRoleAdmin}) || memberships.createCalls != 1 {
+		t.Fatalf("existing member Join() = %+v, %v (creates %d); want unchanged admin", again, err, memberships.createCalls)
+	}
+
+	groups.findByCodeErr = ErrGroupNotFound
+	if _, err := service.Join(context.Background(), 9, "UNKNOWN00000"); !errors.Is(err, ErrGroupInviteNotFound) {
+		t.Fatalf("Join(unknown) error = %v, want ErrGroupInviteNotFound", err)
+	}
+	if _, err := service.Join(context.Background(), 9, "  "); !errors.Is(err, ErrGroupInviteNotFound) {
+		t.Fatalf("Join(empty) error = %v, want ErrGroupInviteNotFound", err)
+	}
+}
+
+func TestGroupServiceMembersVisibility(t *testing.T) {
+	email := func(value string) *string { return &value }
+	members := []GroupMember{
+		{UserID: 7, Roles: []string{GroupRolePlayer}, Email: email("self@example.test"), TeamIDs: []int64{1}},
+		{UserID: 8, Roles: []string{GroupRolePlayer}, Email: email("teammate@example.test"), TeamIDs: []int64{1, 2}},
+		{UserID: 9, Roles: []string{GroupRoleParent}, Email: email("other@example.test"), TeamIDs: []int64{3}},
+		{UserID: 10, Roles: []string{GroupRoleAdmin}, Email: email("admin@example.test")},
+	}
+	tests := []struct {
+		name       string
+		grants     GroupAccessGrants
+		wantIDs    []int64
+		wantEmails []int64
+	}{
+		{name: "admin sees everyone with emails", grants: memberWith(GroupRoleAdmin), wantIDs: []int64{7, 8, 9, 10}, wantEmails: []int64{7, 8, 9, 10}},
+		{name: "manager sees everyone with emails", grants: memberWith(GroupRoleManager), wantIDs: []int64{7, 8, 9, 10}, wantEmails: []int64{7, 8, 9, 10}},
+		{name: "player sees self and teammates by name", grants: GroupAccessGrants{Member: true, Roles: []string{GroupRolePlayer}, OwnTeams: []TeamRole{{TeamID: 1, Role: GroupRolePlayer}}}, wantIDs: []int64{7, 8}, wantEmails: []int64{7}},
+		{name: "coach sees coached team with emails", grants: GroupAccessGrants{Member: true, Roles: []string{GroupRoleCoach}, CoachedTeamIDs: []int64{3}}, wantIDs: []int64{7, 9}, wantEmails: []int64{7, 9}},
+		{name: "member without teams sees only self", grants: memberWith(), wantIDs: []int64{7}, wantEmails: []int64{7}},
+	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			groups := &groupRepositoryStub{group: Group{ID: 5, Version: 1}}
-			service, err := NewGroupService(groups, &groupMembershipRepositoryStub{member: test.member, role: GroupRoleAdmin}, &groupUserRepositoryStub{user: test.user})
+			memberships := newMembershipStub()
+			memberships.members = slices.Clone(members)
+			service, _ := newTestGroupService(t, &groupRepositoryStub{}, memberships, usersWith(User{ID: 7}))
+			got, err := service.Members(context.Background(), accessFor(test.grants))
 			if err != nil {
-				t.Fatalf("NewGroupService() error = %v", err)
+				t.Fatalf("Members() error = %v", err)
 			}
-			auditor := &auditRecorderStub{}
-			service.SetAuditor(auditor)
-			if _, err := service.Rename(context.Background(), 7, 5, 1, "Renamed"); !errors.Is(err, test.wantErr) {
-				t.Fatalf("Rename() error = %v, want %v", err, test.wantErr)
+			var ids, emails []int64
+			for _, member := range got {
+				ids = append(ids, member.UserID)
+				if member.Email != nil {
+					emails = append(emails, member.UserID)
+				}
 			}
-			audited := len(auditor.records) == 1 && auditor.records[0].Action == AuditActionGroupRenamed &&
-				auditor.records[0].TargetType == "group" && auditor.records[0].TargetID == "5" && auditor.records[0].ActorUserID == 7
-			if audited != test.wantAudit || (!test.wantAudit && len(auditor.records) != 0) {
-				t.Fatalf("audit records = %+v, want audited %v", auditor.records, test.wantAudit)
+			if !slices.Equal(ids, test.wantIDs) || !slices.Equal(emails, test.wantEmails) {
+				t.Fatalf("members %v emails %v, want %v emails %v", ids, emails, test.wantIDs, test.wantEmails)
+			}
+		})
+	}
+	service, _ := newTestGroupService(t, &groupRepositoryStub{}, newMembershipStub(), usersWith(User{ID: 7}))
+	if _, err := service.Members(context.Background(), accessFor(GroupAccessGrants{})); !errors.Is(err, ErrGroupNotFound) {
+		t.Fatalf("outsider Members() error = %v, want ErrGroupNotFound", err)
+	}
+}
+
+func TestGroupServiceAddRole(t *testing.T) {
+	tests := []struct {
+		name       string
+		actor      GroupActor
+		target     User
+		targetRole []string
+		role       string
+		writeErr   error
+		wantErr    error
+		wantWrite  bool
+	}{
+		{name: "admin adds coach to a full user", actor: adminActor(), target: User{ID: 8}, targetRole: []string{GroupRolePlayer}, role: GroupRoleCoach, wantWrite: true},
+		{name: "manager adds parent to a guest", actor: actorWith(memberWith(GroupRoleManager)), target: User{ID: 8, Kind: UserKindGuest}, targetRole: []string{GroupRolePlayer}, role: GroupRoleParent, wantWrite: true},
+		{name: "guest cannot become coach", actor: adminActor(), target: User{ID: 8, Kind: UserKindGuest}, targetRole: []string{GroupRolePlayer}, role: GroupRoleCoach, wantErr: ErrRoleNeedsAccount},
+		{name: "profile cannot become manager", actor: adminActor(), target: User{ID: 8, Kind: UserKindProfile}, role: GroupRoleManager, wantErr: ErrRoleNeedsAccount},
+		{name: "manager cannot grant admin", actor: actorWith(memberWith(GroupRoleManager)), target: User{ID: 8}, role: GroupRoleAdmin, wantErr: ErrGroupForbidden},
+		{name: "coach cannot grant roles", actor: actorWith(memberWith(GroupRoleCoach)), target: User{ID: 8}, role: GroupRolePlayer, wantErr: ErrGroupForbidden},
+		{name: "outsider is not found", actor: actorWith(GroupAccessGrants{}), target: User{ID: 8}, role: GroupRolePlayer, wantErr: ErrGroupNotFound},
+		{name: "unknown role", actor: adminActor(), target: User{ID: 8}, role: "member", wantErr: ErrInvalidGroupRole},
+		{name: "unknown role from a player stays forbidden", actor: actorWith(memberWith(GroupRolePlayer)), target: User{ID: 8}, role: "member", wantErr: ErrGroupForbidden},
+		{name: "held role is unchanged", actor: adminActor(), target: User{ID: 8}, targetRole: []string{GroupRolePlayer}, role: GroupRolePlayer},
+		{name: "stale revision", actor: adminActor(), target: User{ID: 8}, role: GroupRolePlayer, writeErr: ErrOptimisticLockConflict, wantErr: ErrOptimisticLockConflict, wantWrite: true},
+		{name: "vanished member", actor: adminActor(), target: User{ID: 8}, role: GroupRolePlayer, writeErr: ErrMembershipNotFound, wantErr: ErrMembershipNotFound, wantWrite: true},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			memberships := newMembershipStub()
+			memberships.memberships[8] = GroupMembership{GroupID: 5, UserID: 8, Roles: test.targetRole, Version: 3}
+			memberships.addErr = test.writeErr
+			service, auditor := newTestGroupService(t, &groupRepositoryStub{}, memberships, usersWith(User{ID: 7, Email: strPtr("admin@example.test")}, test.target))
+			_, err := service.AddRole(context.Background(), test.actor, 8, 3, test.role)
+			if test.wantErr != nil && !errors.Is(err, test.wantErr) {
+				t.Fatalf("AddRole() error = %v, want %v", err, test.wantErr)
+			}
+			if test.wantErr == nil && err != nil {
+				t.Fatalf("AddRole() error = %v", err)
+			}
+			if (memberships.writes > 0) != test.wantWrite {
+				t.Fatalf("writes = %d, want write %v", memberships.writes, test.wantWrite)
+			}
+			audited := len(auditor.records) == 1 && auditor.records[0].Action == AuditActionGroupRoleAdded && auditor.records[0].ActorEmail == "admin@example.test"
+			if audited != (test.wantErr == nil && test.wantWrite) {
+				t.Fatalf("audit = %+v", auditor.records)
 			}
 		})
 	}
 }
 
-func TestGroupServiceRenameRequiresAdmin(t *testing.T) {
-	memberships := &groupMembershipRepositoryStub{member: true, role: GroupRoleMember}
-	service, err := NewGroupService(&groupRepositoryStub{group: Group{ID: 5, Version: 2}}, memberships, &groupUserRepositoryStub{user: User{ID: 7}})
-	if err != nil {
-		t.Fatalf("NewGroupService() error = %v", err)
+func TestGroupServiceRemoveRole(t *testing.T) {
+	tests := []struct {
+		name     string
+		actor    GroupActor
+		held     []string
+		role     string
+		writeErr error
+		wantErr  error
+	}{
+		{name: "admin removes admin", actor: adminActor(), held: []string{GroupRoleAdmin}, role: GroupRoleAdmin},
+		{name: "last admin is kept", actor: adminActor(), held: []string{GroupRoleAdmin}, role: GroupRoleAdmin, writeErr: ErrLastGroupAdmin, wantErr: ErrLastGroupAdmin},
+		{name: "manager cannot remove admin", actor: actorWith(memberWith(GroupRoleManager)), held: []string{GroupRoleAdmin}, role: GroupRoleAdmin, wantErr: ErrGroupForbidden},
+		{name: "manager removes coach", actor: actorWith(memberWith(GroupRoleManager)), held: []string{GroupRoleCoach}, role: GroupRoleCoach},
+		{name: "player is forbidden", actor: actorWith(memberWith(GroupRolePlayer)), held: []string{GroupRoleCoach}, role: GroupRoleCoach, wantErr: ErrGroupForbidden},
+		{name: "unknown role", actor: adminActor(), role: "owner", wantErr: ErrInvalidGroupRole},
+		{name: "stale revision", actor: adminActor(), held: []string{GroupRolePlayer}, role: GroupRolePlayer, writeErr: ErrOptimisticLockConflict, wantErr: ErrOptimisticLockConflict},
 	}
-	if _, err := service.Rename(context.Background(), 7, 5, 2, "New Name"); !errors.Is(err, ErrNotGroupAdmin) {
-		t.Fatalf("Rename() error = %v, want ErrNotGroupAdmin", err)
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			memberships := newMembershipStub()
+			memberships.memberships[8] = GroupMembership{GroupID: 5, UserID: 8, Roles: test.held, Version: 3}
+			memberships.removeErr = test.writeErr
+			service, auditor := newTestGroupService(t, &groupRepositoryStub{}, memberships, usersWith(User{ID: 7}))
+			_, err := service.RemoveRole(context.Background(), test.actor, 8, 3, test.role)
+			if test.wantErr != nil {
+				if !errors.Is(err, test.wantErr) {
+					t.Fatalf("RemoveRole() error = %v, want %v", err, test.wantErr)
+				}
+				if len(auditor.records) != 0 {
+					t.Fatal("failed removal was audited")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("RemoveRole() error = %v", err)
+			}
+			if len(auditor.records) != 1 || auditor.records[0].Action != AuditActionGroupRoleRemoved {
+				t.Fatalf("audit = %+v", auditor.records)
+			}
+		})
 	}
 }
 
-func TestGroupServiceRenamePersistsNormalized(t *testing.T) {
-	memberships := &groupMembershipRepositoryStub{member: true, role: GroupRoleAdmin}
-	groups := &groupRepositoryStub{group: Group{ID: 5, Version: 2}}
-	service, err := NewGroupService(groups, memberships, &groupUserRepositoryStub{user: User{ID: 7}})
-	if err != nil {
-		t.Fatalf("NewGroupService() error = %v", err)
+func TestGroupServiceRemoveMemberAndLeave(t *testing.T) {
+	memberships := newMembershipStub()
+	memberships.memberships[7] = GroupMembership{GroupID: 5, UserID: 7, Roles: []string{GroupRoleManager}, Version: 1}
+	memberships.memberships[8] = GroupMembership{GroupID: 5, UserID: 8, Roles: []string{GroupRolePlayer}}
+	memberships.memberships[9] = GroupMembership{GroupID: 5, UserID: 9, Roles: []string{GroupRoleAdmin}}
+	service, auditor := newTestGroupService(t, &groupRepositoryStub{}, memberships, usersWith(User{ID: 7}))
+	manager := actorWith(memberWith(GroupRoleManager))
+
+	if err := service.RemoveMember(context.Background(), manager, 7, 0); !errors.Is(err, ErrInvalidGroup) {
+		t.Fatalf("RemoveMember(self) error = %v, want ErrInvalidGroup", err)
 	}
-	updated, err := service.Rename(context.Background(), 7, 5, 2, "  New   Name ")
-	if err != nil {
-		t.Fatalf("Rename() error = %v", err)
+	if err := service.RemoveMember(context.Background(), manager, 9, 0); !errors.Is(err, ErrGroupForbidden) {
+		t.Fatalf("manager removing admin error = %v, want ErrGroupForbidden", err)
 	}
-	if updated.Name != "New   Name" || updated.NameNorm != "new   name" {
-		t.Fatalf("rename result = %+v, want trimmed name and normalized form", updated)
+	if err := service.RemoveMember(context.Background(), actorWith(memberWith(GroupRoleCoach)), 8, 0); !errors.Is(err, ErrGroupForbidden) {
+		t.Fatalf("coach RemoveMember() error = %v, want ErrGroupForbidden", err)
 	}
-	if groups.expectedVersion != 2 {
-		t.Fatalf("expected version = %d, want 2", groups.expectedVersion)
+	if err := service.RemoveMember(context.Background(), manager, 8, 0); err != nil {
+		t.Fatalf("RemoveMember() error = %v", err)
+	}
+	if err := service.RemoveMember(context.Background(), manager, 42, 0); !errors.Is(err, ErrMembershipNotFound) {
+		t.Fatalf("RemoveMember(missing) error = %v, want ErrMembershipNotFound", err)
+	}
+	if len(auditor.records) != 1 || auditor.records[0].Action != AuditActionGroupRemoved {
+		t.Fatalf("audit = %+v, want one removal", auditor.records)
+	}
+
+	if err := service.Leave(context.Background(), manager.Access); err != nil {
+		t.Fatalf("Leave() error = %v", err)
+	}
+	if memberships.deleteCount != 2 || memberships.deletedVersion != 1 {
+		t.Fatalf("deletes = %d (version %d), want leave at the member's revision", memberships.deleteCount, memberships.deletedVersion)
+	}
+	memberships.deleteErr = ErrLastGroupAdmin
+	if err := service.Leave(context.Background(), adminActor().Access); !errors.Is(err, ErrLastGroupAdmin) {
+		t.Fatalf("last admin Leave() error = %v, want ErrLastGroupAdmin", err)
+	}
+	if err := service.Leave(context.Background(), actorWith(GroupAccessGrants{SiteAdmin: true}).Access); !errors.Is(err, ErrMembershipNotFound) {
+		t.Fatalf("site administrator Leave() error = %v, want ErrMembershipNotFound", err)
+	}
+}
+
+func TestGroupServiceSiteAdministratorActionsAreMarked(t *testing.T) {
+	groups := &groupRepositoryStub{group: Group{ID: 5, Version: 1}}
+	service, auditor := newTestGroupService(t, groups, newMembershipStub(), usersWith(User{ID: 7, IsAdmin: true}))
+	if _, err := service.RotateInvite(context.Background(), actorWith(GroupAccessGrants{SiteAdmin: true})); err != nil {
+		t.Fatalf("RotateInvite() error = %v", err)
+	}
+	if len(auditor.records) != 1 || !strings.Contains(auditor.records[0].Detail, "site administrator") {
+		t.Fatalf("audit = %+v, want site administrator marker", auditor.records)
 	}
 }
 
@@ -289,19 +456,40 @@ func TestNormalizeGroupName(t *testing.T) {
 	}
 }
 
+func TestNewGroupServiceRejectsNilDependencies(t *testing.T) {
+	if _, err := NewGroupService(nil, newMembershipStub(), usersWith()); !errors.Is(err, ErrNilGroupRepository) {
+		t.Fatalf("nil groups error = %v", err)
+	}
+	if _, err := NewGroupService(&groupRepositoryStub{}, nil, usersWith()); !errors.Is(err, ErrNilMembershipRepository) {
+		t.Fatalf("nil memberships error = %v", err)
+	}
+	if _, err := NewGroupService(&groupRepositoryStub{}, newMembershipStub(), nil); !errors.Is(err, ErrNilUserRepository) {
+		t.Fatalf("nil users error = %v", err)
+	}
+}
+
 type groupUserRepositoryStub struct {
-	user User
+	users map[int64]User
+}
+
+func usersWith(users ...User) *groupUserRepositoryStub {
+	stub := &groupUserRepositoryStub{users: make(map[int64]User)}
+	for _, user := range users {
+		stub.users[user.ID] = user
+	}
+	return stub
 }
 
 func (r *groupUserRepositoryStub) CreateUser(context.Context, User) (User, error) {
 	return User{}, nil
 }
 
-func (r *groupUserRepositoryStub) FindUserByID(context.Context, int64) (User, error) {
-	if r.user.ID <= 0 {
+func (r *groupUserRepositoryStub) FindUserByID(_ context.Context, id int64) (User, error) {
+	user, ok := r.users[id]
+	if !ok || id <= 0 {
 		return User{}, ErrUserNotFound
 	}
-	return r.user, nil
+	return user, nil
 }
 
 func (r *groupUserRepositoryStub) FindUserByEmail(context.Context, string) (User, error) {
@@ -322,19 +510,10 @@ type groupRepositoryStub struct {
 	group           Group
 	summaries       []GroupSummary
 	allSummaries    []GroupSummary
-	createErr       error
 	findErr         error
 	findByCodeErr   error
 	updateErr       error
 	expectedVersion int64
-}
-
-func (r *groupRepositoryStub) CreateGroup(_ context.Context, group Group) (Group, error) {
-	if r.createErr != nil {
-		return Group{}, r.createErr
-	}
-	group.ID = 1
-	return group, nil
 }
 
 func (r *groupRepositoryStub) FindGroupByID(context.Context, int64) (Group, error) {
@@ -372,24 +551,27 @@ func (r *groupRepositoryStub) UpdateGroup(_ context.Context, group Group, expect
 }
 
 type groupMembershipRepositoryStub struct {
-	member            bool
-	role              string
-	members           []GroupMember
-	collisions        int
-	createCalls       int
-	createErr         error
-	adminUserID       int64
-	adminRole         string
-	updateErr         error
-	deleteErr         error
-	deleteCount       int
-	createdMembership GroupMembership
+	memberships    map[int64]GroupMembership
+	members        []GroupMember
+	collisions     int
+	createCalls    int
+	createErr      error
+	addErr         error
+	removeErr      error
+	deleteErr      error
+	adminUserID    int64
+	writes         int
+	deleteCount    int
+	deletedVersion int64
 }
 
-func (r *groupMembershipRepositoryStub) CreateGroupWithAdmin(_ context.Context, group Group, userID int64, role string) (Group, GroupMembership, error) {
+func newMembershipStub() *groupMembershipRepositoryStub {
+	return &groupMembershipRepositoryStub{memberships: make(map[int64]GroupMembership)}
+}
+
+func (r *groupMembershipRepositoryStub) CreateGroupWithAdmin(_ context.Context, group Group, userID int64) (Group, GroupMembership, error) {
 	r.createCalls++
 	r.adminUserID = userID
-	r.adminRole = role
 	if r.createErr != nil {
 		return Group{}, GroupMembership{}, r.createErr
 	}
@@ -398,23 +580,24 @@ func (r *groupMembershipRepositoryStub) CreateGroupWithAdmin(_ context.Context, 
 		return Group{}, GroupMembership{}, ErrGroupInviteTaken
 	}
 	group.ID = int64(r.createCalls)
-	group.Version = 0
-	return group, GroupMembership{GroupID: group.ID, UserID: userID, Role: role}, nil
+	return group, GroupMembership{GroupID: group.ID, UserID: userID, Roles: []string{GroupRoleAdmin}}, nil
 }
 
 func (r *groupMembershipRepositoryStub) CreateMembership(_ context.Context, membership GroupMembership) (GroupMembership, error) {
-	r.createdMembership = membership
+	r.createCalls++
 	if r.createErr != nil {
 		return GroupMembership{}, r.createErr
 	}
+	r.memberships[membership.UserID] = membership
 	return membership, nil
 }
 
-func (r *groupMembershipRepositoryStub) FindMembership(context.Context, int64, int64) (GroupMembership, error) {
-	if !r.member {
+func (r *groupMembershipRepositoryStub) FindMembership(_ context.Context, _, userID int64) (GroupMembership, error) {
+	membership, ok := r.memberships[userID]
+	if !ok {
 		return GroupMembership{}, ErrMembershipNotFound
 	}
-	return GroupMembership{GroupID: 5, UserID: 7, Role: r.role}, nil
+	return membership, nil
 }
 
 func (r *groupMembershipRepositoryStub) ListMembers(context.Context, int64) ([]GroupMember, error) {
@@ -422,130 +605,35 @@ func (r *groupMembershipRepositoryStub) ListMembers(context.Context, int64) ([]G
 }
 
 func (r *groupMembershipRepositoryStub) CountMembers(context.Context, int64) (int, error) {
-	if len(r.members) > 0 {
-		return len(r.members), nil
-	}
-	if r.member {
-		return 1, nil
-	}
-	return 0, nil
+	return len(r.members), nil
 }
 
-func (r *groupMembershipRepositoryStub) UpdateMembershipRole(_ context.Context, membership GroupMembership, _ int64) (GroupMembership, error) {
-	if r.updateErr != nil {
-		return GroupMembership{}, r.updateErr
+func (r *groupMembershipRepositoryStub) AddMemberRole(_ context.Context, _, userID int64, role string, _ int64) (GroupMembership, error) {
+	r.writes++
+	if r.addErr != nil {
+		return GroupMembership{}, r.addErr
 	}
+	membership := r.memberships[userID]
+	membership.Roles = append(membership.Roles, role)
+	membership.Version++
+	r.memberships[userID] = membership
 	return membership, nil
 }
 
-func (r *groupMembershipRepositoryStub) DeleteMembership(context.Context, int64, int64, int64) error {
+func (r *groupMembershipRepositoryStub) RemoveMemberRole(_ context.Context, _, userID int64, role string, _ int64) (GroupMembership, error) {
+	r.writes++
+	if r.removeErr != nil {
+		return GroupMembership{}, r.removeErr
+	}
+	membership := r.memberships[userID]
+	membership.Roles = slices.DeleteFunc(slices.Clone(membership.Roles), func(held string) bool { return held == role })
+	membership.Version++
+	r.memberships[userID] = membership
+	return membership, nil
+}
+
+func (r *groupMembershipRepositoryStub) DeleteMembership(_ context.Context, _, _, expectedVersion int64) error {
 	r.deleteCount++
+	r.deletedVersion = expectedVersion
 	return r.deleteErr
-}
-
-func TestGroupServiceJoinIsIdempotent(t *testing.T) {
-	memberships := &groupMembershipRepositoryStub{}
-	groups := &groupRepositoryStub{group: Group{ID: 5, InviteCode: "ABCDEFGHJKLM"}}
-	service, err := NewGroupService(groups, memberships, &groupUserRepositoryStub{user: User{ID: 7}})
-	if err != nil {
-		t.Fatalf("NewGroupService() error = %v", err)
-	}
-	joined, err := service.Join(context.Background(), 8, " abcdefghjklm ")
-	if err != nil {
-		t.Fatalf("Join() error = %v", err)
-	}
-	if joined.Role != GroupRoleMember || joined.GroupID != 5 {
-		t.Fatalf("Join() = %+v, want ordinary member of group 5", joined)
-	}
-	if memberships.createdMembership.Role != GroupRoleMember {
-		t.Fatalf("created role = %q, want member", memberships.createdMembership.Role)
-	}
-
-	existing := &groupMembershipRepositoryStub{member: true, role: GroupRoleAdmin}
-	service, err = NewGroupService(groups, existing, &groupUserRepositoryStub{user: User{ID: 7}})
-	if err != nil {
-		t.Fatalf("NewGroupService() error = %v", err)
-	}
-	again, err := service.Join(context.Background(), 7, "ABCDEFGHJKLM")
-	if err != nil {
-		t.Fatalf("Join() existing error = %v", err)
-	}
-	if again.Role != GroupRoleAdmin || existing.createCalls != 0 {
-		t.Fatalf("idempotent join = %+v calls %d, want existing admin membership", again, existing.createCalls)
-	}
-}
-
-func TestGroupServiceJoinUnknownCode(t *testing.T) {
-	groups := &groupRepositoryStub{findByCodeErr: ErrGroupNotFound}
-	service, err := NewGroupService(groups, &groupMembershipRepositoryStub{}, &groupUserRepositoryStub{user: User{ID: 7}})
-	if err != nil {
-		t.Fatalf("NewGroupService() error = %v", err)
-	}
-	if _, err := service.Join(context.Background(), 7, "UNKNOWN00000"); !errors.Is(err, ErrGroupInviteNotFound) {
-		t.Fatalf("Join() error = %v, want ErrGroupInviteNotFound", err)
-	}
-}
-
-func TestGroupServiceRotateInviteRequiresAdmin(t *testing.T) {
-	memberships := &groupMembershipRepositoryStub{member: true, role: GroupRoleMember}
-	service, err := NewGroupService(&groupRepositoryStub{group: Group{ID: 5, Version: 1}}, memberships, &groupUserRepositoryStub{user: User{ID: 7}})
-	if err != nil {
-		t.Fatalf("NewGroupService() error = %v", err)
-	}
-	if _, err := service.RotateInvite(context.Background(), 7, 5); !errors.Is(err, ErrNotGroupAdmin) {
-		t.Fatalf("RotateInvite() error = %v, want ErrNotGroupAdmin", err)
-	}
-}
-
-func TestGroupServiceRotateInviteChangesCode(t *testing.T) {
-	memberships := &groupMembershipRepositoryStub{member: true, role: GroupRoleAdmin}
-	groups := &groupRepositoryStub{group: Group{ID: 5, InviteCode: "OLDCODE12345", Version: 1}}
-	service, err := NewGroupService(groups, memberships, &groupUserRepositoryStub{user: User{ID: 7}})
-	if err != nil {
-		t.Fatalf("NewGroupService() error = %v", err)
-	}
-	code, err := service.RotateInvite(context.Background(), 7, 5)
-	if err != nil {
-		t.Fatalf("RotateInvite() error = %v", err)
-	}
-	if len(code) != groupInviteCodeLength || code == "OLDCODE12345" {
-		t.Fatalf("rotated code = %q, want a fresh invite code", code)
-	}
-}
-
-func TestGroupServiceChangeRoleGuardsLastAdmin(t *testing.T) {
-	memberships := &groupMembershipRepositoryStub{member: true, role: GroupRoleAdmin, updateErr: ErrLastGroupAdmin}
-	service, err := NewGroupService(&groupRepositoryStub{group: Group{ID: 5, Version: 1}}, memberships, &groupUserRepositoryStub{user: User{ID: 7}})
-	if err != nil {
-		t.Fatalf("NewGroupService() error = %v", err)
-	}
-	if _, err := service.ChangeRole(context.Background(), 7, 5, 8, 0, GroupRoleMember); !errors.Is(err, ErrLastGroupAdmin) {
-		t.Fatalf("ChangeRole() error = %v, want ErrLastGroupAdmin", err)
-	}
-	if _, err := service.ChangeRole(context.Background(), 7, 5, 8, 0, "owner"); !errors.Is(err, ErrInvalidGroup) {
-		t.Fatalf("ChangeRole(invalid role) error = %v, want ErrInvalidGroup", err)
-	}
-}
-
-func TestGroupServiceRemoveAndLeave(t *testing.T) {
-	memberships := &groupMembershipRepositoryStub{member: true, role: GroupRoleAdmin}
-	service, err := NewGroupService(&groupRepositoryStub{group: Group{ID: 5, Version: 1}}, memberships, &groupUserRepositoryStub{user: User{ID: 7}})
-	if err != nil {
-		t.Fatalf("NewGroupService() error = %v", err)
-	}
-	if err := service.RemoveMember(context.Background(), 7, 5, 7, 0); !errors.Is(err, ErrInvalidGroup) {
-		t.Fatalf("RemoveMember(self) error = %v, want ErrInvalidGroup", err)
-	}
-	if err := service.RemoveMember(context.Background(), 7, 5, 8, 0); err != nil {
-		t.Fatalf("RemoveMember() error = %v, want nil", err)
-	}
-	if memberships.deleteCount != 1 {
-		t.Fatalf("delete calls = %d, want 1", memberships.deleteCount)
-	}
-	if err := service.Leave(context.Background(), 7, 5); err != nil {
-		t.Fatalf("Leave() error = %v, want nil", err)
-	}
-	if memberships.deleteCount != 2 {
-		t.Fatalf("delete calls after leave = %d, want 2", memberships.deleteCount)
-	}
 }

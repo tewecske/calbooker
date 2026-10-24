@@ -220,7 +220,7 @@ func TestClientModeSettingsHideCredentialControls(t *testing.T) {
 func guestClientModeDependencies(t *testing.T, client *httpSSOClientStub) Dependencies {
 	t.Helper()
 	dependencies := clientModeDependencies(t, client)
-	dependencies.Users = httpUserStub{user: service.User{ID: 42, IsGuest: true, Theme: "light"}}
+	dependencies.Users = httpUserStub{user: service.User{ID: 42, Kind: service.UserKindGuest, Theme: "light"}}
 	return dependencies
 }
 

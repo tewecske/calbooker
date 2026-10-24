@@ -33,22 +33,37 @@ func TestGroupsAndMembershipsSchema(t *testing.T) {
 		t.Fatalf("insert group: %v", err)
 	}
 	if _, err := harness.DB.ExecContext(ctx, `
-		INSERT INTO group_members (group_id, user_id, role, created_at)
-		VALUES ($1, $2, 'admin', 100)
+		INSERT INTO group_members (group_id, user_id, created_at)
+		VALUES ($1, $2, 100)
 	`, groupID, userID); err != nil {
 		t.Fatalf("insert administrator membership: %v", err)
 	}
 	if _, err := harness.DB.ExecContext(ctx, `
-		INSERT INTO group_members (group_id, user_id, role, created_at)
-		VALUES ($1, $2, 'member', 101)
+		INSERT INTO group_members (group_id, user_id, created_at)
+		VALUES ($1, $2, 101)
 	`, groupID, userID); err == nil {
 		t.Fatal("duplicate membership was accepted")
 	}
 	if _, err := harness.DB.ExecContext(ctx, `
-		INSERT INTO group_members (group_id, user_id, role, created_at)
-		VALUES ($1, 999999, 'owner', 101)
-	`, groupID); err == nil {
+		INSERT INTO group_member_roles (group_id, user_id, role, created_at)
+		VALUES ($1, $2, 'owner', 101)
+	`, groupID, userID); err == nil {
 		t.Fatal("invalid membership role was accepted")
+	}
+	if _, err := harness.DB.ExecContext(ctx, `
+		INSERT INTO group_member_roles (group_id, user_id, role, created_at)
+		VALUES ($1, 999999, 'player', 101)
+	`, groupID); err == nil {
+		t.Fatal("role without a membership was accepted")
+	}
+	if _, err := harness.DB.ExecContext(ctx, `
+		INSERT INTO group_member_roles (group_id, user_id, role, created_at)
+		VALUES ($1, $2, 'admin', 101), ($1, $2, 'coach', 101)
+	`, groupID, userID); err != nil {
+		t.Fatalf("several roles per member: %v", err)
+	}
+	if _, err := harness.DB.ExecContext(ctx, `UPDATE groups SET time_zone = '' WHERE id = $1`, groupID); err == nil {
+		t.Fatal("empty time zone was accepted")
 	}
 	if _, err := harness.DB.ExecContext(ctx, `
 		INSERT INTO groups (name, name_norm, invite_code, created_at)

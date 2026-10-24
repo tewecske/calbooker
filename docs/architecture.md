@@ -79,3 +79,37 @@ redirects back (303).
 in-memory items. It is registered only when `Dependencies.DevelopmentRoutes`
 is true, which `cmd/web` sets from `Config.DevelopmentRoutes()` (only
 `CALBOOKER_ENV=development`).
+
+## Group access
+
+Every group-scoped page and use case is authorized by one type,
+`service.GroupAccess` (`internal/service/group_access.go`). It is built per
+request by `GroupAccessService.For(ctx, userID, groupID)` from the member's
+roles (`group_member_roles`), own teams (`team_members`), and two extension
+sources. Accounts that may not see the group, and groups that do not exist,
+get `service.ErrGroupNotFound`, which handlers render as 404.
+
+- Handlers call `groupRequest` (`internal/adapter/http/group.go`), which
+  authenticates, builds the access, and answers 404 to outsiders. They then
+  ask the access questions only to decide what to render.
+- Use cases take the access (`*GroupAccess`) or a `GroupActor` (access plus
+  the client origin for audit) and check it again: not allowed is
+  `ErrGroupForbidden` (403; HTMX 422), not visible is not-found (404).
+- Questions: `CanView`, `IsMember`, `IsSiteAdmin`, `HasRole`, `Roles`,
+  `CanManageGroup` (admin, manager, site administrator), `CanManageRole(role)`
+  (only admins handle `admin`), `CanRotateInvite`, `CanRemoveMember`,
+  `CanViewAllMembers`, `CanCreateTeam`, `CanEditTeam(id)`,
+  `CanManageRoster(id)` (managers and the team's coaches), `CoachesTeam(id)`,
+  `SeesAllTeams`, `VisibleTeamIDs()`, `CanViewTeam(id)`,
+  `CanViewTeamEmails(id)`. Add a question here rather than checking roles in
+  a handler.
+- Extension points: `GroupAccessService.SetCoachedTeams(source)` for season
+  coaches (#5) and `SetChildTeams(source)` for guardians (#3); each source
+  implements `TeamRelationSource.TeamIDs(ctx, groupID, userID)`. Coached
+  teams count only for members with the coach role.
+- Roles: `admin`, `manager`, `coach` need a full account
+  (`users.kind = 'account'`); `player` and `parent` may be guests. A team
+  roster entry (`player` or `parent`) needs the matching group role; the
+  foreign key removes it when the role goes.
+- Every admin and manager action in a group is audited by the group and team
+  services with the group as target (`group.*` action codes).

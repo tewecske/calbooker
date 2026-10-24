@@ -119,16 +119,6 @@ func (h *authHandler) formLabels(language locale.Code) map[string]string {
 		"settings_theme": "settings.preferences.theme", "settings_theme_toggle": "settings.preferences.theme_toggle",
 		"settings_sso_heading": "settings.sso.heading", "settings_sso_help": "settings.sso.help", "settings_sso_manage": "settings.sso.manage",
 		"guest_upgrade_sso_help": "guest.upgrade.sso_help", "guest_upgrade_sso_submit": "guest.upgrade.sso_submit",
-		"groups_title": "groups.title", "groups_heading": "groups.heading", "groups_sections": "groups.sections", "groups_nav": "groups.nav",
-		"groups_mine": "groups.mine", "groups_join": "groups.join", "groups_create": "groups.create",
-		"groups_name": "groups.name", "groups_members": "groups.members", "groups_role": "groups.role",
-		"groups_view": "groups.view", "groups_empty": "groups.empty", "groups_back": "groups.back",
-		"groups_role_admin": "groups.role.admin", "groups_role_member": "groups.role.member",
-		"groups_rename": "groups.rename", "groups_invite": "groups.invite", "groups_invite_code": "groups.invite.code",
-		"groups_rotate": "groups.invite.rotate", "groups_leave": "groups.leave", "groups_leave_confirm": "groups.leave.confirm",
-		"groups_roster": "groups.roster", "groups_member": "groups.roster.member", "groups_you": "groups.roster.you",
-		"groups_remove": "groups.roster.remove", "groups_remove_confirm": "groups.roster.remove_confirm",
-		"groups_promote": "groups.roster.promote", "groups_demote": "groups.roster.demote",
 	} {
 		labels[name] = h.translate(language, id)
 	}

@@ -17,7 +17,7 @@ func TestGuestServiceCreate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Create() error = %v, want nil", err)
 	}
-	if guest.ID != 42 || !guest.IsGuest {
+	if guest.ID != 42 || !guest.IsGuest() {
 		t.Fatalf("created guest = %+v, want persisted guest", guest)
 	}
 	if guest.Email != nil || guest.EmailVerifiedAt != nil {
@@ -26,7 +26,7 @@ func TestGuestServiceCreate(t *testing.T) {
 	if repository.createCalls != 1 {
 		t.Fatalf("CreateUser() calls = %d, want 1", repository.createCalls)
 	}
-	if !repository.created.IsGuest || repository.created.Email != nil {
+	if !repository.created.IsGuest() || repository.created.Email != nil {
 		t.Fatalf("persisted guest = %+v, want credential-free guest", repository.created)
 	}
 	if repository.created.Theme != defaultUserTheme || repository.created.Locale != defaultUserLocale {

@@ -29,7 +29,7 @@ func TestDatastoreStatsRepositoryCountsSafely(t *testing.T) {
 	guestFixture := testfixtures.NewUser()
 	guestFixture.Email = nil
 	guestFixture.Username = nil
-	guestFixture.IsGuest = true
+	guestFixture.Kind = "guest"
 	if _, err := testfixtures.InsertUser(ctx, harness.DB, guestFixture); err != nil {
 		t.Fatal(err)
 	}

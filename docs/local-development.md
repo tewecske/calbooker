@@ -100,6 +100,23 @@ Health check:
 curl -i http://127.0.0.1:8082/healthz
 ```
 
+### Recreating the database
+
+Issue #2 rewrote migrations 000001 to 000003 in place (nothing was deployed):
+`users.kind` replaces `is_guest`, groups got a time zone, and roles and teams
+are new tables. The migrator skips versions it already installed, so a
+database migrated before that keeps the old schema and the app fails at run
+time. Drop it once and run dev-setup again (use your checkout's database
+name):
+
+```sh
+docker exec goweb-postgres psql -U goweb -d goweb -c "DROP DATABASE IF EXISTS calbooker WITH (FORCE)"
+make dev-setup GOWEB_DIR=../goweb
+```
+
+Integration tests use throwaway schemas inside that database, so they need
+nothing extra.
+
 ## Tests
 
 ```sh

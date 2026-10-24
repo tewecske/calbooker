@@ -29,14 +29,46 @@ func IsWriteConflict(err error) bool {
 	return errors.Is(err, ErrOptimisticLockConflict) || errors.Is(err, ErrRecordNotFound)
 }
 
+// UserKind says how an account signs in.
+type UserKind string
+
+const (
+	// UserKindAccount signs in through single sign-on (a full user).
+	UserKindAccount UserKind = "account"
+	// UserKindGuest is a local account without an identity. Guest retention
+	// removes old guests; an upgrade turns a guest into an account.
+	UserKindGuest UserKind = "guest"
+	// UserKindProfile never signs in (for example a child created by a
+	// parent or staff). Guest retention never removes profiles.
+	UserKindProfile UserKind = "profile"
+)
+
+// Valid reports whether k is a stored user kind.
+func (k UserKind) Valid() bool {
+	return k == UserKindAccount || k == UserKindGuest || k == UserKindProfile
+}
+
+// IsGuest reports whether the account is a guest.
+func (u User) IsGuest() bool {
+	return u.Kind == UserKindGuest
+}
+
+// IsFullUser reports whether the account signs in through single sign-on.
+// The zero kind counts as an account, matching the database default.
+func (u User) IsFullUser() bool {
+	return u.Kind == UserKindAccount || u.Kind == ""
+}
+
 // User is the persistence-facing account model. Nullable database columns use
 // pointers so repositories cannot silently turn NULL into an application value.
 type User struct {
-	ID              int64
-	Email           *string
-	Username        *string
-	DisplayName     *string
-	IsGuest         bool
+	ID          int64
+	Email       *string
+	Username    *string
+	DisplayName *string
+	// Kind is UserKindAccount, UserKindGuest, or UserKindProfile. The zero
+	// value is treated as an account when a user is created.
+	Kind            UserKind
 	IsAdmin         bool
 	Theme           string
 	Locale          string

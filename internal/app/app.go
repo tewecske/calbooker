@@ -32,6 +32,7 @@ type Graph struct {
 	OAuthIdentities       *postgresstore.OAuthIdentityRepository
 	Groups                *postgresstore.GroupRepository
 	GroupMemberships      *postgresstore.GroupMembershipRepository
+	Teams                 *postgresstore.TeamRepository
 	AdminUsers            *postgresstore.AdminUserRepository
 	AuditLogs             *postgresstore.AuditLogRepository
 	Retention             *postgresstore.RetentionRepository
@@ -49,6 +50,8 @@ type Graph struct {
 	Theme                 *service.ThemeService
 	LocaleSettings        *service.LocaleSettingsService
 	Group                 *service.GroupService
+	GroupAccess           *service.GroupAccessService
+	Team                  *service.TeamService
 	GroupJoin             *service.RateLimitedGroupJoiner
 	AdminAccounts         *service.AdminAccountService
 	AdminDiagnostics      *service.AdminDiagnosticsService
@@ -140,6 +143,10 @@ func New(database *sql.DB, appConfig config.Config) (*Graph, error) {
 	if err != nil {
 		return nil, fmt.Errorf("construct group membership repository: %w", err)
 	}
+	teamsRepository, err := postgresstore.NewTeamRepository(database)
+	if err != nil {
+		return nil, fmt.Errorf("construct team repository: %w", err)
+	}
 	adminUsersRepository, err := postgresstore.NewAdminUserRepository(database)
 	if err != nil {
 		return nil, fmt.Errorf("construct admin user repository: %w", err)
@@ -230,6 +237,14 @@ func New(database *sql.DB, appConfig config.Config) (*Graph, error) {
 	if err != nil {
 		return nil, fmt.Errorf("construct group service: %w", err)
 	}
+	groupAccess, err := service.NewGroupAccessService(groupMembershipsRepository, users)
+	if err != nil {
+		return nil, fmt.Errorf("construct group access service: %w", err)
+	}
+	teamService, err := service.NewTeamService(teamsRepository, groupMembershipsRepository, users)
+	if err != nil {
+		return nil, fmt.Errorf("construct team service: %w", err)
+	}
 	groupJoinLimiter, _, err := newSharedRateLimiter(database, "group-join", service.RateLimitConfig{Limit: 20, Window: time.Minute})
 	if err != nil {
 		return nil, fmt.Errorf("construct group join rate limiter: %w", err)
@@ -243,6 +258,7 @@ func New(database *sql.DB, appConfig config.Config) (*Graph, error) {
 		return nil, fmt.Errorf("construct audit service: %w", err)
 	}
 	groupService.SetAuditor(auditService)
+	teamService.SetAuditor(auditService)
 	adminAccounts, err := service.NewAdminAccountService(users, adminUsersRepository, auditService, sessionService)
 	if err != nil {
 		return nil, fmt.Errorf("construct admin account service: %w", err)
@@ -310,6 +326,7 @@ func New(database *sql.DB, appConfig config.Config) (*Graph, error) {
 		OAuthIdentities:       oauthIdentities,
 		Groups:                groupsRepository,
 		GroupMemberships:      groupMembershipsRepository,
+		Teams:                 teamsRepository,
 		AdminUsers:            adminUsersRepository,
 		AuditLogs:             auditLogRepository,
 		Retention:             retentionRepository,
@@ -327,6 +344,8 @@ func New(database *sql.DB, appConfig config.Config) (*Graph, error) {
 		Theme:                 theme,
 		LocaleSettings:        localeSettings,
 		Group:                 groupService,
+		GroupAccess:           groupAccess,
+		Team:                  teamService,
 		GroupJoin:             groupJoinService,
 		AdminAccounts:         adminAccounts,
 		AdminDiagnostics:      adminDiagnostics,

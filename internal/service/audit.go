@@ -29,10 +29,6 @@ const (
 	// hidden among ordinary account edits.
 	AuditActionAdminGranted = "admin.account.admin_granted"
 	AuditActionAdminRevoked = "admin.account.admin_revoked"
-	AuditActionGroupRenamed = "admin.group.renamed"
-	AuditActionGroupInvite  = "admin.group.invite_rotated"
-	AuditActionGroupRole    = "admin.group.member_role_changed"
-	AuditActionGroupRemoved = "admin.group.member_removed"
 )
 
 // Audit sink outcomes.

@@ -8,7 +8,7 @@ import (
 )
 
 func TestGuestClaimServiceIssueIsIdempotent(t *testing.T) {
-	users := &guestClaimUserRepositoryStub{user: User{ID: 42, IsGuest: true}}
+	users := &guestClaimUserRepositoryStub{user: User{ID: 42, Kind: UserKindGuest}}
 	codes := &guestClaimCodeRepositoryStub{}
 	service, err := NewGuestClaimService(users, codes)
 	if err != nil {
@@ -65,7 +65,7 @@ func TestGuestClaimServiceIssueRejectsInvalidInputs(t *testing.T) {
 
 func TestGuestClaimServiceIssuePropagatesCodeFailures(t *testing.T) {
 	findErr := errors.New("find code failed")
-	users := &guestClaimUserRepositoryStub{user: User{ID: 42, IsGuest: true}}
+	users := &guestClaimUserRepositoryStub{user: User{ID: 42, Kind: UserKindGuest}}
 	codes := &guestClaimCodeRepositoryStub{findErr: findErr}
 	service, err := NewGuestClaimService(users, codes)
 	if err != nil {

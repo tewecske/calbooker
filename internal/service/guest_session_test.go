@@ -27,7 +27,7 @@ func TestGuestSessionServiceCreate(t *testing.T) {
 	if result.User.ID != result.Session.UserID || result.User.ID != 42 {
 		t.Fatalf("guest/session IDs = %d/%d, want persisted guest ID", result.User.ID, result.Session.UserID)
 	}
-	if !result.User.IsGuest || result.User.Email != nil || result.User.EmailVerifiedAt != nil {
+	if !result.User.IsGuest() || result.User.Email != nil || result.User.EmailVerifiedAt != nil {
 		t.Fatalf("guest account = %+v, want guest without credentials", result.User)
 	}
 	if result.User.Username == nil || !strings.HasPrefix(*result.User.Username, "guest-") {

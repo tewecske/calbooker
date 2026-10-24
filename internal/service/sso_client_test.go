@@ -300,13 +300,13 @@ func upgradeFixture(t *testing.T) *ssoClientFixture {
 	f := newSSOClientFixture(t)
 	f.states.consumed.Action = oauthActionLink
 	f.states.consumed.UserID = 5
-	f.users.byID = User{ID: 5, IsGuest: true, Theme: "dark", Locale: "hu", Version: 2}
+	f.users.byID = User{ID: 5, Kind: UserKindGuest, Theme: "dark", Locale: "hu", Version: 2}
 	return f
 }
 
 func TestSSOClientStartUpgradeRequiresAGuest(t *testing.T) {
 	f := newSSOClientFixture(t)
-	f.users.byID = User{ID: 5, IsGuest: true}
+	f.users.byID = User{ID: 5, Kind: UserKindGuest}
 	if _, _, err := f.service.StartUpgrade(context.Background(), 5); err != nil {
 		t.Fatalf("StartUpgrade(guest) error = %v", err)
 	}
@@ -331,7 +331,7 @@ func TestSSOClientCallbackUpgradesTheGuestThatStartedIt(t *testing.T) {
 		t.Fatalf("upgrade calls %d, accounts created %d; want the guest converted in place", f.upgrades.calls, f.users.createCalls)
 	}
 	guest := f.upgrades.guest
-	if guest.ID != 5 || guest.IsGuest || guest.Email == nil || *guest.Email != "ada@example.test" || guest.EmailVerifiedAt == nil || guest.DisplayName == nil || *guest.DisplayName != "Ada" {
+	if guest.ID != 5 || guest.IsGuest() || guest.Email == nil || *guest.Email != "ada@example.test" || guest.EmailVerifiedAt == nil || guest.DisplayName == nil || *guest.DisplayName != "Ada" {
 		t.Fatalf("converted guest = %+v", guest)
 	}
 	// The guest's own preferences survive the upgrade.
@@ -359,7 +359,7 @@ func TestSSOClientUpgradeRefusals(t *testing.T) {
 	}{
 		{name: "another browser account", actor: 6, want: ErrOAuthStateInvalid},
 		{name: "no signed-in account", actor: 0, want: ErrOAuthStateInvalid},
-		{name: "account is no longer a guest", actor: 5, exchange: true, want: ErrGuestUpgradeRequiresGuest, edit: func(f *ssoClientFixture) { f.users.byID.IsGuest = false }},
+		{name: "account is no longer a guest", actor: 5, exchange: true, want: ErrGuestUpgradeRequiresGuest, edit: func(f *ssoClientFixture) { f.users.byID.Kind = UserKindAccount }},
 		{name: "identity already has an account", actor: 5, exchange: true, want: ErrSSOGuestIdentityTaken, edit: func(f *ssoClientFixture) {
 			f.identities.findErr = nil
 			f.identities.found = OAuthIdentity{UserID: 9, Provider: SSOProviderName, Subject: "42"}

@@ -8,7 +8,7 @@ import (
 )
 
 func TestGuestRedemptionServiceRedeemCreatesMultipleSessions(t *testing.T) {
-	users := &guestRedemptionUserRepositoryStub{user: User{ID: 42, IsGuest: true}}
+	users := &guestRedemptionUserRepositoryStub{user: User{ID: 42, Kind: UserKindGuest}}
 	codes := &guestRedemptionCodeRepositoryStub{claim: GuestClaimCode{
 		UserID:    42,
 		Code:      "ABCDEFGH23",
@@ -57,7 +57,7 @@ func TestGuestRedemptionServiceRejectsUniformlyInvalidCodes(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			users := &guestRedemptionUserRepositoryStub{user: User{ID: 42, IsGuest: true}}
+			users := &guestRedemptionUserRepositoryStub{user: User{ID: 42, Kind: UserKindGuest}}
 			codes := &guestRedemptionCodeRepositoryStub{claim: test.claim, findErr: test.findErr}
 			sessions, err := NewSessionService(&guestRedemptionSessionRepositoryStub{}, time.Hour)
 			if err != nil {
@@ -77,7 +77,7 @@ func TestGuestRedemptionServiceRejectsUniformlyInvalidCodes(t *testing.T) {
 
 func TestGuestRedemptionServicePropagatesOperationalFailures(t *testing.T) {
 	backendErr := errors.New("backend failed")
-	users := &guestRedemptionUserRepositoryStub{user: User{ID: 42, IsGuest: true}}
+	users := &guestRedemptionUserRepositoryStub{user: User{ID: 42, Kind: UserKindGuest}}
 	codes := &guestRedemptionCodeRepositoryStub{
 		claim:   GuestClaimCode{UserID: 42, Code: "ABCDEFGH23", CreatedAt: 1},
 		markErr: backendErr,
@@ -100,7 +100,7 @@ func TestGuestRedemptionServicePropagatesOperationalFailures(t *testing.T) {
 }
 
 func TestGuestRedemptionServiceDoesNotMarkCodeWhenSessionCreationFails(t *testing.T) {
-	users := &guestRedemptionUserRepositoryStub{user: User{ID: 42, IsGuest: true}}
+	users := &guestRedemptionUserRepositoryStub{user: User{ID: 42, Kind: UserKindGuest}}
 	codes := &guestRedemptionCodeRepositoryStub{claim: GuestClaimCode{
 		UserID:    42,
 		Code:      "ABCDEFGH23",

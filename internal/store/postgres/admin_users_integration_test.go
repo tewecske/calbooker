@@ -58,7 +58,7 @@ func TestAdminUserRepositorySearchAndFilters(t *testing.T) {
 	mustCreateAdminUser(t, ctx, repository, service.User{Email: &aliceEmail, IsAdmin: true, Theme: "light", Locale: "en", CreatedAt: 100})
 	mustCreateAdminUser(t, ctx, repository, service.User{Email: &bobEmail, Theme: "light", Locale: "en", CreatedAt: 101})
 	mustCreateAdminUser(t, ctx, repository, service.User{Email: strPtr("alice-extra@example.test"), Theme: "light", Locale: "en", CreatedAt: 102, EmailVerifiedAt: &verified})
-	mustCreateAdminUser(t, ctx, repository, service.User{Username: &guestName, IsGuest: true, Theme: "light", Locale: "en", CreatedAt: 103})
+	mustCreateAdminUser(t, ctx, repository, service.User{Username: &guestName, Kind: service.UserKindGuest, Theme: "light", Locale: "en", CreatedAt: 103})
 
 	listed, err := NewAdminUserRepository(harness.DB)
 	if err != nil {
@@ -85,7 +85,7 @@ func TestAdminUserRepositorySearchAndFilters(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ListUsers(guest) error = %v", err)
 	}
-	if guests.Total != 1 || !guests.Users[0].IsGuest {
+	if guests.Total != 1 || !guests.Users[0].IsGuest() {
 		t.Fatalf("guest filter = %+v, want one guest", guests)
 	}
 

@@ -294,7 +294,7 @@ func (h *adminHandler) detailView(language locale.Code, detail service.AdminUser
 		UserID:    account.ID,
 		Label:     adminAccountLabel(account),
 		IsAdmin:   account.IsAdmin,
-		IsGuest:   account.IsGuest,
+		IsGuest:   account.IsGuest(),
 		Confirmed: detail.Confirmed,
 		Locale:    account.Locale,
 		Theme:     account.Theme,
@@ -652,7 +652,7 @@ func adminUserRowView(language locale.Code, account service.User) AdminUserRowVi
 		ID:        account.ID,
 		Label:     adminAccountLabel(account),
 		IsAdmin:   account.IsAdmin,
-		IsGuest:   account.IsGuest,
+		IsGuest:   account.IsGuest(),
 		Confirmed: account.EmailVerifiedAt != nil,
 	}
 	if account.Email != nil {

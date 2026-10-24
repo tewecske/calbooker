@@ -121,6 +121,8 @@
       {{if eq .Section "team"}}{{template "group-team" $}}{{end}}
       {{if eq .Section "invites"}}{{template "group-invites" $}}{{end}}
       {{if eq .Section "children"}}{{template "group-children" $}}{{end}}
+      {{if eq .Section "resources"}}{{template "group-resources" $}}{{end}}
+      {{if eq .Section "resource"}}{{template "group-resource" $}}{{end}}
     {{end}}
   </div>
 {{end}}

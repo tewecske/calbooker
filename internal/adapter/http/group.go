@@ -97,6 +97,8 @@ type GroupDetailView struct {
 	Team       *TeamDetailView
 	Invites    *InvitesView
 	Children   *ChildrenView
+	Resources  *ResourcesView
+	Resource   *ResourceDetailView
 }
 
 // GroupNavItem is one group section link.
@@ -201,6 +203,7 @@ func registerGroupRoutes(mux *http.ServeMux, groups *groupHandler) {
 	registerTeamRoutes(mux, groups)
 	registerInviteRoutes(mux, groups)
 	registerChildRoutes(mux, groups)
+	registerResourceRoutes(mux, groups)
 }
 
 func newGroupHandler(renderer *PageRenderer, dependencies Dependencies) *groupHandler {
@@ -226,7 +229,7 @@ func groupLabels(renderer *PageRenderer) map[locale.Code]map[string]string {
 	for _, language := range locale.Codes() {
 		values := make(map[string]string)
 		for _, id := range renderer.catalogs.Keys(language) {
-			if !strings.HasPrefix(id, "groups.") && !strings.HasPrefix(id, "teams.") && !strings.HasPrefix(id, "invites.") && !strings.HasPrefix(id, "children.") {
+			if !strings.HasPrefix(id, "groups.") && !strings.HasPrefix(id, "teams.") && !strings.HasPrefix(id, "invites.") && !strings.HasPrefix(id, "children.") && !strings.HasPrefix(id, "resources.") {
 				continue
 			}
 			if text, err := renderer.catalogs.Translate(language, id, nil); err == nil {
@@ -505,7 +508,7 @@ func (h *groupHandler) groupRequest(writer http.ResponseWriter, request *http.Re
 func (h *groupHandler) renderWriteError(writer http.ResponseWriter, request *http.Request, current groupRequest, section string, teamID int64, err error, form FormData) {
 	message, status := "", http.StatusUnprocessableEntity
 	switch {
-	case errors.Is(err, service.ErrGroupNotFound), errors.Is(err, service.ErrTeamNotFound):
+	case errors.Is(err, service.ErrGroupNotFound), errors.Is(err, service.ErrTeamNotFound), errors.Is(err, service.ErrResourceNotFound):
 		h.renderGroupNotFound(writer, request, current.language)
 		return
 	case errors.Is(err, service.ErrGroupForbidden):
@@ -552,6 +555,9 @@ func (h *groupHandler) renderWriteError(writer http.ResponseWriter, request *htt
 		message = "children.error.invalid_link"
 	case errors.Is(err, service.ErrProfileMembership):
 		message = "children.error.remove_profile"
+	case errors.Is(err, service.ErrInvalidResourceName), errors.Is(err, service.ErrResourceNameTaken), errors.Is(err, service.ErrInvalidResourceKind),
+		errors.Is(err, service.ErrInvalidResourceDescription), errors.Is(err, service.ErrInvalidResourceCapacity):
+		_, message = resourceErrorField(err)
 	case errors.Is(err, service.ErrInvalidGroup):
 		message = "groups.error.generic"
 	default:
@@ -619,12 +625,20 @@ func (h *groupHandler) renderSection(writer http.ResponseWriter, request *http.R
 		if !h.loadChildren(writer, request, current, group.ID, form, view) {
 			return
 		}
+	case groupSectionResources:
+		if !h.loadResources(writer, request, current, group.ID, form, view) {
+			return
+		}
+	case groupSectionResource:
+		if !h.loadResource(writer, request, current, group.ID, teamID, form, view) {
+			return
+		}
 	}
 	h.renderGroupPage(writer, request, current, view, form, alerts, status)
 }
 
 func (h *groupHandler) renderLoadError(writer http.ResponseWriter, request *http.Request, language locale.Code, err error) {
-	if errors.Is(err, service.ErrGroupNotFound) || errors.Is(err, service.ErrTeamNotFound) {
+	if errors.Is(err, service.ErrGroupNotFound) || errors.Is(err, service.ErrTeamNotFound) || errors.Is(err, service.ErrResourceNotFound) {
 		h.renderGroupNotFound(writer, request, language)
 		return
 	}
@@ -646,6 +660,9 @@ func (h *groupHandler) groupShell(current groupRequest, group service.Group, sec
 		{groupSectionMembers, "groups.nav.members", "/members"},
 		{groupSectionTeams, "groups.nav.teams", "/teams"},
 	}
+	if current.access.CanViewResources() {
+		items = append(items, struct{ id, label, route string }{groupSectionResources, "resources.nav", "/resources"})
+	}
 	if current.access.CanViewChildren() {
 		items = append(items, struct{ id, label, route string }{groupSectionChildren, "groups.nav.children", "/children"})
 	}
@@ -656,7 +673,7 @@ func (h *groupHandler) groupShell(current groupRequest, group service.Group, sec
 		items = append(items, struct{ id, label, route string }{groupSectionSettings, "groups.nav.settings", "/settings"})
 	}
 	for _, item := range items {
-		currentSection := section == item.id || (section == groupSectionTeam && item.id == groupSectionTeams)
+		currentSection := section == item.id || (section == groupSectionTeam && item.id == groupSectionTeams) || (section == groupSectionResource && item.id == groupSectionResources)
 		view.Nav = append(view.Nav, GroupNavItem{ID: item.id, Label: h.t(language, item.label), URL: h.groupPath(language, group.ID, item.route), Current: currentSection})
 	}
 	return view

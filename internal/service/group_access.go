@@ -252,6 +252,19 @@ func (a *GroupAccess) CanCreateTeam() bool {
 	return a.CanManageGroup()
 }
 
+// CanManageResources reports whether the account may create, edit, archive,
+// and restore resources (admins, managers, and site administrators).
+func (a *GroupAccess) CanManageResources() bool {
+	return a.CanManageGroup()
+}
+
+// CanViewResources reports whether the account sees the resource list:
+// those who manage resources, and coaches (read only). Players and parents
+// see a resource only where an event or plan names it.
+func (a *GroupAccess) CanViewResources() bool {
+	return a.CanManageResources() || a.HasRole(GroupRoleCoach)
+}
+
 // CanManageRoster reports whether the account may add and remove players
 // and parents on a team: admins, managers, and the team's coaches.
 func (a *GroupAccess) CanManageRoster(teamID int64) bool {

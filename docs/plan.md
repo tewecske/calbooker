@@ -153,9 +153,11 @@ Progress is in the Status table below. The original first steps were:
 | 1 | merged | #16 |
 | 2 | merged | #18 |
 | 3 | merged | #19 |
-| 4 | in progress (lane A) | |
+| 4 | merged | #20 |
+| 5 | in progress (lane A) | |
+| — | browser account pool + rate-limit backoff in progress (lane B env) | |
 | 6 | merged | #17 |
-| 5, 7–15 | open | |
+| 7–15 | open | |
 
 ## Owner answers (2026-10-23)
 

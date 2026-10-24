@@ -1,0 +1,26 @@
+{
+  "messages": {
+    "calendar.nav": {"text": "Naptár"},
+    "calendar.heading": {"text": "Heti naptár"},
+    "calendar.today": {"text": "Ma"},
+    "calendar.this_week": {"text": "Ez a hét"},
+    "calendar.week_navigation": {"text": "Hét"},
+    "calendar.filters": {"text": "Szűrők"},
+    "calendar.filter_team": {"text": "Csapat"},
+    "calendar.filter_resource": {"text": "Erőforrás"},
+    "calendar.filter_kind": {"text": "Típus"},
+    "calendar.all_teams": {"text": "Minden csapat"},
+    "calendar.all_resources": {"text": "Minden erőforrás"},
+    "calendar.all_kinds": {"text": "Minden típus"},
+    "calendar.filter": {"text": "Szűrés"},
+    "calendar.clear": {"text": "Szűrők törlése"},
+    "calendar.switch_group": {"text": "Csoport váltása"},
+    "calendar.empty": {"text": "Ezen a héten nincs esemény."},
+    "calendar.empty_filtered": {"text": "Ezen a héten egy esemény sem felel meg a szűrőknek."},
+    "calendar.day_list": {"text": "Események naponként"},
+    "calendar.day_empty": {"text": "Nincs esemény"},
+    "calendar.today_marker": {"text": "Ma"},
+    "calendar.multi_day": {"text": "Több napos:"},
+    "calendar.your_status": {"text": "A válaszod:"}
+  }
+}

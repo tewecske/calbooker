@@ -1,0 +1,26 @@
+{
+  "messages": {
+    "calendar.nav": {"text": "Calendar"},
+    "calendar.heading": {"text": "Weekly calendar"},
+    "calendar.today": {"text": "Today"},
+    "calendar.this_week": {"text": "This week"},
+    "calendar.week_navigation": {"text": "Week"},
+    "calendar.filters": {"text": "Filters"},
+    "calendar.filter_team": {"text": "Team"},
+    "calendar.filter_resource": {"text": "Resource"},
+    "calendar.filter_kind": {"text": "Kind"},
+    "calendar.all_teams": {"text": "All teams"},
+    "calendar.all_resources": {"text": "All resources"},
+    "calendar.all_kinds": {"text": "All kinds"},
+    "calendar.filter": {"text": "Filter"},
+    "calendar.clear": {"text": "Clear filters"},
+    "calendar.switch_group": {"text": "Switch group"},
+    "calendar.empty": {"text": "There are no events this week."},
+    "calendar.empty_filtered": {"text": "No events this week match the filters."},
+    "calendar.day_list": {"text": "Events by day"},
+    "calendar.day_empty": {"text": "No events"},
+    "calendar.today_marker": {"text": "Today"},
+    "calendar.multi_day": {"text": "Spans several days:"},
+    "calendar.your_status": {"text": "Your answer:"}
+  }
+}

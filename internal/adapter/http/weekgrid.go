@@ -159,6 +159,15 @@ type WeekGridItem struct {
 	// Warning marks an item that breaks a rule; WarningText explains it.
 	Warning     bool
 	WarningText string
+	// URL, when set, turns the item's label into a link that covers the
+	// item (read-only grids, for example to an event page).
+	URL string
+	// Muted shows the item faded with its label struck through, for
+	// example a cancelled event.
+	Muted bool
+	// Badges are short texts shown as small badges on the item, for example
+	// "Cancelled" or the viewer's sign-up status.
+	Badges []string
 }
 
 // WeekGridView is the render-ready grid for the "weekgrid" template.

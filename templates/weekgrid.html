@@ -57,13 +57,14 @@
       {{range .Days}}{{range .Columns}}
       <ol class="wg-column grid {{$.RowsClass}}{{with $.HourClass}} {{.}}{{end}}" data-wg-column data-weekday="{{.Weekday}}" data-resource="{{.Resource}}" aria-label="{{.Label}}">
         {{range .Items}}
-        <li class="wg-item {{.VariantClass}} {{.PlacementClass}}{{if .Warning}} wg-item-warn{{end}}{{if .Movable}} wg-item-movable{{end}}"
+        <li class="wg-item {{.VariantClass}} {{.PlacementClass}}{{if .Warning}} wg-item-warn{{end}}{{if .Movable}} wg-item-movable{{end}}{{if .Muted}} wg-item-muted{{end}}"
             data-wg-item="{{.ID}}" data-weekday="{{.Weekday}}" data-start="{{.StartMinute}}" data-end="{{.EndMinute}}" data-resource="{{.Resource}}"
             {{- if .Movable}} data-wg-draggable{{end}}>
-          <span class="wg-item-label">{{.Label}}</span>
+          {{if .URL}}<a class="wg-item-label wg-item-link" href="{{.URL}}" data-wg-link>{{.Label}}</a>{{else}}<span class="wg-item-label">{{.Label}}</span>{{end}}
           <span class="wg-item-time">{{if .ClippedStart}}<span aria-hidden="true">↑ </span>{{end}}{{.TimeLabel}}{{if .ClippedEnd}}<span aria-hidden="true"> ↓</span>{{end}}</span>
           <span class="sr-only">{{.DayName}}{{if .ResourceLabel}}, {{.ResourceLabel}}{{end}}{{if .ClippedStart}}, {{$.Labels.StartsBefore}}{{end}}{{if .ClippedEnd}}, {{$.Labels.EndsAfter}}{{end}}</span>
           {{if .Detail}}<span class="wg-item-detail">{{.Detail}}</span>{{end}}
+          {{if .Badges}}<span class="wg-item-badges">{{range .Badges}}<span class="badge badge-xs">{{.}}</span>{{end}}</span>{{end}}
           {{if .Warning}}
           <span class="wg-warning-badge" title="{{if .WarningText}}{{.WarningText}}{{else}}{{$.Labels.Warning}}{{end}}" data-wg-warning>
             <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z"/></svg>
@@ -83,7 +84,7 @@
     <h3 id="{{.ID}}-hidden-heading" class="font-medium">{{.Labels.Hidden}}</h3>
     <ul class="mt-1 list-disc pl-5 text-base-content/80" data-wg-hidden>
       {{range .Hidden}}
-      <li data-wg-hidden-item="{{.ID}}">{{.Label}}: {{.DayName}}{{if .ResourceLabel}}, {{.ResourceLabel}}{{end}} {{.TimeLabel}}</li>
+      <li data-wg-hidden-item="{{.ID}}">{{if .URL}}<a class="link" href="{{.URL}}">{{.Label}}</a>{{else}}{{.Label}}{{end}}: {{.DayName}}{{if .ResourceLabel}}, {{.ResourceLabel}}{{end}} {{.TimeLabel}}</li>
       {{end}}
     </ul>
   </section>

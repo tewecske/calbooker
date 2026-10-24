@@ -67,8 +67,10 @@ type SeasonDetailView struct {
 	CanEdit   bool
 	ListURL   string
 	DeleteURL string
-	EditForm  *SeasonFormView
-	Coaches   []SeasonCoachRowView
+	// CoachBoardURL is the season's coach assignment board.
+	CoachBoardURL string
+	EditForm      *SeasonFormView
+	Coaches       []SeasonCoachRowView
 }
 
 // SeasonCoachRowView is one coach assignment.
@@ -362,6 +364,7 @@ func (h *groupHandler) loadSeason(writer http.ResponseWriter, request *http.Requ
 		CanEdit:       current.access.CanManageSeasons(),
 		ListURL:       h.groupPath(current.language, groupID, "/seasons"),
 		DeleteURL:     row.URL + "/delete",
+		CoachBoardURL: row.URL + "/coach-board",
 	}
 	if detail.CanEdit {
 		detail.EditForm = h.seasonFormView(current.language, "season-edit", row.URL, &season, form)

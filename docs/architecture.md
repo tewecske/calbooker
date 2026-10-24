@@ -468,3 +468,47 @@ get `service.ErrGroupNotFound`, which handlers render as 404.
   slot list (out of band), and an alert. A slot's page
   (`.../plan/slots/{slotID}`) edits week, ages, team limit, resource, day, and
   times and deletes it; coaches see it read only.
+
+## Coach assignment board
+
+- `CoachBoardService` (`internal/service/coach_board.go`, store method
+  `SeasonRepository.ReplaceSeasonCoaches` in
+  `internal/store/postgres/coach_board.go`, no migration) edits a season's
+  `season_team_coaches` as a whole. Access: `CanManageSeasons` edits,
+  `CanViewSeasons` (coaches) reads; players and parents get access denied.
+- `Board(access, CoachBoardRequest{SeasonID, Draft, Suggest})`: staff get the
+  posted draft (or the saved set) with the coach pool (qualification,
+  availability, load), warnings, and optionally a suggestion (`fill` keeps the
+  draft and fills active teams without a coach; `replace` starts from an empty
+  board). Unknown teams and non-coaches in a draft are dropped; one head per
+  team is kept. Coaches get the saved assignments only, for the teams that
+  have coaches, without pool, qualifications, or warnings.
+- Pure helpers for #14: `SuggestCoaches` (previous season's coaches of the
+  same team, with their head mark, if still coaches; then one coach whose
+  qualification covers the team's ages, ranked by availability in the
+  season, fewest teams so far, name, user ID; unqualified teams stay empty),
+  `CoachAssignmentWarnings` (`no_qualification`, `qualification_mismatch`,
+  `no_availability` in any part of the season), `PreviousSeason` (latest
+  season ending before the chosen one starts), `CoachAssignmentRevision`,
+  and `DiffCoachAssignments`.
+- `Save(actor, seasonID, revision, assignments)` validates (teams of the
+  group, coach role, at most one head per team, at most
+  `MaxCoachBoardAssignments`), then `ReplaceSeasonCoaches` locks the season
+  row (`FOR UPDATE`; `AssignSeasonCoach` and `RemoveSeasonCoach` now take
+  `FOR NO KEY UPDATE` on it, so they serialize), compares the revision, and
+  applies the diff (remove, unmark heads, upsert) in one transaction. The
+  revision token is a SHA-256 prefix of the sorted `(team, coach, head)` set:
+  a different set is `ErrOptimisticLockConflict`, a deleted season
+  `ErrSeasonNotFound`. Saves that change something are audited as
+  `group.season.coaches_saved` (season ID and name, counts).
+- Page: `/{language}/groups/{id}/seasons/{seasonID}/coach-board` (GET, POST
+  saves) and `.../coach-board/draft` (re-render, add, remove, suggest)
+  (`coach_board.go`, `coach_board.html`, catalogs `coach_board.json`), linked
+  from the season page. The board is one form: hidden `a=<team>:<coach>`
+  values, `head` checkboxes, `suggested` explanation values, per-team `add`
+  selects, and `remove` buttons, so it works without JavaScript. The coach
+  board block of `static/app.js` adds SortableJS: the pool clones cards onto
+  teams, teams move cards between each other, dropping on the pool removes;
+  after a drop it rewrites the card's values and posts the draft, and the
+  server re-renders the board (`#coach-board`, outer swap, alerts out of
+  band). The same pattern fits the training plan board (#14).

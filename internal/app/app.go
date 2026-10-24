@@ -68,6 +68,7 @@ type Graph struct {
 	Coach                 *service.CoachService
 	PlanSlot              *service.PlanSlotService
 	Participation         *service.ParticipationService
+	CoachBoard            *service.CoachBoardService
 	GroupJoin             *service.RateLimitedGroupJoiner
 	AdminAccounts         *service.AdminAccountService
 	AdminDiagnostics      *service.AdminDiagnosticsService
@@ -329,6 +330,10 @@ func New(database *sql.DB, appConfig config.Config) (*Graph, error) {
 	if err != nil {
 		return nil, fmt.Errorf("construct participation service: %w", err)
 	}
+	coachBoardService, err := service.NewCoachBoardService(seasonsRepository, teamsRepository, coachesRepository, groupMembershipsRepository, users)
+	if err != nil {
+		return nil, fmt.Errorf("construct coach board service: %w", err)
+	}
 	groupJoinLimiter, _, err := newSharedRateLimiter(database, "group-join", service.RateLimitConfig{Limit: 20, Window: time.Minute})
 	if err != nil {
 		return nil, fmt.Errorf("construct group join rate limiter: %w", err)
@@ -351,6 +356,7 @@ func New(database *sql.DB, appConfig config.Config) (*Graph, error) {
 	coachService.SetAuditor(auditService)
 	planSlotService.SetAuditor(auditService)
 	participationService.SetAuditor(auditService)
+	coachBoardService.SetAuditor(auditService)
 	adminAccounts, err := service.NewAdminAccountService(users, adminUsersRepository, auditService, sessionService)
 	if err != nil {
 		return nil, fmt.Errorf("construct admin account service: %w", err)
@@ -454,6 +460,7 @@ func New(database *sql.DB, appConfig config.Config) (*Graph, error) {
 		Coach:                 coachService,
 		PlanSlot:              planSlotService,
 		Participation:         participationService,
+		CoachBoard:            coachBoardService,
 		GroupJoin:             groupJoinService,
 		AdminAccounts:         adminAccounts,
 		AdminDiagnostics:      adminDiagnostics,

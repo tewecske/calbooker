@@ -233,3 +233,110 @@
   document.addEventListener("DOMContentLoaded", () => init(document.documentElement));
   document.addEventListener("htmx:load", (event) => init(event.detail.elt));
 })();
+
+// Coach assignment board (templates/coach_board.html). SortableJS carries
+// coach cards from the pool onto teams (as copies), between teams, and back
+// to the pool (which takes them off the team). After a drop this code
+// renames the card's form values to its new team and asks the server to
+// re-render the board from the draft, so warnings and the "unsaved" state
+// stay server-side. Nothing is saved until the user presses Save.
+(() => {
+  const refresh = (form) => {
+    const button = form.querySelector("[data-cb-refresh]");
+    if (button) button.click();
+  };
+
+  // Each card in a team list carries "a" = "<team>:<coach>" and its head
+  // checkbox the same value; a card that changed team loses its head mark
+  // and suggestion. A coach appears once per team.
+  const sync = (form) => {
+    for (const list of form.querySelectorAll("[data-cb-team]")) {
+      const team = list.dataset.cbTeam;
+      const seen = new Set();
+      for (const card of [...list.querySelectorAll("[data-cb-coach]")]) {
+        const coach = card.dataset.cbCoach;
+        if (seen.has(coach)) {
+          card.remove();
+          continue;
+        }
+        seen.add(coach);
+        const key = `${team}:${coach}`;
+        const assignment = card.querySelector("[data-cb-assignment]");
+        if (assignment) {
+          assignment.value = key;
+          assignment.disabled = false;
+        }
+        if (card.dataset.cbFrom !== team) {
+          card.querySelector("[data-cb-suggested]")?.remove();
+          const head = card.querySelector("[data-cb-head]");
+          if (head) {
+            head.checked = false;
+            head.value = key;
+          }
+        }
+      }
+    }
+  };
+
+  const enable = (form) => {
+    const group = `coach-board-${Math.random().toString(36).slice(2)}`;
+    const common = {
+      sort: false,
+      draggable: "[data-cb-coach]",
+      filter: "button, input, select, label, a",
+      preventOnFilter: false,
+      forceFallback: true,
+      fallbackOnBody: true,
+      fallbackTolerance: 3,
+      delay: 200,
+      delayOnTouchOnly: true,
+      ghostClass: "cb-ghost",
+      fallbackClass: "cb-drag",
+    };
+    const pool = form.querySelector("[data-cb-pool]");
+    if (pool) {
+      Sortable.create(pool, {
+        ...common,
+        group: {name: group, pull: "clone", put: true},
+        onAdd: (event) => {
+          // Dropped back on the pool: off the team.
+          event.item.remove();
+          refresh(form);
+        },
+      });
+    }
+    for (const list of form.querySelectorAll("[data-cb-team]")) {
+      Sortable.create(list, {
+        ...common,
+        group: {name: group, pull: true, put: true},
+        onAdd: () => {
+          sync(form);
+          refresh(form);
+        },
+      });
+    }
+    // At most one head coach per team.
+    form.addEventListener("change", (event) => {
+      const head = event.target.closest("[data-cb-head]");
+      if (!head || !head.checked) return;
+      const list = head.closest("[data-cb-team]");
+      for (const other of list.querySelectorAll("[data-cb-head]")) {
+        if (other !== head) other.checked = false;
+      }
+      refresh(form);
+    });
+  };
+
+  const init = (root) => {
+    if (typeof Sortable === "undefined" || !root || !root.querySelectorAll) return;
+    const forms = root.matches("[data-coach-board]") ? [root] : root.querySelectorAll("[data-coach-board]");
+    for (const form of forms) {
+      if (form.dataset.cbReady) continue;
+      form.dataset.cbReady = "true";
+      enable(form);
+    }
+  };
+
+  document.addEventListener("DOMContentLoaded", () => init(document.documentElement));
+  document.addEventListener("htmx:load", (event) => init(event.detail.elt));
+})();

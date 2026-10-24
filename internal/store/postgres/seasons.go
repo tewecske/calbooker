@@ -257,6 +257,10 @@ func (r *SeasonRepository) AssignSeasonCoach(ctx context.Context, assignment ser
 		return mapSeasonError(err)
 	}
 	defer func() { _ = tx.Rollback() }()
+	// The season lock orders this change with board saves (ReplaceSeasonCoaches).
+	if err := lockSeason(ctx, tx, groupID, assignment.SeasonID, "FOR NO KEY UPDATE"); err != nil {
+		return err
+	}
 	if assignment.Head {
 		if _, err := tx.ExecContext(ctx, `
 			UPDATE season_team_coaches SET is_head = false
@@ -281,7 +285,19 @@ func (r *SeasonRepository) RemoveSeasonCoach(ctx context.Context, groupID, seaso
 	if err != nil {
 		return err
 	}
-	result, err := db.ExecContext(ctx, `
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return mapSeasonError(err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	// The season lock orders this change with board saves (ReplaceSeasonCoaches).
+	if err := lockSeason(ctx, tx, groupID, seasonID, "FOR NO KEY UPDATE"); err != nil {
+		if errors.Is(err, service.ErrSeasonNotFound) {
+			return service.ErrSeasonCoachNotFound
+		}
+		return err
+	}
+	result, err := tx.ExecContext(ctx, `
 		DELETE FROM season_team_coaches WHERE group_id = $1 AND season_id = $2 AND team_id = $3 AND coach_user_id = $4
 	`, groupID, seasonID, teamID, coachUserID)
 	if err != nil {
@@ -294,7 +310,7 @@ func (r *SeasonRepository) RemoveSeasonCoach(ctx context.Context, groupID, seaso
 	if rows == 0 {
 		return service.ErrSeasonCoachNotFound
 	}
-	return nil
+	return mapSeasonError(tx.Commit())
 }
 
 // CoachedTeamIDs returns the teams coachUserID coaches in the season

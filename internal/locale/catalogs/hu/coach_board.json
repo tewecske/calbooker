@@ -1,0 +1,157 @@
+{
+  "messages": {
+    "coach_board.add": {
+      "text": "Edző hozzáadása"
+    },
+    "coach_board.add_label": {
+      "text": "Edző hozzáadása: {team}"
+    },
+    "coach_board.ages": {
+      "text": "{min}–{max} évesek"
+    },
+    "coach_board.apply": {
+      "text": "Tábla frissítése"
+    },
+    "coach_board.archived": {
+      "text": "Archivált"
+    },
+    "coach_board.back": {
+      "text": "Vissza a szezonhoz"
+    },
+    "coach_board.coach_no_availability": {
+      "text": "Nincs elérhetőség"
+    },
+    "coach_board.coach_no_qualification": {
+      "text": "Nincs képesítés"
+    },
+    "coach_board.coach_teams": {
+      "one": "{count} csapat",
+      "other": "{count} csapat"
+    },
+    "coach_board.discard": {
+      "text": "Változások elvetése"
+    },
+    "coach_board.error.coach_role": {
+      "text": "A táblán valakinek már nincs edző szerepe. Vesd el a változásaidat, és próbáld újra."
+    },
+    "coach_board.error.team_not_found": {
+      "text": "A tábla egyik csapata már nem létezik. Vesd el a változásaidat, és próbáld újra."
+    },
+    "coach_board.error.too_large": {
+      "text": "A táblán túl sok beosztás van."
+    },
+    "coach_board.error.two_heads": {
+      "text": "Egy csapatnak csak egy vezetőedzője lehet."
+    },
+    "coach_board.head": {
+      "text": "Vezetőedző"
+    },
+    "coach_board.head_label": {
+      "text": "Vezetőedző: {coach}, {team}"
+    },
+    "coach_board.heading": {
+      "text": "Edzőtábla"
+    },
+    "coach_board.intro": {
+      "text": "Húzd az edzőket a listából a csapatokra, vagy válaszd ki őket az Edző hozzáadása listában. Egy edző több csapatnál is lehet, és egy csapatnak több edzője is lehet. Semmi sem mentődik, amíg nem nyomod meg a Mentés gombot."
+    },
+    "coach_board.link": {
+      "text": "Edzőtábla"
+    },
+    "coach_board.new": {
+      "text": "Nincs mentve"
+    },
+    "coach_board.no_assignments": {
+      "text": "Ebben a szezonban még nincs beosztott edző."
+    },
+    "coach_board.no_changes": {
+      "text": "Nem változott semmi."
+    },
+    "coach_board.no_coaches": {
+      "text": "A csoportnak még nincsenek edzői."
+    },
+    "coach_board.no_js": {
+      "text": "JavaScript nélkül válaszd ki az edzőket az Edző hozzáadása listákban, és nyomd meg a Tábla frissítése gombot, vagy használd a csapatoldalak edzők kártyáját."
+    },
+    "coach_board.no_previous": {
+      "text": "Nincs előző szezon"
+    },
+    "coach_board.no_teams": {
+      "text": "A csoportnak még nincsenek csapatai."
+    },
+    "coach_board.pool": {
+      "text": "Edzők"
+    },
+    "coach_board.pool_help": {
+      "text": "Húzz egy edzőt egy csapatra. Ha egy csapatról ide húzod vissza, lekerül a csapatról."
+    },
+    "coach_board.previous": {
+      "text": "Előző szezon"
+    },
+    "coach_board.read_only": {
+      "text": "Az edzőket az adminisztrátorok és a menedzserek osztják be; te csak olvasásra látod a mentett beosztást."
+    },
+    "coach_board.reason.previous": {
+      "text": "Az előző szezonban ezt a csapatot edzette"
+    },
+    "coach_board.reason.qualification": {
+      "one": "{min}–{max} évesekre képesített, eddig {count} csapat",
+      "other": "{min}–{max} évesekre képesített, eddig {count} csapat"
+    },
+    "coach_board.remove": {
+      "text": "Eltávolítás"
+    },
+    "coach_board.remove_label": {
+      "text": "{coach} eltávolítása: {team}"
+    },
+    "coach_board.save": {
+      "text": "Mentés"
+    },
+    "coach_board.saved": {
+      "text": "Edzőbeosztás mentve: {added} hozzáadva, {removed} eltávolítva, {head} vezetőedző-változás."
+    },
+    "coach_board.stale": {
+      "text": "Az edzőbeosztás megváltozott, mióta megnyitottad a táblát. Vesd el a változásaidat, hogy lásd a jelenlegit."
+    },
+    "coach_board.start_over": {
+      "text": "Újrakezdés javaslatból"
+    },
+    "coach_board.start_over_confirm": {
+      "text": "Lecseréled az egész táblát egy új javaslatra? A nem mentett változások elvesznek."
+    },
+    "coach_board.suggest": {
+      "text": "Javaslat"
+    },
+    "coach_board.suggest_help": {
+      "text": "A javaslat az edző nélküli csapatokat tölti fel: először a csapat előző szezonbeli edzőivel, aztán azzal a képesített, elérhető edzővel, akinek a legkevesebb csapata van. Nem ment semmit, és megtartja, ami a táblán van."
+    },
+    "coach_board.suggested": {
+      "one": "{count} javaslat hozzáadva. Nézd át, és mentsd.",
+      "other": "{count} javaslat hozzáadva. Nézd át őket, és mentsd."
+    },
+    "coach_board.suggested_none": {
+      "text": "Nincs mit javasolni: minden csapatnak van edzője, vagy nem maradt képesített edző."
+    },
+    "coach_board.team_empty": {
+      "text": "Még nincs edző."
+    },
+    "coach_board.unsaved": {
+      "text": "Nem mentett változások"
+    },
+    "coach_board.warning.no_availability": {
+      "text": "Ebben a szezonban nincs elérhetősége"
+    },
+    "coach_board.warning.no_qualification": {
+      "text": "Nincs megadva képesítés"
+    },
+    "coach_board.warning.qualification_mismatch": {
+      "text": "{min}–{max} évesekre képesített, a csapat {team_min}–{team_max} éves"
+    },
+    "coach_board.warning_line": {
+      "text": "{team}: {coach} – {warning}"
+    },
+    "coach_board.warnings_heading": {
+      "text": "Figyelmeztetések"
+    }
+  }
+}

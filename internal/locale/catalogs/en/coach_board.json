@@ -1,0 +1,157 @@
+{
+  "messages": {
+    "coach_board.add": {
+      "text": "Add coach"
+    },
+    "coach_board.add_label": {
+      "text": "Add a coach to {team}"
+    },
+    "coach_board.ages": {
+      "text": "Ages {min}–{max}"
+    },
+    "coach_board.apply": {
+      "text": "Update board"
+    },
+    "coach_board.archived": {
+      "text": "Archived"
+    },
+    "coach_board.back": {
+      "text": "Back to the season"
+    },
+    "coach_board.coach_no_availability": {
+      "text": "No availability"
+    },
+    "coach_board.coach_no_qualification": {
+      "text": "No qualification"
+    },
+    "coach_board.coach_teams": {
+      "one": "{count} team",
+      "other": "{count} teams"
+    },
+    "coach_board.discard": {
+      "text": "Discard changes"
+    },
+    "coach_board.error.coach_role": {
+      "text": "Someone on the board no longer has the coach role. Discard your changes and try again."
+    },
+    "coach_board.error.team_not_found": {
+      "text": "A team on the board no longer exists. Discard your changes and try again."
+    },
+    "coach_board.error.too_large": {
+      "text": "The board holds too many assignments."
+    },
+    "coach_board.error.two_heads": {
+      "text": "A team can have only one head coach."
+    },
+    "coach_board.head": {
+      "text": "Head coach"
+    },
+    "coach_board.head_label": {
+      "text": "Head coach: {coach} on {team}"
+    },
+    "coach_board.heading": {
+      "text": "Coach board"
+    },
+    "coach_board.intro": {
+      "text": "Drag coaches from the pool onto teams, or pick them with Add coach. A coach can be on several teams and a team can have several coaches. Nothing is saved until you press Save."
+    },
+    "coach_board.link": {
+      "text": "Coach board"
+    },
+    "coach_board.new": {
+      "text": "Not saved"
+    },
+    "coach_board.no_assignments": {
+      "text": "No coaches are assigned in this season yet."
+    },
+    "coach_board.no_changes": {
+      "text": "Nothing changed."
+    },
+    "coach_board.no_coaches": {
+      "text": "The group has no coaches yet."
+    },
+    "coach_board.no_js": {
+      "text": "Without JavaScript, choose coaches in the Add coach lists and press Update board, or use the coaches card on each team page."
+    },
+    "coach_board.no_previous": {
+      "text": "No previous season"
+    },
+    "coach_board.no_teams": {
+      "text": "The group has no teams yet."
+    },
+    "coach_board.pool": {
+      "text": "Coaches"
+    },
+    "coach_board.pool_help": {
+      "text": "Drag a coach onto a team. Drag a coach from a team back here to take them off."
+    },
+    "coach_board.previous": {
+      "text": "Previous season"
+    },
+    "coach_board.read_only": {
+      "text": "Admins and managers assign coaches; you see the saved assignments read only."
+    },
+    "coach_board.reason.previous": {
+      "text": "Coached this team last season"
+    },
+    "coach_board.reason.qualification": {
+      "one": "Qualified for ages {min}–{max}, {count} team so far",
+      "other": "Qualified for ages {min}–{max}, {count} teams so far"
+    },
+    "coach_board.remove": {
+      "text": "Remove"
+    },
+    "coach_board.remove_label": {
+      "text": "Remove {coach} from {team}"
+    },
+    "coach_board.save": {
+      "text": "Save"
+    },
+    "coach_board.saved": {
+      "text": "Coach assignments saved: {added} added, {removed} removed, {head} head coach changes."
+    },
+    "coach_board.stale": {
+      "text": "The coach assignments changed since you opened the board. Discard your changes to see the current ones."
+    },
+    "coach_board.start_over": {
+      "text": "Start over from suggestion"
+    },
+    "coach_board.start_over_confirm": {
+      "text": "Replace the whole board with a new suggestion? Unsaved changes are lost."
+    },
+    "coach_board.suggest": {
+      "text": "Suggest"
+    },
+    "coach_board.suggest_help": {
+      "text": "Suggest fills teams without a coach: the team's coaches from the previous season first, then a qualified coach with availability and the fewest teams. It saves nothing and keeps what is on the board."
+    },
+    "coach_board.suggested": {
+      "one": "{count} suggestion added. Review it and save.",
+      "other": "{count} suggestions added. Review them and save."
+    },
+    "coach_board.suggested_none": {
+      "text": "Nothing to suggest: every team has a coach, or no qualified coach is left."
+    },
+    "coach_board.team_empty": {
+      "text": "No coach yet."
+    },
+    "coach_board.unsaved": {
+      "text": "Unsaved changes"
+    },
+    "coach_board.warning.no_availability": {
+      "text": "No availability in this season"
+    },
+    "coach_board.warning.no_qualification": {
+      "text": "No qualification set"
+    },
+    "coach_board.warning.qualification_mismatch": {
+      "text": "Qualified for ages {min}–{max}, the team is {team_min}–{team_max}"
+    },
+    "coach_board.warning_line": {
+      "text": "{team}: {coach} – {warning}"
+    },
+    "coach_board.warnings_heading": {
+      "text": "Warnings"
+    }
+  }
+}

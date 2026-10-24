@@ -1,0 +1,183 @@
+{{/* Coaches (#7): qualifications, team ages, and weekly availability per
+     season part (internal/adapter/http/coach.go). */}}
+{{define "group-coaches"}}
+  {{with .Group}}{{$L := .L}}{{with .Coaches}}
+    <section class="card card-border bg-base-100 shadow-sm" aria-labelledby="group-coaches-heading">
+      <div class="card-body">
+        <h2 id="group-coaches-heading" class="card-title">{{$L.coaches_heading}}</h2>
+        <p class="text-sm opacity-70">{{if .CanManage}}{{$L.coaches_intro}}{{else}}{{$L.coaches_intro_coach}}{{end}}</p>
+        {{with .OverviewURL}}<p><a class="btn btn-sm" href="{{.}}" data-testid="coaches-overview-link">{{$L.coaches_overview_link}}</a></p>{{end}}
+        {{if .Rows}}
+          <div class="overflow-x-auto">
+            <table class="table" data-testid="coaches">
+              <thead><tr><th scope="col">{{$L.coaches_coach}}</th><th scope="col">{{$L.coaches_qualification}}</th><th scope="col"><span class="sr-only">{{$L.coaches_availability_link}}</span></th></tr></thead>
+              <tbody>
+                {{range .Rows}}
+                  {{$uid := .UserID}}<tr data-coach-id="{{.UserID}}">
+                    <td>{{.Label}}{{with .Email}}<div class="text-sm opacity-70">{{.}}</div>{{end}}</td>
+                    <td>
+                      <span data-testid="coach-qualification">{{if .HasQualification}}{{.QualificationLabel}}{{else}}<span class="opacity-70">{{$L.coaches_qualification_none}}</span>{{end}}</span>
+                      {{if $.Group.Coaches.CanManage}}
+                        <form class="mt-2 flex flex-wrap items-end gap-2" method="post" action="{{.ActionURL}}" hx-post="{{.ActionURL}}" hx-target="#page-content" hx-swap="outerHTML" hx-disabled-elt="this">
+                          <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
+                          <label class="grid gap-1 text-sm" for="coach-{{.UserID}}-min-age">{{$L.coaches_min_age}}
+                            <input id="coach-{{.UserID}}-min-age" class="input input-sm w-20" type="number" name="min_age" min="0" max="99" required value="{{.MinAge}}"{{if .Error}} aria-invalid="true" aria-describedby="coach-{{.UserID}}-error"{{end}}>
+                          </label>
+                          <label class="grid gap-1 text-sm" for="coach-{{.UserID}}-max-age">{{$L.coaches_max_age}}
+                            <input id="coach-{{.UserID}}-max-age" class="input input-sm w-20" type="number" name="max_age" min="0" max="99" required value="{{.MaxAge}}">
+                          </label>
+                          <button class="btn btn-sm" type="submit" aria-label="{{$L.coaches_save}}: {{.Label}}">{{$L.coaches_save}}</button>
+                        </form>
+                        {{with .Error}}<p id="coach-{{$uid}}-error" class="text-sm text-error" role="alert">{{.}}</p>{{end}}
+                        {{if .HasQualification}}
+                          <form class="mt-1" method="post" action="{{.ClearURL}}" hx-post="{{.ClearURL}}" hx-target="#page-content" hx-swap="outerHTML" hx-disabled-elt="this">
+                            <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
+                            <button class="btn btn-xs btn-ghost" type="submit" aria-label="{{$L.coaches_clear}}: {{.Label}}">{{$L.coaches_clear}}</button>
+                          </form>
+                        {{end}}
+                      {{end}}
+                    </td>
+                    <td><a class="link" href="{{.AvailabilityURL}}" data-testid="coach-availability-link">{{if .IsSelf}}{{$L.coaches_my_availability}}{{else}}{{$L.coaches_availability_link}}{{end}}</a></td>
+                  </tr>
+                {{end}}
+              </tbody>
+            </table>
+          </div>
+        {{else}}
+          <p class="text-sm opacity-70" data-testid="coaches-empty">{{$L.coaches_empty}}</p>
+        {{end}}
+      </div>
+    </section>
+
+    <section class="card card-border bg-base-100 shadow-sm" aria-labelledby="coaches-ages-heading">
+      <div class="card-body">
+        <h2 id="coaches-ages-heading" class="card-title">{{$L.coaches_ages_heading}}</h2>
+        {{if .AgeSeason}}
+          <p class="text-sm opacity-70">{{.AgesIntro}}</p>
+          {{if .Teams}}
+            <div class="overflow-x-auto">
+              <table class="table" data-testid="coaches-team-ages">
+                <thead><tr><th scope="col">{{$L.coaches_team}}</th><th scope="col">{{$L.coaches_age}}</th>{{if .CanManage}}<th scope="col">{{$L.coaches_qualified}}</th>{{end}}</tr></thead>
+                <tbody>
+                  {{range .Teams}}
+                    <tr data-team-id="{{.ID}}">
+                      <td><a class="link" href="{{.URL}}">{{.Name}}</a></td>
+                      <td data-testid="team-age">{{.AgeLabel}}</td>
+                      {{if $.Group.Coaches.CanManage}}<td data-testid="team-qualified-coaches">{{if .Coaches}}{{range $index, $name := .Coaches}}{{if $index}}, {{end}}{{$name}}{{end}}{{else}}<span class="opacity-70">{{$L.coaches_qualified_none}}</span>{{end}}</td>{{end}}
+                    </tr>
+                  {{end}}
+                </tbody>
+              </table>
+            </div>
+          {{else}}
+            <p class="text-sm opacity-70">{{$L.coaches_teams_empty}}</p>
+          {{end}}
+        {{else}}
+          <p class="text-sm opacity-70" data-testid="coaches-ages-none">{{$L.coaches_ages_none}}</p>
+        {{end}}
+      </div>
+    </section>
+  {{end}}{{end}}
+{{end}}
+
+{{/* One coach's availability, or (Overview) every coach side by side. The
+     legend uses badge-primary badge-secondary badge-accent badge-info
+     badge-success badge-warning badge-error badge-neutral. */}}
+{{define "group-availability"}}
+  {{with .Group}}{{$L := .L}}{{with .Availability}}
+    <p class="flex flex-wrap gap-4"><a class="link" href="{{.BackURL}}">{{$L.coaches_availability_back}}</a>{{if and (not .Overview) .OverviewURL}}<a class="link" href="{{.OverviewURL}}">{{$L.coaches_overview_link}}</a>{{end}}</p>
+    <section class="card card-border bg-base-100 shadow-sm" aria-labelledby="availability-heading" data-testid="{{if .Overview}}availability-overview{{else}}availability{{end}}">
+      <div class="card-body gap-4">
+        <h2 id="availability-heading" class="card-title">{{.Heading}}</h2>
+        <p class="text-sm opacity-70">{{if .Overview}}{{$L.coaches_availability_overview_intro}}{{else}}{{$L.coaches_availability_intro}}{{end}}</p>
+        {{if .Parts}}
+          <form class="flex flex-wrap items-end gap-2" method="get" action="{{.PickerURL}}">
+            <fieldset class="fieldset">
+              <label class="fieldset-legend" for="availability-part">{{$L.coaches_availability_part}}</label>
+              <select id="availability-part" class="select" name="part">
+                {{range .Parts}}<option value="{{.Value}}"{{if .Selected}} selected{{end}}>{{.Label}}</option>{{end}}
+              </select>
+            </fieldset>
+            <button class="btn" type="submit">{{$L.coaches_availability_show}}</button>
+          </form>
+        {{else}}
+          <div role="status" class="alert alert-info alert-soft" data-testid="availability-no-parts"><span>{{$L.coaches_availability_no_parts}}</span></div>
+        {{end}}
+        {{if .HasPart}}
+          {{if .WeekTabs}}
+            <nav class="tabs tabs-box tabs-sm w-fit" aria-label="{{$L.coaches_availability_weeks}}" data-testid="availability-weeks">
+              {{range .WeekTabs}}<a class="tab{{if .Current}} tab-active{{end}}" href="{{.URL}}"{{if .Current}} aria-current="page"{{end}}>{{.Label}}</a>{{end}}
+            </nav>
+          {{end}}
+          {{template "weekgrid" .Grid}}
+          {{if .Overview}}
+            <h3 class="font-semibold">{{$L.coaches_availability_legend}}</h3>
+            {{if .Legend}}
+              <ul class="list rounded-box border border-base-300" data-testid="availability-legend">
+                {{range .Legend}}
+                  <li class="list-row items-center">
+                    <span class="badge {{.BadgeClass}} badge-xs" aria-hidden="true"></span>
+                    <a class="link list-col-grow" href="{{.URL}}">{{.Label}}</a>
+                    <span class="text-sm opacity-70"><span class="sr-only">{{$L.coaches_availability_windows_count}}: </span>{{.Windows}}</span>
+                  </li>
+                {{end}}
+              </ul>
+            {{else}}
+              <p class="text-sm opacity-70">{{$L.coaches_empty}}</p>
+            {{end}}
+          {{end}}
+        {{end}}
+      </div>
+    </section>
+
+    {{if and .HasPart (not .Overview)}}
+      <section class="card card-border bg-base-100 shadow-sm" aria-labelledby="availability-windows-heading">
+        <div class="card-body">
+          <h2 id="availability-windows-heading" class="card-title">{{$L.coaches_availability_windows}} <span class="text-base font-normal opacity-70">{{.PartLabel}}</span></h2>
+          {{if .Windows}}
+            <div class="overflow-x-auto">
+              <table class="table" data-testid="availability-windows">
+                <thead><tr><th scope="col">{{$L.coaches_availability_window_week}}</th><th scope="col">{{$L.coaches_availability_window_day}}</th><th scope="col">{{$L.coaches_availability_window_time}}</th><th scope="col"><span class="sr-only">{{$L.coaches_availability_delete}}</span></th></tr></thead>
+                <tbody>
+                  {{range .Windows}}
+                    <tr data-window-id="{{.ID}}">
+                      <td>{{.WeekLabel}}{{if not .Counts}} <span class="badge badge-warning badge-soft badge-sm" title="{{$L.coaches_availability_not_counted}}">{{$L.coaches_availability_not_counted}}</span>{{end}}</td>
+                      <td>{{.DayName}}</td>
+                      <td>{{.TimeLabel}}</td>
+                      <td>
+                        <form method="post" action="{{$.Group.Availability.DeleteURL}}" hx-post="{{$.Group.Availability.DeleteURL}}" hx-target="#page-content" hx-swap="outerHTML" hx-disabled-elt="this">
+                          <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
+                          <input type="hidden" name="window" value="{{.ID}}">
+                          <button class="btn btn-xs btn-outline btn-error" type="submit" aria-label="{{$L.coaches_availability_delete}}: {{.WeekLabel}}, {{.DayName}} {{.TimeLabel}}">{{$L.coaches_availability_delete}}</button>
+                        </form>
+                      </td>
+                    </tr>
+                  {{end}}
+                </tbody>
+              </table>
+            </div>
+          {{else}}
+            <p class="text-sm opacity-70" data-testid="availability-windows-empty">{{$L.coaches_availability_windows_empty}}</p>
+          {{end}}
+          <div class="divider"></div>
+          <h3 class="font-semibold">{{$L.coaches_availability_copy_heading}}</h3>
+          {{if .CopyURL}}
+            <p class="text-sm opacity-70">{{.CopyHelp}}</p>
+            <form method="post" action="{{.CopyURL}}" hx-post="{{.CopyURL}}" hx-target="#page-content" hx-swap="outerHTML" hx-disabled-elt="this" hx-confirm="{{$L.coaches_availability_copy_confirm}}">
+              <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
+              <button class="btn btn-sm" type="submit" data-testid="availability-copy">{{$L.coaches_availability_copy}}</button>
+            </form>
+          {{else}}
+            <p class="text-sm opacity-70" data-testid="availability-no-previous">{{$L.coaches_availability_no_previous}}</p>
+          {{end}}
+        </div>
+      </section>
+    {{end}}
+  {{end}}{{end}}
+{{end}}
+
+{{/* Answer to a grid change: the grid (outer swap) and the alerts. */}}
+{{define "group-availability-swap"}}
+  {{template "alerts-oob" .}}
+  {{with .Group.Availability}}{{template "weekgrid" .Grid}}{{end}}
+{{end}}

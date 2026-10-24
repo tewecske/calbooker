@@ -145,6 +145,37 @@ Refinements made in #8 (open for the owner to confirm):
   marks it edited by hand.
 - Audit entries name events by ID, title, kind, times, and team IDs
   (`group.event.*`), never by the location text.
+Refinements made in #7 (open for the owner to confirm):
+
+- A qualification is one age range per coach and group (whole years, 0 to
+  99). A team's age in a season is the season's start year minus its birth
+  years, so a team born 2015-2016 is 10-11 in a season starting in 2026. A
+  qualification covers a team only when the team's whole age range is inside
+  it (`CoachQualification.Covers`); the planning boards (#12, #14) use this.
+- Admins, managers, and site administrators set and clear qualifications
+  (audited as `group.coach.qualification_set`, `.qualification_cleared`).
+  Coaches see their own qualification read only and nobody else's.
+- Availability is weekly windows per season part. A part with alternating
+  weeks has windows for week A, week B, and every week; other parts only
+  every-week windows. When a part stops alternating its A/B windows stay
+  stored and listed as "not counted"; they no longer count.
+- Overlapping or touching windows of the same week and weekday merge into
+  one (16:00-17:00 plus 17:00-18:00 is 16:00-18:00). Times are 5-minute
+  steps (the grid snaps to 15). A coach has at most 100 windows per part.
+- The coach edits their own availability; admins, managers, and site
+  administrators edit anyone's. Coaches do not see other coaches'
+  availability. A coach's own edits are self-service and not audited; staff
+  edits of another coach are (`group.coach.availability_changed`,
+  `.availability_copied`).
+- "Copy from the previous part" is per coach and replaces the target part's
+  windows after a confirmation. The previous part is part 1 of the same
+  season for part 2, else the last part of the previous season. Into a part
+  without A/B weeks only every-week windows are copied. If nothing fits,
+  nothing is replaced.
+- Staff see every coach's availability side by side in one read-only grid
+  per part and week, one color per coach.
+- Availability changes never change plans or events (owner decision); #12
+  and #14 show the resulting warnings.
 
 ## Data model
 
@@ -168,8 +199,8 @@ resources (group_id, name, kind, description?, max_concurrent_teams?, archived_a
 seasons (group_id, name, starts_on, ends_on, version)   dates in the group's calendar; seasons of a group never overlap
 season_parts (group_id, season_id, position 1 | 2, name, starts_on, ends_on, alternating_weeks bool)   edited with the season's version
 season_team_coaches (group_id, season_id, team_id, coach_user_id, is_head)   coach needs the coach role; one head coach per team and season
-coach_qualifications (group_id, coach_user_id, min_age, max_age)
-coach_availability (season_part_id, coach_user_id, week, weekday, start_minute, end_minute)
+coach_qualifications (group_id, coach_user_id, min_age, max_age)   ages 0..99; coach needs the coach role
+coach_availability (group_id, season_part_id, coach_user_id, week, weekday, start_minute, end_minute)   merged per week and weekday
 plan_slots (season_part_id, resource_id, week, weekday, start_minute, end_minute, min_age?, max_age?, max_teams?)
 plan_trainings (season_part_id, team_id, resource_id, plan_slot_id?, week, weekday, start_minute, end_minute)
 events (group_id, kind, title, starts_at, ends_at, resource_id?, location?, signup_mode,

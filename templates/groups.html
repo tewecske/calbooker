@@ -127,6 +127,8 @@
       {{if eq .Section "season"}}{{template "group-season" $}}{{end}}
       {{if eq .Section "events"}}{{template "group-events" $}}{{end}}
       {{if eq .Section "event"}}{{template "group-event" $}}{{end}}
+      {{if eq .Section "coaches"}}{{template "group-coaches" $}}{{end}}
+      {{if or (eq .Section "availability") (eq .Section "availability-overview")}}{{template "group-availability" $}}{{end}}
     {{end}}
   </div>
 {{end}}

@@ -69,6 +69,7 @@ type Graph struct {
 	PlanSlot              *service.PlanSlotService
 	Participation         *service.ParticipationService
 	CoachBoard            *service.CoachBoardService
+	Statistics            *service.StatisticsService
 	GroupJoin             *service.RateLimitedGroupJoiner
 	AdminAccounts         *service.AdminAccountService
 	AdminDiagnostics      *service.AdminDiagnosticsService
@@ -195,6 +196,10 @@ func New(database *sql.DB, appConfig config.Config) (*Graph, error) {
 	participantsRepository, err := postgresstore.NewParticipantRepository(database)
 	if err != nil {
 		return nil, fmt.Errorf("construct participant repository: %w", err)
+	}
+	statisticsRepository, err := postgresstore.NewStatisticsRepository(database)
+	if err != nil {
+		return nil, fmt.Errorf("construct statistics repository: %w", err)
 	}
 	adminUsersRepository, err := postgresstore.NewAdminUserRepository(database)
 	if err != nil {
@@ -334,6 +339,10 @@ func New(database *sql.DB, appConfig config.Config) (*Graph, error) {
 	if err != nil {
 		return nil, fmt.Errorf("construct coach board service: %w", err)
 	}
+	statisticsService, err := service.NewStatisticsService(statisticsRepository, seasonsRepository)
+	if err != nil {
+		return nil, fmt.Errorf("construct statistics service: %w", err)
+	}
 	groupJoinLimiter, _, err := newSharedRateLimiter(database, "group-join", service.RateLimitConfig{Limit: 20, Window: time.Minute})
 	if err != nil {
 		return nil, fmt.Errorf("construct group join rate limiter: %w", err)
@@ -461,6 +470,7 @@ func New(database *sql.DB, appConfig config.Config) (*Graph, error) {
 		PlanSlot:              planSlotService,
 		Participation:         participationService,
 		CoachBoard:            coachBoardService,
+		Statistics:            statisticsService,
 		GroupJoin:             groupJoinService,
 		AdminAccounts:         adminAccounts,
 		AdminDiagnostics:      adminDiagnostics,

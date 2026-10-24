@@ -45,6 +45,8 @@ type Dependencies struct {
 	Participation ParticipationUseCases
 	CoachBoard    CoachBoardUseCases
 	JoinGroup     JoinRateLimitedGroupJoiner
+	// Statistics is participation statistics per period (#11).
+	Statistics StatisticsUseCases
 
 	AdminAccounts       AdminAccountLister
 	AdminAccountEditor  AdminAccountEditor

@@ -279,6 +279,27 @@ Refinements made in #12 (open for the owner to confirm):
   season (as on the season page), coach names and head marks, no
   qualifications, availability, or warnings.
 
+Refinements made in #11 (open for the owner to confirm):
+
+- The statistics page is `/{language}/groups/{id}/statistics`. A period is a
+  week (Monday to Sunday), a calendar month, a season part, or a season, in
+  the group's time zone; weeks and months work without seasons.
+- Only events that are not cancelled and have already ended count. A team's
+  "opportunities" are held events times its current players; sign-ups are
+  answers "signed up" plus nominations; attended is confirmed attendance;
+  the rate is attended over opportunities (a player: over held events of
+  their current teams), rounded to whole percent, a dash when nothing was
+  held.
+- Team membership has no history: current rosters are used for past
+  periods. Walk-in attendance at another team's event is not counted in a
+  player's figures.
+- Admins, managers, and site administrators see every non-archived team and
+  player; coaches see the teams they coach this season and those teams'
+  players (and themselves if they also play); players and parents see only
+  their own and their linked children's rows and no team table. Emails show
+  for staff only. Non-members get 404.
+- No charts and no migration.
+
 ## Data model
 
 All tables carry `group_id` (directly or through their parent) so every query

@@ -165,7 +165,7 @@ Progress is in the Status table below. The original first steps were:
 | 8 | merged | #24 |
 | 9 | merged | #27 |
 | 13 | merged | #26 |
-| 12 | in progress (lane C) | |
+| 12 | merged | #29 |
 | 21 | merged (browser account pool, rate-limit backoff) | #22 |
 | 6 | merged | #17 |
 | 11 | in progress (lane A) | |

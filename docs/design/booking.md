@@ -88,6 +88,36 @@ Refinements made in #4 (open for the owner to confirm):
   Nothing deletes a resource except deleting its group.
 - Audit entries name a resource by ID and name (`group.resource.*`).
 
+Refinements made in #5 (open for the owner to confirm):
+
+- Season and part dates are calendar days in the group's time zone, both
+  ends included. A season needs a first day before its last; it has one or
+  two parts, each inside the season, and part 2 starts after part 1 ends.
+  Parts need not cover the whole season (a winter break is allowed).
+- Seasons of a group never overlap, so "the current season" (the one
+  containing today in the group's time zone) is unique; there may be none.
+  Season names are unique per group, ignoring case.
+- A part with alternating weeks starts with an A week: the Monday-based week
+  that holds the part's first day.
+- Admins, managers, and site administrators create, edit, and delete
+  seasons and assign coaches. Coaches see the season pages read only.
+  Players and parents do not see the season pages (no navigation entry,
+  access denied); on their teams' pages they see the current season's
+  coaches.
+- Editing a season edits its parts in the same form under one revision;
+  removing part 2 deletes it with whatever later features stored for it.
+  Deleting a season deletes its parts and coach assignments.
+- Coach assignments are made on the team page for any season, past ones
+  included. Only members with the coach role can be assigned; removing the
+  role (or the member) removes their assignments. At most one head coach per
+  team and season: marking another coach as head unmarks the previous one.
+- Coach rights on a team (roster, invites, emails) come only from the
+  current season's assignments. Between seasons, coaches manage no team
+  until an admin or manager assigns them in the new season.
+- Archived teams keep their assignments and can still be assigned.
+- Audit entries name seasons by ID and name and coach assignments by season,
+  team, and member ID (`group.season.*`).
+
 ## Data model
 
 All tables carry `group_id` (directly or through their parent) so every query
@@ -107,9 +137,9 @@ team_members (team_id, user_id, role: player | parent)
 child_profiles (user_id, group_id, birth_year, created_by, version)   the users row has kind 'profile'
 guardians (group_id, parent_user_id, child_user_id)  parent needs the parent role; linked parents are derived onto rosters
 resources (group_id, name, kind, description?, max_concurrent_teams?, archived_at?, version)   kind: field | court | hall | pool | room | other
-seasons (group_id, name, starts_on, ends_on)
-season_parts (season_id, name, starts_on, ends_on, alternating_weeks bool)
-season_team_coaches (season_id, team_id, coach_user_id, is_head)
+seasons (group_id, name, starts_on, ends_on, version)   dates in the group's calendar; seasons of a group never overlap
+season_parts (group_id, season_id, position 1 | 2, name, starts_on, ends_on, alternating_weeks bool)   edited with the season's version
+season_team_coaches (group_id, season_id, team_id, coach_user_id, is_head)   coach needs the coach role; one head coach per team and season
 coach_qualifications (group_id, coach_user_id, min_age, max_age)
 coach_availability (season_part_id, coach_user_id, week, weekday, start_minute, end_minute)
 plan_slots (season_part_id, resource_id, week, weekday, start_minute, end_minute, min_age?, max_age?, max_teams?)

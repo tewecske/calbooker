@@ -107,11 +107,14 @@ get `service.ErrGroupNotFound`, which handlers render as 404.
   (staff and parents), `CanEditProfile(id)` (staff and the child's
   guardians), `CanManageGuardians` (staff), `CanViewChildren`,
   `CanManageResources` (admins, managers, site administrators),
-  `CanViewResources` (those plus coaches). Add a question here rather than
-  checking roles in a handler.
-- Extension points: `GroupAccessService.SetCoachedTeams(source)` for season
-  coaches (#5), a `TeamRelationSource.TeamIDs(ctx, groupID, userID)`; coached
-  teams count only for members with the coach role. `SetChildTeams(source)`
+  `CanViewResources` (those plus coaches), `CanManageSeasons` (admins,
+  managers, site administrators), `CanViewSeasons` (those plus coaches). Add
+  a question here rather than checking roles in a handler.
+- Extension points: `GroupAccessService.SetCoachedTeams(source)` takes a
+  `TeamRelationSource.TeamIDs(ctx, groupID, userID)`; `service.SeasonService`
+  implements it from `season_team_coaches` of the group's current season and
+  `internal/app` wires it. Coached teams count only for members with the
+  coach role, so the source is asked only for them. `SetChildTeams(source)`
   takes a `ChildRelationSource` (`ChildUserIDs` plus `TeamIDs`, the teams on
   which the member's children play); `postgres.ProfileRepository` implements
   it from `guardians` and `internal/app` wires it.
@@ -178,3 +181,53 @@ get `service.ErrGroupNotFound`, which handlers render as 404.
   `/{language}/groups/{id}/resources/{resourceID}` (`resource.go`,
   `resources.html`, catalogs `resources.json`). Coaches see them read only;
   players and parents get access denied and no navigation entry.
+
+## Seasons
+
+- `SeasonService` (`internal/service/season.go`, store
+  `internal/store/postgres/seasons.go`, migration 000006) owns `seasons`
+  (name, `starts_on`, `ends_on` as `date` in the group's calendar, both ends
+  included, `version`), `season_parts` (position 1 or 2, name, dates,
+  `alternating_weeks`), and `season_team_coaches` (season, team, coach,
+  `is_head`).
+- Validation (`buildSeason`): a name, a first day before the last day, one
+  or two named parts, each inside the season with its first day before its
+  last, part 2 starting after part 1 ends. The database repeats what it can:
+  an exclusion constraint keeps a group's seasons from overlapping
+  (`seasons_no_overlap`, `ErrSeasonOverlap`; range types, no extension), a
+  deferred one keeps parts apart, names are unique per group ignoring case.
+- Dates are `time.Time` at midnight UTC holding the calendar date
+  (`SeasonDate`, `ParseSeasonDate`, `FormatSeasonDate`); `LocalDate(instant,
+  zone)` gives the group's day. The current season contains today in the
+  group's time zone; the service takes an injected clock, so tests pin the
+  instant across zones.
+- Use cases: `List(access)` and `SeasonCoaches(access, seasonID)` need
+  `CanViewSeasons`; `Find(access, id)`, `FindPart(access, partID)` (season
+  and part), `Current(access)` (season, found), and `Today(access)` work for
+  every account that sees the group, so later features can name and resolve
+  seasons and parts; `TeamCoaching(access, teamID)` backs the team page (every
+  season for those who see seasons, the current season's coaches for
+  players and parents, emails only where `CanViewTeamEmails`); `Create`,
+  `Update` (season and parts together at the season's revision; parts keep
+  their IDs by position, dropping part 2 deletes it), `Delete`,
+  `AssignCoach(CoachAssignment)` (add, or change the head flag), and
+  `RemoveCoach` need `CanManageSeasons` and are audited as
+  `group.season.created`, `.updated`, `.deleted`, `.coach_assigned`,
+  `.coach_removed`. `Season.PartOn(day)`, `Season.Part(id)`, and
+  `SeasonPart.WeekOn(day)` (`A`/`B` for alternating parts, week 1 being the
+  Monday-based week holding the part's first day; `all` otherwise) are for
+  the weekly plans.
+- A coach assignment references the member's coach role by foreign key
+  (`(group_id, coach_user_id, coach_role)` to `group_member_roles`), so
+  removing the role or the member removes the assignments; a partial unique
+  index allows one head coach per team and season (marking a new one
+  unmarks the old one in the same transaction).
+- Later tables reference a season as `(group_id, season_id)` to
+  `seasons (group_id, id)` and a part as `(group_id, season_part_id)` to
+  `season_parts (group_id, id)`, so a reference never crosses groups.
+- Pages: `/{language}/groups/{id}/seasons` and
+  `/{language}/groups/{id}/seasons/{seasonID}` (`season.go`, `seasons.html`,
+  catalogs `seasons.json`), plus the coaches card on the team page
+  (`POST .../teams/{teamID}/coaches/add`, `/head`, `/remove`). Coaches see the
+  season pages read only; players and parents get access denied and no
+  navigation entry.

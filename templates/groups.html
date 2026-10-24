@@ -123,6 +123,8 @@
       {{if eq .Section "children"}}{{template "group-children" $}}{{end}}
       {{if eq .Section "resources"}}{{template "group-resources" $}}{{end}}
       {{if eq .Section "resource"}}{{template "group-resource" $}}{{end}}
+      {{if eq .Section "seasons"}}{{template "group-seasons" $}}{{end}}
+      {{if eq .Section "season"}}{{template "group-season" $}}{{end}}
     {{end}}
   </div>
 {{end}}

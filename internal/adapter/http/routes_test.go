@@ -49,6 +49,9 @@ func TestAreaRoutesRegistered(t *testing.T) {
 		{http.MethodPost, "/groups/7/teams/4/roster/remove"},
 		{http.MethodGet, "/groups/7/resources"},
 		{http.MethodPost, "/groups/7/resources/4/archive"},
+		{http.MethodGet, "/groups/7/seasons"},
+		{http.MethodPost, "/groups/7/seasons/4/delete"},
+		{http.MethodPost, "/groups/7/teams/4/coaches/add"},
 		{http.MethodGet, "/admin/users/3/edit"},
 		{http.MethodPost, "/admin/ratelimits/clear"},
 	}

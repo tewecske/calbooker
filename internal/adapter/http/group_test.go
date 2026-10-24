@@ -37,6 +37,7 @@ func groupTestDependencies(t *testing.T, access *service.GroupAccess) (Dependenc
 	dependencies.Invites = &invitesUseCaseStub{}
 	dependencies.Profiles = &profilesUseCaseStub{}
 	dependencies.Resources = &resourcesUseCaseStub{}
+	dependencies.Seasons = &seasonsUseCaseStub{}
 	dependencies.GroupAccess = &groupAccessStub{access: access}
 	return dependencies, groups, teams
 }
@@ -436,8 +437,8 @@ func TestGroupTemplateLabelsExist(t *testing.T) {
 		t.Fatalf("NewPageRenderer() error = %v", err)
 	}
 	labels := groupLabels(renderer)
-	pattern := regexp.MustCompile(`[.$]L\.((?:groups|teams|invites|children|resources)_[a-z0-9_]+)`)
-	for _, name := range []string{"groups.html", "teams.html", "invites.html", "children.html", "resources.html"} {
+	pattern := regexp.MustCompile(`[.$]L\.((?:groups|teams|invites|children|resources|seasons)_[a-z0-9_]+)`)
+	for _, name := range []string{"groups.html", "teams.html", "invites.html", "children.html", "resources.html", "seasons.html"} {
 		source, err := os.ReadFile(filepath.Join("..", "..", "..", "templates", name))
 		if err != nil {
 			t.Fatalf("read %s: %v", name, err)

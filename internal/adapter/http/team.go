@@ -88,6 +88,9 @@ type TeamDetailView struct {
 	PlayerList      RosterListView
 	ParentList      RosterListView
 	Candidates      []RosterCandidateView
+	// Coaches is the season coaches card; nil when the account sees no
+	// season and cannot assign coaches.
+	Coaches *TeamCoachesView
 }
 
 // RosterRowView is one player or parent on a team.
@@ -365,6 +368,9 @@ func (h *groupHandler) loadTeam(writer http.ResponseWriter, request *http.Reques
 			label := h.memberLabel(language, member.UserID, member.DisplayName, member.Username, member.Email) + " (" + h.roleLabel(language, role) + ")"
 			team.Candidates = append(team.Candidates, RosterCandidateView{Value: value, Label: label})
 		}
+	}
+	if !h.loadTeamCoaches(writer, request, current, groupID, teamID, team) {
+		return false
 	}
 	view.Team = team
 	return true

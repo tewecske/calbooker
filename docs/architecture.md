@@ -116,8 +116,9 @@ get `service.ErrGroupNotFound`, which handlers render as 404.
   `CanViewCoaches` (staff and coaches), `CanManageQualifications` (staff),
   `CanViewQualification(id)`, `CanViewAvailability(id)`, and
   `CanEditAvailability(id)` (staff, and the coach themself),
-  `CanViewAllAvailability` (staff). Add
-  a question here rather than checking roles in a handler.
+  `CanViewAllAvailability` (staff), `CanManagePlan` (admins, managers, site
+  administrators), `CanViewPlan` (those plus coaches). Add a question here
+  rather than checking roles in a handler.
 - Extension points: `GroupAccessService.SetCoachedTeams(source)` takes a
   `TeamRelationSource.TeamIDs(ctx, groupID, userID)`; `service.SeasonService`
   implements it from `season_team_coaches` of the group's current season and
@@ -328,3 +329,64 @@ get `service.ErrGroupNotFound`, which handlers render as 404.
   (`coach.go`, `coaches.html`, catalogs `coaches.json`). The week grid is
   used unchanged: alternating parts get A / B / every-week tabs of their own,
   the grid's `Week` is `A` or `B` on those tabs and empty otherwise.
+
+## Weekly plan: resource slots
+
+- `PlanSlotService` (`internal/service/plan_slot.go`, store
+  `internal/store/postgres/plan_slots.go`, migration 000009) owns
+  `plan_slots`: per season part, a resource, `week` (`A`, `B`, or `all`;
+  A and B only in parts with alternating weeks), ISO `weekday`,
+  `start_minute`/`end_minute` (minutes after local midnight, end up to
+  1440), optional `min_age`/`max_age` (1 to 99) and `max_teams` (1 to 99),
+  and `version`. Slots may overlap; a part holds at most 500. References are
+  `(group_id, season_part_id)` to `season_parts` and `(group_id,
+  resource_id)` to `resources`, both cascading, so removing a part (or a
+  group) removes its slots. `plan_slots_group_id_unique` lets the training
+  plan (#14) reference a slot as `(group_id, plan_slot_id)`.
+- Access: `CanManagePlan` (admins, managers, site administrators) edits,
+  `CanViewPlan` (those plus coaches) reads; players and parents get access
+  denied and no navigation entry. A coach's availability never changes the
+  plan by itself.
+- Use cases: `Slots(access, partID)` and `Slot(access, slotID)` (read, for
+  #14), `Board(access, partID)` (the page: seasons for the part picker, the
+  part, its slots, every resource, capacity warnings, copy sources; part 0
+  picks the part containing today, else the current season's next or last
+  part, else the next part to start, else the latest part), `Create(actor,
+  partID, input)` (active resource only), `Update(actor, slotID, version,
+  input)` (a slot may stay on an archived resource; changing the resource
+  needs an active one), `Move(actor, slotID, version, move)` (week grid:
+  resource, weekday, time; keeps week, ages, and team limit; an A/B slot in
+  a part that no longer alternates becomes `all`), `Delete(actor, slotID,
+  version)`, and `Copy(actor, targetPartID, sourcePartID, replace)`. Writes
+  are revision-checked (`ClassifyStaleWrite`: a vanished slot is
+  `ErrPlanSlotNotFound`) and audited as `group.plan.slot_created`,
+  `.slot_updated`, `.slot_deleted`, and `group.plan.copied` (IDs, week, day,
+  times, ages, team limit, counts).
+- Copy (`CopyPlanSlots`): explicit, offered from the previous season's part
+  at the same position and from the part before the target (part 1 of the
+  same season, or the previous season's last part); the server accepts any
+  other part of the group. It replaces the target's slots in one
+  transaction (the part row is locked), needs `replace` when the target has
+  slots, and can be redone. Copies keep resource, weekday, time, ages, and
+  team limit; weeks stay as they are when the target alternates weeks,
+  otherwise every copy is `all` and exact duplicates are copied once;
+  slots on archived resources are skipped. Slots have no dates, so a copy
+  into a part with other dates keeps weekdays and times.
+- Warnings (`PlanWarnings`): stretches in which a resource's slots allow
+  more teams than its `max_concurrent_teams` (a slot without `max_teams`
+  counts as one team; resources without a limit never warn). Alternating
+  parts check weeks A and B apart (`all` slots count in both); a warning of
+  both weeks is reported once. They never block a write; the page lists
+  them and marks the slots on the grid.
+- Page: `/{language}/groups/{id}/plan?part=&week=&r=` (`plan.go`,
+  `plan.html`, catalogs `plan.json`): a part picker, the week grid with the
+  active resources (plus archived ones that still hold slots, marked and not
+  draggable) as columns, at most eight at once (`r` picks them when there
+  are more), the A/B switch for alternating parts, the slot list, and the
+  copy form. Clicking an empty spot adds a one-hour slot for the shown week
+  (`all` in parts without A/B weeks); dragging moves or resizes. Grid item
+  IDs are `<slot ID>-<version>`, so moves are revision-checked. Grid changes
+  post to `.../plan/slots/create` and `/move` and answer with the grid, the
+  slot list (out of band), and an alert. A slot's page
+  (`.../plan/slots/{slotID}`) edits week, ages, team limit, resource, day, and
+  times and deletes it; coaches see it read only.

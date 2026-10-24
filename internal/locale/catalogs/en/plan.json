@@ -1,0 +1,234 @@
+{
+  "messages": {
+    "plan.nav": {
+      "text": "Plan"
+    },
+    "plan.heading": {
+      "text": "Resource slot plan"
+    },
+    "plan.intro": {
+      "text": "The weekly plan of a season part: when each resource is open for trainings, optionally for an age range and a number of teams. Slots may overlap."
+    },
+    "plan.no_seasons": {
+      "text": "There is no season part to plan yet."
+    },
+    "plan.add_season": {
+      "text": "Add a season"
+    },
+    "plan.part": {
+      "text": "Season part"
+    },
+    "plan.show": {
+      "text": "Show"
+    },
+    "plan.alternating": {
+      "text": "A/B weeks"
+    },
+    "plan.read_only": {
+      "text": "Admins and managers edit the plan; you see it read only."
+    },
+    "plan.no_resources": {
+      "text": "There is no active resource to plan."
+    },
+    "plan.add_resource": {
+      "text": "Add a resource"
+    },
+    "plan.add_help": {
+      "text": "Click an empty spot of a resource column to add a slot; drag a slot to move it, or its bottom edge to change its end. Open a slot to set ages and the team limit."
+    },
+    "plan.add_help_week": {
+      "text": "Click an empty spot of a resource column to add a slot for the shown week only; drag a slot to move it, or its bottom edge to change its end. Open a slot to set ages, the team limit, or both weeks."
+    },
+    "plan.columns": {
+      "text": "Resource columns"
+    },
+    "plan.columns_help": {
+      "text": "The grid shows up to eight resources at once."
+    },
+    "plan.week.a": {
+      "text": "Week A"
+    },
+    "plan.week.b": {
+      "text": "Week B"
+    },
+    "plan.slot_week.a": {
+      "text": "Week A only"
+    },
+    "plan.slot_week.b": {
+      "text": "Week B only"
+    },
+    "plan.slot_week.all": {
+      "text": "Every week"
+    },
+    "plan.ages.any": {
+      "text": "Any age"
+    },
+    "plan.ages.range": {
+      "text": "Ages {min}–{max}"
+    },
+    "plan.ages.from": {
+      "text": "Ages {min}+"
+    },
+    "plan.ages.to": {
+      "text": "Up to age {max}"
+    },
+    "plan.max_teams.value": {
+      "one": "Up to {count} team",
+      "other": "Up to {count} teams"
+    },
+    "plan.max_teams_none": {
+      "text": "No limit"
+    },
+    "plan.resource.archived": {
+      "text": "{name} (archived)"
+    },
+    "plan.resource.unknown": {
+      "text": "Unknown resource"
+    },
+    "plan.warnings_heading": {
+      "text": "Capacity warnings"
+    },
+    "plan.warning.capacity": {
+      "text": "{resource}, {day} {from}–{to}: slots allow {teams} teams at once, the resource takes {limit}."
+    },
+    "plan.warning_badge": {
+      "text": "Warning"
+    },
+    "plan.slots_heading": {
+      "text": "Slots"
+    },
+    "plan.slots_empty": {
+      "text": "There are no slots in this plan yet."
+    },
+    "plan.slot_day": {
+      "text": "Day"
+    },
+    "plan.slot_time": {
+      "text": "Time"
+    },
+    "plan.slot_resource": {
+      "text": "Resource"
+    },
+    "plan.slot_week": {
+      "text": "Weeks"
+    },
+    "plan.slot_ages": {
+      "text": "Ages"
+    },
+    "plan.slot_max_teams": {
+      "text": "Max teams"
+    },
+    "plan.slot_open": {
+      "text": "Open"
+    },
+    "plan.slot_heading": {
+      "text": "Slot"
+    },
+    "plan.slot_edit": {
+      "text": "Edit slot"
+    },
+    "plan.slot_start": {
+      "text": "Start"
+    },
+    "plan.slot_end": {
+      "text": "End"
+    },
+    "plan.slot_min_age": {
+      "text": "Minimum age"
+    },
+    "plan.slot_max_age": {
+      "text": "Maximum age"
+    },
+    "plan.slot_ages_help": {
+      "text": "Ages in years; leave empty for no limit."
+    },
+    "plan.slot_max_teams_help": {
+      "text": "How many teams may train in the slot; empty is no limit. Without a limit the slot counts as one team in capacity warnings."
+    },
+    "plan.slot_save": {
+      "text": "Save slot"
+    },
+    "plan.slot_delete": {
+      "text": "Delete slot"
+    },
+    "plan.slot_delete_confirm": {
+      "text": "Delete this slot?"
+    },
+    "plan.back": {
+      "text": "Back to the plan"
+    },
+    "plan.saved": {
+      "text": "Plan saved."
+    },
+    "plan.copy_heading": {
+      "text": "Copy a plan"
+    },
+    "plan.copy_intro": {
+      "text": "Start this part from an earlier plan: the copy keeps weekday, time, resource, ages, and team limit, and replaces this part's slots. You can copy again at any time."
+    },
+    "plan.copy_source": {
+      "text": "Copy from"
+    },
+    "plan.copy.source.previous_season": {
+      "text": "Last season: {season}, {part} ({count} slots)"
+    },
+    "plan.copy.source.previous_part": {
+      "text": "Previous part: {season}, {part} ({count} slots)"
+    },
+    "plan.copy.replace": {
+      "one": "Replace the {count} slot of this part",
+      "other": "Replace the {count} slots of this part"
+    },
+    "plan.copy_submit": {
+      "text": "Copy plan"
+    },
+    "plan.copy_none": {
+      "text": "There is no earlier part to copy from."
+    },
+    "plan.copy.done": {
+      "one": "Copied {count} slot.",
+      "other": "Copied {count} slots."
+    },
+    "plan.copy.skipped_archived": {
+      "one": "{count} slot on an archived resource was not copied.",
+      "other": "{count} slots on archived resources were not copied."
+    },
+    "plan.copy.merged": {
+      "one": "This part has no A/B weeks: {count} duplicate slot was copied once.",
+      "other": "This part has no A/B weeks: {count} duplicate slots were copied once."
+    },
+    "plan.error.invalid_change": {
+      "text": "That change does not fit the plan. Try again."
+    },
+    "plan.error.slot_not_found": {
+      "text": "This slot no longer exists."
+    },
+    "plan.error.resource_not_found": {
+      "text": "Choose a resource of the group."
+    },
+    "plan.error.resource_archived": {
+      "text": "This resource is archived. Choose an active resource."
+    },
+    "plan.error.invalid_week": {
+      "text": "Choose week A, week B, or every week. A/B weeks need a part with alternating weeks."
+    },
+    "plan.error.invalid_time": {
+      "text": "Enter a start before the end, within one day."
+    },
+    "plan.error.invalid_ages": {
+      "text": "Enter ages from 1 to 99, the minimum not above the maximum."
+    },
+    "plan.error.invalid_max_teams": {
+      "text": "Enter a team limit from 1 to 99, or leave it empty."
+    },
+    "plan.error.full": {
+      "text": "This plan has the most slots a part can hold."
+    },
+    "plan.error.invalid_copy": {
+      "text": "Choose another season part to copy from."
+    },
+    "plan.error.copy_confirm": {
+      "text": "Confirm that the copy replaces this part's slots."
+    }
+  }
+}

@@ -40,6 +40,7 @@ type Dependencies struct {
 	Seasons     SeasonUseCases
 	Events      EventUseCases
 	Coaches     CoachUseCases
+	Plan        PlanUseCases
 	JoinGroup   JoinRateLimitedGroupJoiner
 
 	AdminAccounts       AdminAccountLister

@@ -38,6 +38,7 @@ type Graph struct {
 	Resources             *postgresstore.ResourceRepository
 	Seasons               *postgresstore.SeasonRepository
 	Events                *postgresstore.EventRepository
+	PlanSlots             *postgresstore.PlanSlotRepository
 	AdminUsers            *postgresstore.AdminUserRepository
 	AuditLogs             *postgresstore.AuditLogRepository
 	Retention             *postgresstore.RetentionRepository
@@ -62,6 +63,7 @@ type Graph struct {
 	Resource              *service.ResourceService
 	Season                *service.SeasonService
 	Event                 *service.EventService
+	PlanSlot              *service.PlanSlotService
 	GroupJoin             *service.RateLimitedGroupJoiner
 	AdminAccounts         *service.AdminAccountService
 	AdminDiagnostics      *service.AdminDiagnosticsService
@@ -176,6 +178,10 @@ func New(database *sql.DB, appConfig config.Config) (*Graph, error) {
 	eventsRepository, err := postgresstore.NewEventRepository(database)
 	if err != nil {
 		return nil, fmt.Errorf("construct event repository: %w", err)
+	}
+	planSlotsRepository, err := postgresstore.NewPlanSlotRepository(database)
+	if err != nil {
+		return nil, fmt.Errorf("construct plan slot repository: %w", err)
 	}
 	adminUsersRepository, err := postgresstore.NewAdminUserRepository(database)
 	if err != nil {
@@ -299,6 +305,10 @@ func New(database *sql.DB, appConfig config.Config) (*Graph, error) {
 	if err != nil {
 		return nil, fmt.Errorf("construct event service: %w", err)
 	}
+	planSlotService, err := service.NewPlanSlotService(planSlotsRepository, seasonService, resourceService, users)
+	if err != nil {
+		return nil, fmt.Errorf("construct plan slot service: %w", err)
+	}
 	groupJoinLimiter, _, err := newSharedRateLimiter(database, "group-join", service.RateLimitConfig{Limit: 20, Window: time.Minute})
 	if err != nil {
 		return nil, fmt.Errorf("construct group join rate limiter: %w", err)
@@ -318,6 +328,7 @@ func New(database *sql.DB, appConfig config.Config) (*Graph, error) {
 	resourceService.SetAuditor(auditService)
 	seasonService.SetAuditor(auditService)
 	eventService.SetAuditor(auditService)
+	planSlotService.SetAuditor(auditService)
 	adminAccounts, err := service.NewAdminAccountService(users, adminUsersRepository, auditService, sessionService)
 	if err != nil {
 		return nil, fmt.Errorf("construct admin account service: %w", err)
@@ -391,6 +402,7 @@ func New(database *sql.DB, appConfig config.Config) (*Graph, error) {
 		Resources:             resourcesRepository,
 		Seasons:               seasonsRepository,
 		Events:                eventsRepository,
+		PlanSlots:             planSlotsRepository,
 		AdminUsers:            adminUsersRepository,
 		AuditLogs:             auditLogRepository,
 		Retention:             retentionRepository,
@@ -415,6 +427,7 @@ func New(database *sql.DB, appConfig config.Config) (*Graph, error) {
 		Resource:              resourceService,
 		Season:                seasonService,
 		Event:                 eventService,
+		PlanSlot:              planSlotService,
 		GroupJoin:             groupJoinService,
 		AdminAccounts:         adminAccounts,
 		AdminDiagnostics:      adminDiagnostics,

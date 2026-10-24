@@ -1,0 +1,234 @@
+{
+  "messages": {
+    "plan.nav": {
+      "text": "Terv"
+    },
+    "plan.heading": {
+      "text": "Erőforrás-idősávok terve"
+    },
+    "plan.intro": {
+      "text": "Egy szezonrész heti terve: mikor használható az egyes erőforrás edzésre, akár korosztályhoz és csapatszámhoz kötve. Az idősávok átfedhetik egymást."
+    },
+    "plan.no_seasons": {
+      "text": "Még nincs megtervezhető szezonrész."
+    },
+    "plan.add_season": {
+      "text": "Szezon hozzáadása"
+    },
+    "plan.part": {
+      "text": "Szezonrész"
+    },
+    "plan.show": {
+      "text": "Megjelenítés"
+    },
+    "plan.alternating": {
+      "text": "A/B hetek"
+    },
+    "plan.read_only": {
+      "text": "A tervet az adminisztrátorok és a menedzserek szerkesztik; te csak megtekintheted."
+    },
+    "plan.no_resources": {
+      "text": "Nincs aktív erőforrás, amelyet tervezni lehetne."
+    },
+    "plan.add_resource": {
+      "text": "Erőforrás hozzáadása"
+    },
+    "plan.add_help": {
+      "text": "Kattints egy erőforrásoszlop üres részére új idősávhoz; húzd az idősávot az áthelyezéshez, vagy az alsó szélét a vége módosításához. Nyisd meg az idősávot a korosztály és a csapatkorlát beállításához."
+    },
+    "plan.add_help_week": {
+      "text": "Kattints egy erőforrásoszlop üres részére, hogy csak a látható hétre adj idősávot; húzd az idősávot az áthelyezéshez, vagy az alsó szélét a vége módosításához. Nyisd meg az idősávot a korosztály, a csapatkorlát vagy mindkét hét beállításához."
+    },
+    "plan.columns": {
+      "text": "Erőforrásoszlopok"
+    },
+    "plan.columns_help": {
+      "text": "A rács egyszerre legfeljebb nyolc erőforrást mutat."
+    },
+    "plan.week.a": {
+      "text": "A hét"
+    },
+    "plan.week.b": {
+      "text": "B hét"
+    },
+    "plan.slot_week.a": {
+      "text": "Csak A hét"
+    },
+    "plan.slot_week.b": {
+      "text": "Csak B hét"
+    },
+    "plan.slot_week.all": {
+      "text": "Minden héten"
+    },
+    "plan.ages.any": {
+      "text": "Bármely kor"
+    },
+    "plan.ages.range": {
+      "text": "{min}–{max} évesek"
+    },
+    "plan.ages.from": {
+      "text": "{min} évestől"
+    },
+    "plan.ages.to": {
+      "text": "{max} évesig"
+    },
+    "plan.max_teams.value": {
+      "one": "Legfeljebb {count} csapat",
+      "other": "Legfeljebb {count} csapat"
+    },
+    "plan.max_teams_none": {
+      "text": "Nincs korlát"
+    },
+    "plan.resource.archived": {
+      "text": "{name} (archivált)"
+    },
+    "plan.resource.unknown": {
+      "text": "Ismeretlen erőforrás"
+    },
+    "plan.warnings_heading": {
+      "text": "Kapacitásfigyelmeztetések"
+    },
+    "plan.warning.capacity": {
+      "text": "{resource}, {day} {from}–{to}: az idősávok egyszerre {teams} csapatot engednek, az erőforrás {limit} csapatot fogad."
+    },
+    "plan.warning_badge": {
+      "text": "Figyelmeztetés"
+    },
+    "plan.slots_heading": {
+      "text": "Idősávok"
+    },
+    "plan.slots_empty": {
+      "text": "Ebben a tervben még nincs idősáv."
+    },
+    "plan.slot_day": {
+      "text": "Nap"
+    },
+    "plan.slot_time": {
+      "text": "Idő"
+    },
+    "plan.slot_resource": {
+      "text": "Erőforrás"
+    },
+    "plan.slot_week": {
+      "text": "Hetek"
+    },
+    "plan.slot_ages": {
+      "text": "Korosztály"
+    },
+    "plan.slot_max_teams": {
+      "text": "Max. csapat"
+    },
+    "plan.slot_open": {
+      "text": "Megnyitás"
+    },
+    "plan.slot_heading": {
+      "text": "Idősáv"
+    },
+    "plan.slot_edit": {
+      "text": "Idősáv szerkesztése"
+    },
+    "plan.slot_start": {
+      "text": "Kezdés"
+    },
+    "plan.slot_end": {
+      "text": "Vége"
+    },
+    "plan.slot_min_age": {
+      "text": "Legkisebb életkor"
+    },
+    "plan.slot_max_age": {
+      "text": "Legnagyobb életkor"
+    },
+    "plan.slot_ages_help": {
+      "text": "Életkor években; hagyd üresen, ha nincs korlát."
+    },
+    "plan.slot_max_teams_help": {
+      "text": "Hány csapat edzhet az idősávban; üresen nincs korlát. Korlát nélkül az idősáv egy csapatnak számít a kapacitásfigyelmeztetésekben."
+    },
+    "plan.slot_save": {
+      "text": "Idősáv mentése"
+    },
+    "plan.slot_delete": {
+      "text": "Idősáv törlése"
+    },
+    "plan.slot_delete_confirm": {
+      "text": "Törlöd ezt az idősávot?"
+    },
+    "plan.back": {
+      "text": "Vissza a tervhez"
+    },
+    "plan.saved": {
+      "text": "Terv mentve."
+    },
+    "plan.copy_heading": {
+      "text": "Terv másolása"
+    },
+    "plan.copy_intro": {
+      "text": "Indítsd ezt a részt egy korábbi tervből: a másolat megtartja a napot, az időt, az erőforrást, a korosztályt és a csapatkorlátot, és lecseréli a rész idősávjait. Bármikor másolhatsz újra."
+    },
+    "plan.copy_source": {
+      "text": "Másolás innen"
+    },
+    "plan.copy.source.previous_season": {
+      "text": "Előző szezon: {season}, {part} ({count} idősáv)"
+    },
+    "plan.copy.source.previous_part": {
+      "text": "Előző rész: {season}, {part} ({count} idősáv)"
+    },
+    "plan.copy.replace": {
+      "one": "A rész {count} idősávjának cseréje",
+      "other": "A rész {count} idősávjának cseréje"
+    },
+    "plan.copy_submit": {
+      "text": "Terv másolása"
+    },
+    "plan.copy_none": {
+      "text": "Nincs korábbi rész, ahonnan másolni lehetne."
+    },
+    "plan.copy.done": {
+      "one": "{count} idősáv átmásolva.",
+      "other": "{count} idősáv átmásolva."
+    },
+    "plan.copy.skipped_archived": {
+      "one": "{count} archivált erőforráson lévő idősáv nem lett átmásolva.",
+      "other": "{count} archivált erőforráson lévő idősáv nem lett átmásolva."
+    },
+    "plan.copy.merged": {
+      "one": "Ennek a résznek nincsenek A/B hetei: {count} ismétlődő idősáv egyszer lett átmásolva.",
+      "other": "Ennek a résznek nincsenek A/B hetei: {count} ismétlődő idősáv egyszer lett átmásolva."
+    },
+    "plan.error.invalid_change": {
+      "text": "Ez a módosítás nem illik a tervbe. Próbáld újra."
+    },
+    "plan.error.slot_not_found": {
+      "text": "Ez az idősáv már nem létezik."
+    },
+    "plan.error.resource_not_found": {
+      "text": "Válassz a csoport erőforrásai közül."
+    },
+    "plan.error.resource_archived": {
+      "text": "Ez az erőforrás archivált. Válassz aktív erőforrást."
+    },
+    "plan.error.invalid_week": {
+      "text": "Válaszd az A hetet, a B hetet vagy minden hetet. A/B hetekhez váltakozó hetű rész kell."
+    },
+    "plan.error.invalid_time": {
+      "text": "Adj meg a végénél korábbi kezdést egy napon belül."
+    },
+    "plan.error.invalid_ages": {
+      "text": "Adj meg 1 és 99 közötti életkort; a legkisebb nem lehet nagyobb a legnagyobbnál."
+    },
+    "plan.error.invalid_max_teams": {
+      "text": "Adj meg 1 és 99 közötti csapatkorlátot, vagy hagyd üresen."
+    },
+    "plan.error.full": {
+      "text": "Ebben a tervben már a lehető legtöbb idősáv van."
+    },
+    "plan.error.invalid_copy": {
+      "text": "Válassz másik szezonrészt a másoláshoz."
+    },
+    "plan.error.copy_confirm": {
+      "text": "Erősítsd meg, hogy a másolat lecseréli a rész idősávjait."
+    }
+  }
+}

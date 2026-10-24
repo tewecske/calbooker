@@ -332,6 +332,20 @@ func (a *GroupAccess) CanViewEvent(event Event) bool {
 	return a.IsMember() && slices.Contains(event.CoachUserIDs(), a.userID)
 }
 
+// CanManagePlan reports whether the account may edit the weekly plans of
+// season parts (resource slots, and later trainings): admins, managers, and
+// site administrators.
+func (a *GroupAccess) CanManagePlan() bool {
+	return a.CanManageGroup()
+}
+
+// CanViewPlan reports whether the account sees the weekly plans: those who
+// edit them, and coaches (read only). A coach's availability never changes
+// the plan by itself.
+func (a *GroupAccess) CanViewPlan() bool {
+	return a.CanManagePlan() || a.HasRole(GroupRoleCoach)
+}
+
 // CanManageRoster reports whether the account may add and remove players
 // and parents on a team: admins, managers, and the team's coaches.
 func (a *GroupAccess) CanManageRoster(teamID int64) bool {

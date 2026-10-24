@@ -119,6 +119,8 @@
       {{if eq .Section "members"}}{{template "group-members" $}}{{end}}
       {{if eq .Section "teams"}}{{template "group-teams" $}}{{end}}
       {{if eq .Section "team"}}{{template "group-team" $}}{{end}}
+      {{if eq .Section "invites"}}{{template "group-invites" $}}{{end}}
+      {{if eq .Section "children"}}{{template "group-children" $}}{{end}}
     {{end}}
   </div>
 {{end}}
@@ -132,18 +134,6 @@
           <dt class="opacity-70">{{$L.groups_members}}</dt><dd>{{.MemberCount}}</dd>
           <dt class="opacity-70">{{$L.groups_time_zone}}</dt><dd data-testid="group-time-zone">{{.TimeZone}}</dd>
         </dl>
-        {{if .InviteCode}}
-          <div class="divider"></div>
-          <h3 class="font-semibold">{{$L.groups_invite}}</h3>
-          <p class="text-sm opacity-70">{{$L.groups_invite_help}}</p>
-          <div class="flex flex-wrap items-center gap-3">
-            <code data-testid="group-invite-code" class="rounded-box bg-base-200 p-3 tracking-[0.2em]">{{.InviteCode}}</code>
-            <form method="post" action="{{.InviteURL}}" hx-post="{{.InviteURL}}" hx-target="#page-content" hx-swap="outerHTML" hx-disabled-elt="this">
-              <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
-              <button class="btn btn-sm" type="submit">{{$L.groups_invite_rotate}}</button>
-            </form>
-          </div>
-        {{end}}
         {{if .IsMember}}
           <div class="divider"></div>
           <form method="post" action="{{.LeaveURL}}" hx-post="{{.LeaveURL}}" hx-target="#page-content" hx-swap="outerHTML" hx-disabled-elt="this"
@@ -204,7 +194,7 @@
                 {{$member := .}}
                 <tr data-member-id="{{.UserID}}">
                   <td>
-                    <div class="font-medium">{{.Label}}{{if .IsSelf}} <span class="badge badge-ghost badge-sm">{{$L.groups_members_you}}</span>{{end}}{{if .IsGuest}} <span class="badge badge-outline badge-sm">{{$L.groups_members_guest}}</span>{{end}}</div>
+                    <div class="font-medium">{{.Label}}{{if .IsSelf}} <span class="badge badge-ghost badge-sm">{{$L.groups_members_you}}</span>{{end}}{{if .IsGuest}} <span class="badge badge-outline badge-sm">{{$L.groups_members_guest}}</span>{{end}}{{if .IsProfile}} <span class="badge badge-outline badge-sm">{{$L.groups_members_profile}}</span>{{end}}</div>
                     {{if .Email}}<div class="text-sm opacity-70">{{.Email}}</div>{{end}}
                   </td>
                   <td>

@@ -28,6 +28,16 @@ var _ service.TeamRepository = (*TeamRepository)(nil)
 
 const teamColumns = `id, group_id, name, birth_year_from, birth_year_to, description, archived_at, created_at, version`
 
+// teamParentIDs selects the distinct parents of team t: roster parents and
+// guardians of the team's players.
+const teamParentIDs = `
+	SELECT tm.user_id FROM team_members tm
+	WHERE tm.group_id = t.group_id AND tm.team_id = t.id AND tm.role = 'parent'
+	UNION
+	SELECT g.parent_user_id FROM guardians g
+	JOIN team_members child ON child.group_id = g.group_id AND child.user_id = g.child_user_id AND child.role = 'player'
+	WHERE g.group_id = t.group_id AND child.team_id = t.id`
+
 // CreateTeam inserts one team.
 func (r *TeamRepository) CreateTeam(ctx context.Context, team service.Team) (service.Team, error) {
 	db, err := r.database(ctx)
@@ -54,7 +64,8 @@ func (r *TeamRepository) FindTeam(ctx context.Context, groupID, teamID int64) (s
 }
 
 // ListTeams returns the group's teams with roster counts: active teams first,
-// then by birth years and name.
+// then by birth years and name. Parents count once whether they are on the
+// roster themselves or linked to a player on it.
 func (r *TeamRepository) ListTeams(ctx context.Context, groupID int64) ([]service.TeamSummary, error) {
 	db, err := r.database(ctx)
 	if err != nil {
@@ -62,12 +73,10 @@ func (r *TeamRepository) ListTeams(ctx context.Context, groupID int64) ([]servic
 	}
 	rows, err := db.QueryContext(ctx, `
 		SELECT t.id, t.group_id, t.name, t.birth_year_from, t.birth_year_to, t.description, t.archived_at, t.created_at, t.version,
-			count(tm.user_id) FILTER (WHERE tm.role = 'player'),
-			count(tm.user_id) FILTER (WHERE tm.role = 'parent')
+			(SELECT count(*) FROM team_members tm WHERE tm.group_id = t.group_id AND tm.team_id = t.id AND tm.role = 'player'),
+			(SELECT count(*) FROM (`+teamParentIDs+`) parents)
 		FROM teams t
-		LEFT JOIN team_members tm ON tm.team_id = t.id AND tm.group_id = t.group_id
 		WHERE t.group_id = $1
-		GROUP BY t.id
 		ORDER BY (t.archived_at IS NOT NULL), t.birth_year_from DESC, t.birth_year_to DESC, lower(t.name), t.id
 	`, groupID)
 	if err != nil {
@@ -154,6 +163,66 @@ func (r *TeamRepository) ListRoster(ctx context.Context, groupID, teamID int64) 
 		entry.Username = nullableString(username)
 		entry.DisplayName = nullableString(display)
 		entry.Email = nullableString(email)
+		roster = append(roster, entry)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, mapTeamError(err)
+	}
+	_ = rows.Close()
+	return r.addLinkedParents(ctx, db, groupID, teamID, roster)
+}
+
+// addLinkedParents adds the guardians of the team's players as parents. A
+// guardian already on the roster as a parent keeps that entry and gains the
+// child IDs; others are appended as linked entries, which are derived and
+// cannot be removed from the roster directly.
+func (r *TeamRepository) addLinkedParents(ctx context.Context, db *sql.DB, groupID, teamID int64, roster []service.TeamRosterEntry) ([]service.TeamRosterEntry, error) {
+	rows, err := db.QueryContext(ctx, `
+		SELECT g.parent_user_id, u.kind, u.username, u.display_name, u.email,
+			string_agg(g.child_user_id::text, ',' ORDER BY g.child_user_id)
+		FROM guardians g
+		JOIN team_members child ON child.group_id = g.group_id AND child.user_id = g.child_user_id
+			AND child.role = 'player' AND child.team_id = $2
+		JOIN users u ON u.id = g.parent_user_id
+		WHERE g.group_id = $1
+		GROUP BY g.parent_user_id, u.kind, u.username, u.display_name, u.email
+		ORDER BY lower(u.display_name), lower(u.username), g.parent_user_id
+	`, groupID, teamID)
+	if err != nil {
+		return nil, mapTeamError(err)
+	}
+	defer func() { _ = rows.Close() }()
+	for rows.Next() {
+		var (
+			entry                    service.TeamRosterEntry
+			kind                     string
+			username, display, email sql.NullString
+			children                 sql.NullString
+		)
+		if err := rows.Scan(&entry.UserID, &kind, &username, &display, &email, &children); err != nil {
+			return nil, mapTeamError(err)
+		}
+		childIDs, err := splitIDs(children)
+		if err != nil {
+			return nil, err
+		}
+		found := false
+		for index := range roster {
+			if roster[index].UserID == entry.UserID && roster[index].Role == service.GroupRoleParent {
+				roster[index].ChildUserIDs = childIDs
+				found = true
+			}
+		}
+		if found {
+			continue
+		}
+		entry.Role = service.GroupRoleParent
+		entry.Kind = service.UserKind(kind)
+		entry.Username = nullableString(username)
+		entry.DisplayName = nullableString(display)
+		entry.Email = nullableString(email)
+		entry.ChildUserIDs = childIDs
+		entry.Linked = true
 		roster = append(roster, entry)
 	}
 	if err := rows.Err(); err != nil {

@@ -80,12 +80,13 @@
   {{if .Rows}}
     <ul class="list rounded-box border border-base-300">
       {{range .Rows}}
-        <li class="list-row items-center" data-roster-user="{{.UserID}}" data-roster-role="{{.Role}}">
+        <li class="list-row items-center" data-roster-user="{{.UserID}}" data-roster-role="{{.Role}}"{{if .Linked}} data-roster-linked="true"{{end}}>
           <div class="list-col-grow">
             <div>{{.Label}}</div>
             {{if .Email}}<div class="text-sm opacity-70">{{.Email}}</div>{{end}}
+            {{if .ParentOf}}<div class="text-sm opacity-70" data-testid="roster-parent-of">{{$.ParentOfLabel}} {{.ParentOf}}</div>{{end}}
           </div>
-          {{if $.CanManage}}
+          {{if and $.CanManage (not .Linked)}}
             <form method="post" action="{{$.RemoveURL}}" hx-post="{{$.RemoveURL}}" hx-target="#page-content" hx-swap="outerHTML" hx-disabled-elt="this">
               <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
               <input type="hidden" name="entry" value="{{.UserID}}:{{.Role}}">

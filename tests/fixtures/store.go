@@ -53,24 +53,22 @@ func InsertUser(ctx context.Context, db RowQuerier, user User) (int64, error) {
 
 // Group contains explicit values for every groups column.
 type Group struct {
-	Name       string
-	NameNorm   string
-	InviteCode string
-	TimeZone   string
-	CreatedBy  *int64
-	CreatedAt  int64
-	Version    int64
+	Name      string
+	NameNorm  string
+	TimeZone  string
+	CreatedBy *int64
+	CreatedAt int64
+	Version   int64
 }
 
-// NewGroup returns a group fixture with an explicit invite code.
+// NewGroup returns a group fixture.
 func NewGroup(createdBy int64) Group {
 	return Group{
-		Name:       "Fixture Group",
-		NameNorm:   "fixture group",
-		InviteCode: "fixture-invite",
-		TimeZone:   "Europe/Budapest",
-		CreatedBy:  Int64(createdBy),
-		CreatedAt:  1,
+		Name:      "Fixture Group",
+		NameNorm:  "fixture group",
+		TimeZone:  "Europe/Budapest",
+		CreatedBy: Int64(createdBy),
+		CreatedAt: 1,
 	}
 }
 
@@ -78,10 +76,10 @@ func NewGroup(createdBy int64) Group {
 func InsertGroup(ctx context.Context, db RowQuerier, group Group) (int64, error) {
 	var id int64
 	err := db.QueryRowContext(ctx, `
-		INSERT INTO groups (name, name_norm, invite_code, time_zone, created_by, created_at, version)
-		VALUES ($1, $2, $3, COALESCE(NULLIF($4, ''), 'Europe/Budapest'), $5, $6, $7)
+		INSERT INTO groups (name, name_norm, time_zone, created_by, created_at, version)
+		VALUES ($1, $2, COALESCE(NULLIF($3, ''), 'Europe/Budapest'), $4, $5, $6)
 		RETURNING id
-	`, group.Name, group.NameNorm, group.InviteCode, group.TimeZone, group.CreatedBy, group.CreatedAt, group.Version).Scan(&id)
+	`, group.Name, group.NameNorm, group.TimeZone, group.CreatedBy, group.CreatedAt, group.Version).Scan(&id)
 	return id, err
 }
 

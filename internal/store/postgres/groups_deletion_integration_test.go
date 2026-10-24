@@ -23,7 +23,7 @@ func TestAccountDeletionPreservesSharedGroup(t *testing.T) {
 	memberID := insertIntegrationUser(t, harness, "member@example.test")
 
 	group, _, err := memberships.CreateGroupWithAdmin(ctx, service.Group{
-		Name: "Shared", NameNorm: "shared", InviteCode: "INVITE000071", CreatedBy: &creatorID, CreatedAt: 100,
+		Name: "Shared", NameNorm: "shared", CreatedBy: &creatorID, CreatedAt: 100,
 	}, creatorID)
 	if err != nil {
 		t.Fatalf("CreateGroupWithAdmin() error = %v", err)
@@ -45,9 +45,6 @@ func TestAccountDeletionPreservesSharedGroup(t *testing.T) {
 	}
 	if surviving.CreatedBy != nil {
 		t.Fatalf("created_by = %v, want NULL after creator deletion", surviving.CreatedBy)
-	}
-	if surviving.InviteCode != "INVITE000071" {
-		t.Fatalf("invite code = %q, want preserved", surviving.InviteCode)
 	}
 
 	if _, err := memberships.FindMembership(ctx, group.ID, creatorID); !isMembershipNotFound(err) {

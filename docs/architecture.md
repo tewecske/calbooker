@@ -97,16 +97,50 @@ get `service.ErrGroupNotFound`, which handlers render as 404.
   `ErrGroupForbidden` (403; HTMX 422), not visible is not-found (404).
 - Questions: `CanView`, `IsMember`, `IsSiteAdmin`, `HasRole`, `Roles`,
   `CanManageGroup` (admin, manager, site administrator), `CanManageRole(role)`
-  (only admins handle `admin`), `CanRotateInvite`, `CanRemoveMember`,
+  (only admins handle `admin`), `CanRemoveMember`,
   `CanViewAllMembers`, `CanCreateTeam`, `CanEditTeam(id)`,
   `CanManageRoster(id)` (managers and the team's coaches), `CoachesTeam(id)`,
   `SeesAllTeams`, `VisibleTeamIDs()`, `CanViewTeam(id)`,
-  `CanViewTeamEmails(id)`. Add a question here rather than checking roles in
-  a handler.
+  `CanViewTeamEmails(id)`, `CanManageInvites` (admins, managers, coaches),
+  `CanCreateInvite(role, teamID)` (also decides which invites an account sees
+  and revokes), `ChildUserIDs()`, `IsGuardianOf(id)`, `CanCreateProfile`
+  (staff and parents), `CanEditProfile(id)` (staff and the child's
+  guardians), `CanManageGuardians` (staff), `CanViewChildren`. Add a question
+  here rather than checking roles in a handler.
 - Extension points: `GroupAccessService.SetCoachedTeams(source)` for season
-  coaches (#5) and `SetChildTeams(source)` for guardians (#3); each source
-  implements `TeamRelationSource.TeamIDs(ctx, groupID, userID)`. Coached
-  teams count only for members with the coach role.
+  coaches (#5), a `TeamRelationSource.TeamIDs(ctx, groupID, userID)`; coached
+  teams count only for members with the coach role. `SetChildTeams(source)`
+  takes a `ChildRelationSource` (`ChildUserIDs` plus `TeamIDs`, the teams on
+  which the member's children play); `postgres.ProfileRepository` implements
+  it from `guardians` and `internal/app` wires it.
+
+## Invites, child profiles, and guardians
+
+- `InviteService` (`internal/service/invite.go`, store
+  `internal/store/postgres/invites.go`) owns `group_invites`: each code carries
+  a role and optionally a team (player and parent only), an expiry, and a use
+  limit. `Create(actor, InviteInput)`, `List(access)`, `Revoke(actor, id)`,
+  and `Join(userID, code)` (wrapped by `RateLimitedGroupJoiner`) return
+  `InviteRedemption{Membership, TeamID, Changed}`. `RedeemInvite` locks the
+  invite row, re-checks it, and adds the membership, the role, and the roster
+  entry in one transaction; a use counts only when something was added.
+  Joining as an existing member adds the role and team. The group's single
+  `groups.invite_code` was dropped in migration 000004; existing codes became
+  player invites.
+- `ProfileService` (`internal/service/profile.go`, store
+  `internal/store/postgres/profiles.go`) owns child profiles (`users.kind =
+  'profile'` plus `child_profiles`: owning group, birth year, revision) and
+  `guardians` (parent, child, group). A profile is a group member with the
+  player role only. A guardian link needs the parent role (foreign key to
+  `group_member_roles`) and goes with it.
+- Linked parents are derived, not stored: `TeamRepository.ListRoster` adds the
+  guardians of the team's players as parent entries (`Linked`, with
+  `ChildUserIDs`), and `ListTeams` counts each parent once. `team_members`
+  stays the record of explicit roster entries, so its foreign key to the
+  member's roles is unchanged.
+- Pages: `/{language}/groups/{id}/invites` and `/{language}/groups/{id}/children`
+  (`internal/adapter/http/invite.go`, `children.go`; templates
+  `invites.html`, `children.html`; catalogs `invites.json`, `children.json`).
 - Roles: `admin`, `manager`, `coach` need a full account
   (`users.kind = 'account'`); `player` and `parent` may be guests. A team
   roster entry (`player` or `parent`) needs the matching group role; the

@@ -28,15 +28,14 @@ func groupTestDependencies(t *testing.T, access *service.GroupAccess) (Dependenc
 	t.Helper()
 	dependencies := settingsStubDependencies(t)
 	groups := &groupsUseCaseStub{
-		group:    service.Group{ID: 3, Name: "Lions Club", TimeZone: "Europe/Budapest", InviteCode: "ABCDEFGHJKLM", Version: 2},
+		group:    service.Group{ID: 3, Name: "Lions Club", TimeZone: "Europe/Budapest", Version: 2},
 		overview: service.GroupOverview{Group: service.Group{ID: 3, Name: "Lions Club", TimeZone: "Europe/Budapest"}, MemberCount: 2},
-	}
-	if access.CanRotateInvite() {
-		groups.overview.InviteCode = "ABCDEFGHJKLM"
 	}
 	teams := &teamsUseCaseStub{}
 	dependencies.Groups = groups
 	dependencies.Teams = teams
+	dependencies.Invites = &invitesUseCaseStub{}
+	dependencies.Profiles = &profilesUseCaseStub{}
 	dependencies.GroupAccess = &groupAccessStub{access: access}
 	return dependencies, groups, teams
 }
@@ -142,7 +141,15 @@ func TestGroupsCreate(t *testing.T) {
 func TestGroupRoutesAnswerNotFoundToOutsiders(t *testing.T) {
 	routes := []struct{ method, path string }{
 		{http.MethodGet, "/en/groups/3"},
-		{http.MethodPost, "/en/groups/3/invite"},
+		{http.MethodGet, "/en/groups/3/invites"},
+		{http.MethodPost, "/en/groups/3/invites"},
+		{http.MethodPost, "/en/groups/3/invites/5/revoke"},
+		{http.MethodGet, "/en/groups/3/children"},
+		{http.MethodPost, "/en/groups/3/children"},
+		{http.MethodPost, "/en/groups/3/children/9"},
+		{http.MethodPost, "/en/groups/3/children/9/delete"},
+		{http.MethodPost, "/en/groups/3/guardians/add"},
+		{http.MethodPost, "/en/groups/3/guardians/remove"},
 		{http.MethodPost, "/en/groups/3/leave"},
 		{http.MethodGet, "/en/groups/3/settings"},
 		{http.MethodPost, "/en/groups/3/settings"},
@@ -192,7 +199,6 @@ func TestGroupRoutesAnswerForbiddenToInsufficientRoles(t *testing.T) {
 	}{
 		{name: "settings page", method: http.MethodGet, path: "/en/groups/3/settings"},
 		{name: "settings update", method: http.MethodPost, path: "/en/groups/3/settings", form: "version=2&name=X&time_zone=UTC", setup: func(g *groupsUseCaseStub, _ *teamsUseCaseStub) { g.writeErr = service.ErrGroupForbidden }},
-		{name: "invite rotation", method: http.MethodPost, path: "/en/groups/3/invite", setup: func(g *groupsUseCaseStub, _ *teamsUseCaseStub) { g.writeErr = service.ErrGroupForbidden }},
 		{name: "role grant", method: http.MethodPost, path: "/en/groups/3/members/8/roles/add", form: "version=0&role=coach", setup: func(g *groupsUseCaseStub, _ *teamsUseCaseStub) { g.writeErr = service.ErrGroupForbidden }},
 		{name: "member removal", method: http.MethodPost, path: "/en/groups/3/members/8/remove", form: "version=0", setup: func(g *groupsUseCaseStub, _ *teamsUseCaseStub) { g.writeErr = service.ErrGroupForbidden }},
 		{name: "team creation", method: http.MethodPost, path: "/en/groups/3/teams", form: "name=A&birth_year_from=2015&birth_year_to=2016", setup: func(_ *groupsUseCaseStub, s *teamsUseCaseStub) { s.writeErr = service.ErrGroupForbidden }},
@@ -224,13 +230,16 @@ func TestGroupOverviewByRole(t *testing.T) {
 		name         string
 		access       *service.GroupAccess
 		wantInvite   bool
+		wantChildren bool
 		wantSettings bool
 		wantLeave    bool
 	}{
-		{name: "admin", access: groupMemberAs(service.GroupRoleAdmin), wantInvite: true, wantSettings: true, wantLeave: true},
-		{name: "manager", access: groupMemberAs(service.GroupRoleManager), wantInvite: true, wantSettings: true, wantLeave: true},
+		{name: "admin", access: groupMemberAs(service.GroupRoleAdmin), wantInvite: true, wantChildren: true, wantSettings: true, wantLeave: true},
+		{name: "manager", access: groupMemberAs(service.GroupRoleManager), wantInvite: true, wantChildren: true, wantSettings: true, wantLeave: true},
+		{name: "coach", access: groupMemberAs(service.GroupRoleCoach), wantInvite: true, wantLeave: true},
+		{name: "parent", access: groupMemberAs(service.GroupRoleParent), wantChildren: true, wantLeave: true},
 		{name: "player", access: groupMemberAs(service.GroupRolePlayer), wantLeave: true},
-		{name: "site administrator", access: groupAccessAs(service.GroupAccessGrants{SiteAdmin: true}), wantInvite: true, wantSettings: true},
+		{name: "site administrator", access: groupAccessAs(service.GroupAccessGrants{SiteAdmin: true}), wantInvite: true, wantChildren: true, wantSettings: true},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -241,7 +250,8 @@ func TestGroupOverviewByRole(t *testing.T) {
 				t.Fatalf("status = %d, overview incomplete", response.Code)
 			}
 			checks := map[string]bool{
-				"ABCDEFGHJKLM":            test.wantInvite,
+				`data-section="invites"`:  test.wantInvite,
+				`data-section="children"`: test.wantChildren,
 				`data-section="settings"`: test.wantSettings,
 				"Leave group":             test.wantLeave,
 			}
@@ -378,9 +388,29 @@ func TestGroupsJoin(t *testing.T) {
 	if response.Code != http.StatusUnprocessableEntity || strings.Contains(response.Body.String(), "UNKNOWN") {
 		t.Fatalf("invalid code status = %d, want 422 without echoing the code", response.Code)
 	}
-	dependencies.JoinGroup = &rateLimitedJoinStub{membership: service.GroupMembership{GroupID: 3}}
+	dependencies.JoinGroup = &rateLimitedJoinStub{redemption: service.InviteRedemption{Membership: service.GroupMembership{GroupID: 3}}}
 	if response := serveGroups(t, dependencies, http.MethodPost, "/en/groups/join", "code=ABCDEFGHJKLM", false); response.Header().Get("Location") != "/en/groups/3" {
 		t.Fatalf("join redirect = %q, want /en/groups/3", response.Header().Get("Location"))
+	}
+	// A team invite lands on the team page.
+	dependencies.JoinGroup = &rateLimitedJoinStub{redemption: service.InviteRedemption{Membership: service.GroupMembership{GroupID: 3}, TeamID: 4}}
+	if response := serveGroups(t, dependencies, http.MethodPost, "/en/groups/join", "code=ABCDEFGHJKLM", false); response.Header().Get("Location") != "/en/groups/3/teams/4" {
+		t.Fatalf("team join redirect = %q, want /en/groups/3/teams/4", response.Header().Get("Location"))
+	}
+	for _, test := range []struct {
+		err  error
+		want string
+	}{
+		{service.ErrInviteExpired, "has expired"},
+		{service.ErrInviteUsedUp, "used up"},
+		{service.ErrInviteRevoked, "was revoked"},
+		{service.ErrRoleNeedsAccount, "Upgrade to a full account"},
+	} {
+		dependencies.JoinGroup = &rateLimitedJoinStub{err: test.err}
+		response := serveGroups(t, dependencies, http.MethodPost, "/en/groups/join", "code=ABCDEFGHJKLM", false)
+		if response.Code != http.StatusUnprocessableEntity || !strings.Contains(response.Body.String(), test.want) {
+			t.Fatalf("join error %v = %d, want 422 with %q", test.err, response.Code, test.want)
+		}
 	}
 }
 
@@ -405,8 +435,8 @@ func TestGroupTemplateLabelsExist(t *testing.T) {
 		t.Fatalf("NewPageRenderer() error = %v", err)
 	}
 	labels := groupLabels(renderer)
-	pattern := regexp.MustCompile(`\.L\.((?:groups|teams)_[a-z_]+)`)
-	for _, name := range []string{"groups.html", "teams.html"} {
+	pattern := regexp.MustCompile(`[.$]L\.((?:groups|teams|invites|children)_[a-z0-9_]+)`)
+	for _, name := range []string{"groups.html", "teams.html", "invites.html", "children.html"} {
 		source, err := os.ReadFile(filepath.Join("..", "..", "..", "templates", name))
 		if err != nil {
 			t.Fatalf("read %s: %v", name, err)
@@ -488,10 +518,6 @@ func (s *groupsUseCaseStub) UpdateSettings(_ context.Context, actor service.Grou
 	return s.group, s.write()
 }
 
-func (s *groupsUseCaseStub) RotateInvite(context.Context, service.GroupActor) (string, error) {
-	return "NEWCODE23456", s.write()
-}
-
 func (s *groupsUseCaseStub) Leave(context.Context, *service.GroupAccess) error {
 	return s.write()
 }
@@ -517,13 +543,13 @@ func (s *groupsUseCaseStub) RemoveMember(_ context.Context, _ service.GroupActor
 }
 
 type rateLimitedJoinStub struct {
-	membership service.GroupMembership
+	redemption service.InviteRedemption
 	err        error
 }
 
-func (s *rateLimitedJoinStub) Join(context.Context, int64, string) (service.GroupMembership, error) {
+func (s *rateLimitedJoinStub) Join(context.Context, int64, string) (service.InviteRedemption, error) {
 	if s.err != nil {
-		return service.GroupMembership{}, s.err
+		return service.InviteRedemption{}, s.err
 	}
-	return s.membership, nil
+	return s.redemption, nil
 }

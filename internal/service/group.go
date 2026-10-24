@@ -2,10 +2,8 @@ package service
 
 import (
 	"context"
-	"crypto/rand"
 	"errors"
 	"fmt"
-	"math/big"
 	"slices"
 	"strconv"
 	"strings"
@@ -14,17 +12,11 @@ import (
 )
 
 const (
-	maxGroupNameLength        = 64
-	maxTimeZoneLength         = 64
-	groupInviteCodeLength     = 12
-	groupInviteAlphabet       = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
-	groupInviteCollisionTries = 5
+	maxGroupNameLength = 64
+	maxTimeZoneLength  = 64
 	// DefaultGroupTimeZone is the time zone of a new group unless its creator
 	// picks another.
 	DefaultGroupTimeZone = "Europe/Budapest"
-	// groupJoinRole is the role a member gets when joining with the group's
-	// invite code. Invites that carry a role and team come with #3.
-	groupJoinRole = GroupRolePlayer
 )
 
 var (
@@ -45,22 +37,16 @@ var (
 	ErrInvalidGroupRole = errors.New("service: invalid group role")
 	// ErrRoleNeedsAccount identifies a staff role offered to a guest or profile.
 	ErrRoleNeedsAccount = errors.New("service: role needs a full account")
-	// ErrGroupInviteNotFound identifies an unknown or rotated invite code.
-	ErrGroupInviteNotFound = errors.New("service: group invite not found")
 	// ErrLastGroupAdmin prevents removing a group's final administrator.
 	ErrLastGroupAdmin = errors.New("service: last group administrator")
 	// ErrMembershipNotFound identifies a missing group membership.
 	ErrMembershipNotFound = errors.New("service: group membership not found")
 	// ErrMembershipExists identifies a duplicate membership for the same account.
 	ErrMembershipExists = errors.New("service: group membership exists")
-	// ErrGroupInviteTaken identifies an invite code already used by another group.
-	ErrGroupInviteTaken = errors.New("service: group invite already in use")
 	// ErrNilGroupRepository identifies missing group persistence.
 	ErrNilGroupRepository = errors.New("service: nil group repository")
 	// ErrNilMembershipRepository identifies missing membership persistence.
 	ErrNilMembershipRepository = errors.New("service: nil membership repository")
-	// ErrGroupInviteGeneration identifies unavailable secure randomness.
-	ErrGroupInviteGeneration = errors.New("service: group invite generation failed")
 )
 
 // Stable group audit action codes. Every admin and manager action in a group
@@ -68,7 +54,6 @@ var (
 const (
 	AuditActionGroupCreated     = "group.created"
 	AuditActionGroupSettings    = "group.settings_updated"
-	AuditActionGroupInvite      = "group.invite_rotated"
 	AuditActionGroupRoleAdded   = "group.role_added"
 	AuditActionGroupRoleRemoved = "group.role_removed"
 	AuditActionGroupRemoved     = "group.member_removed"
@@ -82,14 +67,13 @@ const (
 
 // Group is a club with an optimistic-lock revision.
 type Group struct {
-	ID         int64
-	Name       string
-	NameNorm   string
-	InviteCode string
-	TimeZone   string
-	CreatedBy  *int64
-	CreatedAt  int64
-	Version    int64
+	ID        int64
+	Name      string
+	NameNorm  string
+	TimeZone  string
+	CreatedBy *int64
+	CreatedAt int64
+	Version   int64
 }
 
 // GroupMembership is one account's membership and roles within a group.
@@ -134,8 +118,6 @@ type GroupSummary struct {
 type GroupOverview struct {
 	Group       Group
 	MemberCount int
-	// InviteCode is empty unless the account may rotate it.
-	InviteCode string
 }
 
 // GroupActor is the account acting in a group: its access, and the client
@@ -149,7 +131,6 @@ type GroupActor struct {
 // revision so stale writes are reported as conflicts.
 type GroupRepository interface {
 	FindGroupByID(context.Context, int64) (Group, error)
-	FindGroupByInviteCode(context.Context, string) (Group, error)
 	ListGroupsForUser(context.Context, int64) ([]GroupSummary, error)
 	// ListAllGroupsForUser returns every group with the account's real
 	// roles when present. It backs site-administrator listing.
@@ -178,8 +159,8 @@ type GroupMembershipRepository interface {
 	DeleteMembership(ctx context.Context, groupID, userID, expectedVersion int64) error
 }
 
-// GroupService owns group creation, listing, settings, invites, and
-// membership roles.
+// GroupService owns group creation, listing, settings, and membership
+// roles. Invites live in InviteService.
 type GroupService struct {
 	groups      GroupRepository
 	memberships GroupMembershipRepository
@@ -210,9 +191,8 @@ func (s *GroupService) SetAuditor(auditor AuditRecorder) {
 	}
 }
 
-// Create validates the name and time zone, generates a unique invite code,
-// and creates the group with its creator as the first administrator. Only
-// full users create groups.
+// Create validates the name and time zone and creates the group with its
+// creator as the first administrator. Only full users create groups.
 func (s *GroupService) Create(ctx context.Context, userID int64, origin, name, timeZone string) (GroupSummary, error) {
 	if err := s.validate(ctx); err != nil {
 		return GroupSummary{}, err
@@ -241,27 +221,16 @@ func (s *GroupService) Create(ctx context.Context, userID int64, origin, name, t
 		return GroupSummary{}, ErrGroupRequiresAccount
 	}
 
-	var lastErr error
-	for range groupInviteCollisionTries {
-		code, err := newGroupInviteCode()
-		if err != nil {
-			return GroupSummary{}, err
-		}
-		group := Group{Name: strings.TrimSpace(name), NameNorm: normalized, InviteCode: code, TimeZone: zone, CreatedBy: &userID, CreatedAt: s.now().Unix()}
-		created, membership, err := s.memberships.CreateGroupWithAdmin(ctx, group, userID)
-		if err == nil {
-			if err := validateCreatedGroup(created, membership, userID); err != nil {
-				return GroupSummary{}, err
-			}
-			s.record(ctx, userID, origin, created.ID, AuditActionGroupCreated, "name: "+created.Name+"; time zone: "+created.TimeZone)
-			return GroupSummary{Group: created, MemberCount: 1, Roles: []string{GroupRoleAdmin}}, nil
-		}
-		if !errors.Is(err, ErrGroupInviteTaken) {
-			return GroupSummary{}, fmt.Errorf("create group: %w", err)
-		}
-		lastErr = err
+	group := Group{Name: strings.TrimSpace(name), NameNorm: normalized, TimeZone: zone, CreatedBy: &userID, CreatedAt: s.now().Unix()}
+	created, membership, err := s.memberships.CreateGroupWithAdmin(ctx, group, userID)
+	if err != nil {
+		return GroupSummary{}, fmt.Errorf("create group: %w", err)
 	}
-	return GroupSummary{}, fmt.Errorf("create group: %w", lastErr)
+	if err := validateCreatedGroup(created, membership, userID); err != nil {
+		return GroupSummary{}, err
+	}
+	s.record(ctx, userID, origin, created.ID, AuditActionGroupCreated, "name: "+created.Name+"; time zone: "+created.TimeZone)
+	return GroupSummary{Group: created, MemberCount: 1, Roles: []string{GroupRoleAdmin}}, nil
 }
 
 // List returns the groups the account belongs to with member counts and
@@ -293,8 +262,7 @@ func (s *GroupService) List(ctx context.Context, userID int64) ([]GroupSummary, 
 	return summaries, nil
 }
 
-// Overview returns the group's main page data. The invite code is shown only
-// to accounts that may rotate it.
+// Overview returns the group's main page data.
 func (s *GroupService) Overview(ctx context.Context, access *GroupAccess) (GroupOverview, error) {
 	if err := s.validate(ctx); err != nil {
 		return GroupOverview{}, err
@@ -310,11 +278,7 @@ func (s *GroupService) Overview(ctx context.Context, access *GroupAccess) (Group
 	if err != nil {
 		return GroupOverview{}, fmt.Errorf("count group members: %w", err)
 	}
-	overview := GroupOverview{Group: group, MemberCount: count}
-	if access.CanRotateInvite() {
-		overview.InviteCode = group.InviteCode
-	}
-	return overview, nil
+	return GroupOverview{Group: group, MemberCount: count}, nil
 }
 
 // Group returns the group's stored settings to anyone who may see it.
@@ -361,84 +325,6 @@ func (s *GroupService) UpdateSettings(ctx context.Context, actor GroupActor, exp
 	}
 	s.recordActor(ctx, actor, AuditActionGroupSettings, "name: "+updated.Name+"; time zone: "+updated.TimeZone)
 	return updated, nil
-}
-
-// RotateInvite replaces a group's invite code and immediately invalidates the
-// previous code. Admins and managers only.
-func (s *GroupService) RotateInvite(ctx context.Context, actor GroupActor) (string, error) {
-	if err := s.authorize(ctx, actor, actor.Access.CanRotateInvite()); err != nil {
-		return "", err
-	}
-	group, err := s.groups.FindGroupByID(ctx, actor.Access.GroupID())
-	if err != nil {
-		return "", err
-	}
-	var lastErr error
-	for range groupInviteCollisionTries {
-		code, err := newGroupInviteCode()
-		if err != nil {
-			return "", err
-		}
-		group.InviteCode = code
-		updated, err := s.groups.UpdateGroup(ctx, group, group.Version)
-		if err == nil {
-			s.recordActor(ctx, actor, AuditActionGroupInvite, "")
-			return updated.InviteCode, nil
-		}
-		if errors.Is(err, ErrGroupInviteTaken) {
-			lastErr = err
-			continue
-		}
-		if IsWriteConflict(err) || errors.Is(err, ErrGroupNotFound) {
-			return "", err
-		}
-		return "", fmt.Errorf("rotate group invite: %w", err)
-	}
-	return "", fmt.Errorf("rotate group invite: %w", lastErr)
-}
-
-// Join redeems an invite code. A new member gets the player role; an
-// existing member keeps their roles.
-func (s *GroupService) Join(ctx context.Context, userID int64, code string) (GroupMembership, error) {
-	if err := s.validate(ctx); err != nil {
-		return GroupMembership{}, err
-	}
-	if userID <= 0 {
-		return GroupMembership{}, ErrInvalidUserID
-	}
-	normalized := strings.ToUpper(strings.TrimSpace(code))
-	if normalized == "" {
-		return GroupMembership{}, ErrGroupInviteNotFound
-	}
-	group, err := s.groups.FindGroupByInviteCode(ctx, normalized)
-	if err != nil {
-		if errors.Is(err, ErrGroupNotFound) {
-			return GroupMembership{}, ErrGroupInviteNotFound
-		}
-		return GroupMembership{}, fmt.Errorf("find invite group: %w", err)
-	}
-	existing, err := s.memberships.FindMembership(ctx, group.ID, userID)
-	if err == nil {
-		return existing, nil
-	}
-	if !errors.Is(err, ErrMembershipNotFound) {
-		return GroupMembership{}, fmt.Errorf("find join membership: %w", err)
-	}
-	created, err := s.memberships.CreateMembership(ctx, GroupMembership{
-		GroupID:   group.ID,
-		UserID:    userID,
-		Roles:     []string{groupJoinRole},
-		CreatedAt: s.now().Unix(),
-	})
-	if err != nil {
-		if errors.Is(err, ErrMembershipExists) {
-			if existing, lookupErr := s.memberships.FindMembership(ctx, group.ID, userID); lookupErr == nil {
-				return existing, nil
-			}
-		}
-		return GroupMembership{}, fmt.Errorf("create join membership: %w", err)
-	}
-	return created, nil
 }
 
 // Leave removes the acting member from the group. The last administrator
@@ -533,12 +419,14 @@ func (s *GroupService) AddRole(ctx context.Context, actor GroupActor, targetUser
 	if slices.Contains(target.Roles, role) {
 		return target, nil
 	}
-	if GroupRoleNeedsAccount(role) {
+	if role != GroupRolePlayer {
 		user, err := s.users.FindUserByID(ctx, targetUserID)
 		if err != nil {
 			return GroupMembership{}, fmt.Errorf("find role target: %w", err)
 		}
-		if !user.IsFullUser() {
+		// Staff roles need a full account; a child profile is only ever a
+		// player.
+		if (GroupRoleNeedsAccount(role) && !user.IsFullUser()) || user.Kind == UserKindProfile {
 			return GroupMembership{}, ErrRoleNeedsAccount
 		}
 	}
@@ -602,6 +490,13 @@ func (s *GroupService) RemoveMember(ctx context.Context, actor GroupActor, targe
 	}
 	if slices.Contains(target.Roles, GroupRoleAdmin) && !actor.Access.CanManageRole(GroupRoleAdmin) {
 		return ErrGroupForbidden
+	}
+	user, err := s.users.FindUserByID(ctx, targetUserID)
+	if err != nil {
+		return fmt.Errorf("find removed member: %w", err)
+	}
+	if user.Kind == UserKindProfile {
+		return ErrProfileMembership
 	}
 	if err := s.memberships.DeleteMembership(ctx, actor.Access.GroupID(), targetUserID, expectedVersion); err != nil {
 		if errors.Is(err, ErrLastGroupAdmin) || IsWriteConflict(err) || errors.Is(err, ErrMembershipNotFound) {
@@ -728,21 +623,8 @@ func hasControl(value string) bool {
 	return false
 }
 
-func newGroupInviteCode() (string, error) {
-	code := make([]byte, groupInviteCodeLength)
-	maximum := big.NewInt(int64(len(groupInviteAlphabet)))
-	for index := range code {
-		value, err := rand.Int(rand.Reader, maximum)
-		if err != nil {
-			return "", fmt.Errorf("%w: random source unavailable", ErrGroupInviteGeneration)
-		}
-		code[index] = groupInviteAlphabet[value.Int64()]
-	}
-	return string(code), nil
-}
-
 func validateCreatedGroup(group Group, membership GroupMembership, userID int64) error {
-	if group.ID <= 0 || group.Version < 0 || len(group.InviteCode) != groupInviteCodeLength {
+	if group.ID <= 0 || group.Version < 0 {
 		return ErrInvalidGroup
 	}
 	if membership.GroupID != group.ID || membership.UserID != userID || !slices.Contains(membership.Roles, GroupRoleAdmin) {

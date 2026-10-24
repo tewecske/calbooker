@@ -11,7 +11,7 @@ const groupInviteJoinAction = "group.invite.join"
 
 // GroupJoiner is the join operation consumed by group rate limiting.
 type GroupJoiner interface {
-	Join(context.Context, int64, string) (GroupMembership, error)
+	Join(context.Context, int64, string) (InviteRedemption, error)
 }
 
 // RateLimitedGroupJoiner applies an invitation-redemption budget without
@@ -34,16 +34,16 @@ func NewRateLimitedGroupJoiner(joiner GroupJoiner, limiter *RateLimiter) (*RateL
 
 // Join applies the redemption budget for the account before attempting to
 // redeem an invite code.
-func (s *RateLimitedGroupJoiner) Join(ctx context.Context, userID int64, code string) (GroupMembership, error) {
+func (s *RateLimitedGroupJoiner) Join(ctx context.Context, userID int64, code string) (InviteRedemption, error) {
 	if s == nil || s.joiner == nil || s.limiter == nil {
-		return GroupMembership{}, ErrInvalidRateLimitConfig
+		return InviteRedemption{}, ErrInvalidRateLimitConfig
 	}
 	decision, err := s.limiter.Allow(groupInviteJoinAction, strconv.FormatInt(userID, 10))
 	if err != nil {
-		return GroupMembership{}, fmt.Errorf("allow group join: %w", err)
+		return InviteRedemption{}, fmt.Errorf("allow group join: %w", err)
 	}
 	if !decision.Allowed {
-		return GroupMembership{}, RateLimitError{RetryAfter: decision.RetryAfter}
+		return InviteRedemption{}, RateLimitError{RetryAfter: decision.RetryAfter}
 	}
 	return s.joiner.Join(ctx, userID, code)
 }

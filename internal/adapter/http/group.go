@@ -21,7 +21,6 @@ type GroupUseCases interface {
 	Overview(ctx context.Context, access *service.GroupAccess) (service.GroupOverview, error)
 	Group(ctx context.Context, access *service.GroupAccess) (service.Group, error)
 	UpdateSettings(ctx context.Context, actor service.GroupActor, expectedVersion int64, name, timeZone string) (service.Group, error)
-	RotateInvite(ctx context.Context, actor service.GroupActor) (string, error)
 	Leave(ctx context.Context, access *service.GroupAccess) error
 	Members(ctx context.Context, access *service.GroupAccess) ([]service.GroupMember, error)
 	AddRole(ctx context.Context, actor service.GroupActor, targetUserID, expectedVersion int64, role string) (service.GroupMembership, error)
@@ -37,7 +36,7 @@ type GroupAccessProvider interface {
 
 // JoinRateLimitedGroupJoiner is the rate-limited invite redemption operation.
 type JoinRateLimitedGroupJoiner interface {
-	Join(context.Context, int64, string) (service.GroupMembership, error)
+	Join(context.Context, int64, string) (service.InviteRedemption, error)
 }
 
 // Group page sections.
@@ -46,6 +45,8 @@ const (
 	groupSectionMembers  = "members"
 	groupSectionTeams    = "teams"
 	groupSectionTeam     = "team"
+	groupSectionInvites  = "invites"
+	groupSectionChildren = "children"
 	groupSectionSettings = "settings"
 )
 
@@ -94,6 +95,8 @@ type GroupDetailView struct {
 	Members    *GroupMembersView
 	Teams      *TeamsView
 	Team       *TeamDetailView
+	Invites    *InvitesView
+	Children   *ChildrenView
 }
 
 // GroupNavItem is one group section link.
@@ -108,8 +111,6 @@ type GroupNavItem struct {
 type GroupOverviewView struct {
 	MemberCount int
 	TimeZone    string
-	InviteCode  string
-	InviteURL   string
 	IsMember    bool
 	LeaveURL    string
 }
@@ -136,6 +137,7 @@ type GroupMemberView struct {
 	Email         string
 	IsSelf        bool
 	IsGuest       bool
+	IsProfile     bool
 	Version       int64
 	Roles         []RoleBadgeView
 	AddableRoles  []RoleOptionView
@@ -188,7 +190,6 @@ func registerGroupRoutes(mux *http.ServeMux, groups *groupHandler) {
 		mux.HandleFunc("GET "+prefix+"/groups/join", groups.join)
 		mux.HandleFunc("POST "+prefix+"/groups/join", groups.join)
 		mux.HandleFunc("GET "+prefix+"/groups/{id}", groups.overview)
-		mux.HandleFunc("POST "+prefix+"/groups/{id}/invite", groups.rotateInvite)
 		mux.HandleFunc("POST "+prefix+"/groups/{id}/leave", groups.leave)
 		mux.HandleFunc("GET "+prefix+"/groups/{id}/settings", groups.settingsPage)
 		mux.HandleFunc("POST "+prefix+"/groups/{id}/settings", groups.updateSettings)
@@ -198,6 +199,8 @@ func registerGroupRoutes(mux *http.ServeMux, groups *groupHandler) {
 		mux.HandleFunc("POST "+prefix+"/groups/{id}/members/{memberID}/remove", groups.removeMember)
 	}
 	registerTeamRoutes(mux, groups)
+	registerInviteRoutes(mux, groups)
+	registerChildRoutes(mux, groups)
 }
 
 func newGroupHandler(renderer *PageRenderer, dependencies Dependencies) *groupHandler {
@@ -223,7 +226,7 @@ func groupLabels(renderer *PageRenderer) map[locale.Code]map[string]string {
 	for _, language := range locale.Codes() {
 		values := make(map[string]string)
 		for _, id := range renderer.catalogs.Keys(language) {
-			if !strings.HasPrefix(id, "groups.") && !strings.HasPrefix(id, "teams.") {
+			if !strings.HasPrefix(id, "groups.") && !strings.HasPrefix(id, "teams.") && !strings.HasPrefix(id, "invites.") && !strings.HasPrefix(id, "children.") {
 				continue
 			}
 			if text, err := renderer.catalogs.Translate(language, id, nil); err == nil {
@@ -301,25 +304,39 @@ func (h *groupHandler) join(writer http.ResponseWriter, request *http.Request) {
 		h.renderError(writer, request, http.StatusInternalServerError)
 		return
 	}
-	membership, err := h.dependencies.JoinGroup.Join(request.Context(), user.ID, code)
+	redemption, err := h.dependencies.JoinGroup.Join(request.Context(), user.ID, code)
 	if err != nil {
 		form := FormData{Submitted: true, Values: map[string]string{"code": code}}
 		message := "groups.error.generic"
 		status := http.StatusUnprocessableEntity
 		switch {
 		case errors.Is(err, service.ErrGroupInviteNotFound):
-			form.Errors = []FieldError{{Field: "code", Message: h.t(language, "groups.error.invalid_code")}}
 			message = "groups.error.invalid_code"
+		case errors.Is(err, service.ErrInviteExpired):
+			message = "invites.error.expired"
+		case errors.Is(err, service.ErrInviteUsedUp):
+			message = "invites.error.used_up"
+		case errors.Is(err, service.ErrInviteRevoked):
+			message = "invites.error.revoked"
+		case errors.Is(err, service.ErrRoleNeedsAccount):
+			message = "invites.error.needs_account"
 		case errors.Is(err, service.ErrMembershipExists):
 			message = "groups.error.already_member"
 		case errors.Is(err, service.ErrRateLimited):
 			message = "groups.error.rate_limited"
 			status = http.StatusTooManyRequests
 		}
+		if status == http.StatusUnprocessableEntity && message != "groups.error.generic" {
+			form.Errors = []FieldError{{Field: "code", Message: h.t(language, message)}}
+		}
 		h.renderGroups(writer, request, language, user, nil, form, []Alert{{Level: "error", Message: h.t(language, message)}}, status, false)
 		return
 	}
-	h.redirectLocalized(writer, request, language, "/groups/"+strconv.FormatInt(membership.GroupID, 10))
+	route := "/groups/" + strconv.FormatInt(redemption.Membership.GroupID, 10)
+	if redemption.TeamID > 0 {
+		route += "/teams/" + strconv.FormatInt(redemption.TeamID, 10)
+	}
+	h.redirectLocalized(writer, request, language, route)
 }
 
 func (h *groupHandler) overview(writer http.ResponseWriter, request *http.Request) {
@@ -367,18 +384,6 @@ func (h *groupHandler) updateSettings(writer http.ResponseWriter, request *http.
 		return
 	}
 	h.renderSection(writer, request, current, groupSectionSettings, 0, FormData{}, []Alert{{Level: "success", Message: h.t(current.language, "groups.settings.saved")}}, http.StatusOK)
-}
-
-func (h *groupHandler) rotateInvite(writer http.ResponseWriter, request *http.Request) {
-	current, ok := h.groupRequest(writer, request)
-	if !ok {
-		return
-	}
-	if _, err := h.dependencies.Groups.RotateInvite(request.Context(), current.actor()); err != nil {
-		h.renderWriteError(writer, request, current, groupSectionOverview, 0, err, FormData{})
-		return
-	}
-	h.renderSection(writer, request, current, groupSectionOverview, 0, FormData{}, []Alert{{Level: "success", Message: h.t(current.language, "groups.invite.rotated")}}, http.StatusOK)
 }
 
 func (h *groupHandler) leave(writer http.ResponseWriter, request *http.Request) {
@@ -529,6 +534,24 @@ func (h *groupHandler) renderWriteError(writer http.ResponseWriter, request *htt
 		message = "teams.error.invalid_description"
 	case errors.Is(err, service.ErrRosterRoleMissing):
 		message = "teams.error.roster_role_missing"
+	case errors.Is(err, service.ErrGroupInviteNotFound):
+		message, status = "invites.error.not_found", http.StatusNotFound
+	case errors.Is(err, service.ErrInvalidInvite):
+		message = "invites.error.invalid"
+	case errors.Is(err, service.ErrProfileNotFound):
+		message, status = "children.error.not_found", http.StatusNotFound
+	case errors.Is(err, service.ErrGuardianNotFound):
+		message, status = "children.error.link_not_found", http.StatusNotFound
+	case errors.Is(err, service.ErrInvalidProfileName):
+		message = "children.error.invalid_name"
+	case errors.Is(err, service.ErrInvalidProfileBirthYear):
+		message = "children.error.invalid_birth_year"
+	case errors.Is(err, service.ErrGuardianNeedsParentRole):
+		message = "children.error.parent_role"
+	case errors.Is(err, service.ErrInvalidGuardian):
+		message = "children.error.invalid_link"
+	case errors.Is(err, service.ErrProfileMembership):
+		message = "children.error.remove_profile"
 	case errors.Is(err, service.ErrInvalidGroup):
 		message = "groups.error.generic"
 	default:
@@ -558,8 +581,6 @@ func (h *groupHandler) renderSection(writer http.ResponseWriter, request *http.R
 		view.Overview = &GroupOverviewView{
 			MemberCount: overview.MemberCount,
 			TimeZone:    overview.Group.TimeZone,
-			InviteCode:  overview.InviteCode,
-			InviteURL:   h.groupPath(current.language, group.ID, "/invite"),
 			IsMember:    current.access.IsMember(),
 			LeaveURL:    h.groupPath(current.language, group.ID, "/leave"),
 		}
@@ -590,6 +611,14 @@ func (h *groupHandler) renderSection(writer http.ResponseWriter, request *http.R
 		if !h.loadTeam(writer, request, current, group.ID, teamID, form, view) {
 			return
 		}
+	case groupSectionInvites:
+		if !h.loadInvites(writer, request, current, group, form, view) {
+			return
+		}
+	case groupSectionChildren:
+		if !h.loadChildren(writer, request, current, group.ID, form, view) {
+			return
+		}
 	}
 	h.renderGroupPage(writer, request, current, view, form, alerts, status)
 }
@@ -617,6 +646,12 @@ func (h *groupHandler) groupShell(current groupRequest, group service.Group, sec
 		{groupSectionMembers, "groups.nav.members", "/members"},
 		{groupSectionTeams, "groups.nav.teams", "/teams"},
 	}
+	if current.access.CanViewChildren() {
+		items = append(items, struct{ id, label, route string }{groupSectionChildren, "groups.nav.children", "/children"})
+	}
+	if current.access.CanManageInvites() {
+		items = append(items, struct{ id, label, route string }{groupSectionInvites, "groups.nav.invites", "/invites"})
+	}
 	if current.access.CanManageGroup() {
 		items = append(items, struct{ id, label, route string }{groupSectionSettings, "groups.nav.settings", "/settings"})
 	}
@@ -638,6 +673,7 @@ func (h *groupHandler) membersView(current groupRequest, groupID int64, members 
 			Label:         h.memberLabel(language, member.UserID, member.DisplayName, member.Username, member.Email),
 			IsSelf:        member.UserID == access.UserID(),
 			IsGuest:       member.Kind == service.UserKindGuest,
+			IsProfile:     member.Kind == service.UserKindProfile,
 			Version:       member.Version,
 			AddRoleURL:    base + "/roles/add",
 			RemoveRoleURL: base + "/roles/remove",
@@ -656,9 +692,13 @@ func (h *groupHandler) membersView(current groupRequest, groupID int64, members 
 			if service.GroupRoleNeedsAccount(role) && member.Kind != service.UserKindAccount {
 				continue
 			}
+			if member.Kind == service.UserKindProfile && role != service.GroupRolePlayer {
+				continue
+			}
 			row.AddableRoles = append(row.AddableRoles, RoleOptionView{Role: role, Label: h.roleLabel(language, role)})
 		}
-		row.CanRemove = !row.IsSelf && access.CanRemoveMember() && (!member.HasRole(service.GroupRoleAdmin) || access.CanManageRole(service.GroupRoleAdmin))
+		// Child profiles are deleted on the children page, not removed.
+		row.CanRemove = !row.IsSelf && !row.IsProfile && access.CanRemoveMember() && (!member.HasRole(service.GroupRoleAdmin) || access.CanManageRole(service.GroupRoleAdmin))
 		view.Members = append(view.Members, row)
 	}
 	return view

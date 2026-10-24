@@ -18,9 +18,9 @@ func memberWith(roles ...string) GroupAccessGrants {
 
 func TestGroupAccessPerRole(t *testing.T) {
 	type answers struct {
-		manageGroup, manageAdmin, manageCoach, rotateInvite, removeMember bool
-		allMembers, createTeam, editTeam, seesAllTeams, rosterTeam1       bool
-		viewTeam1, viewTeam2, emailsTeam1                                 bool
+		manageGroup, manageAdmin, manageCoach, groupInvite, removeMember bool
+		allMembers, createTeam, editTeam, seesAllTeams, rosterTeam1      bool
+		viewTeam1, viewTeam2, emailsTeam1                                bool
 	}
 	ownTeam1 := []TeamRole{{TeamID: 1, Role: GroupRolePlayer}}
 	tests := []struct {
@@ -91,7 +91,7 @@ func TestGroupAccessPerRole(t *testing.T) {
 				manageGroup:  access.CanManageGroup(),
 				manageAdmin:  access.CanManageRole(GroupRoleAdmin),
 				manageCoach:  access.CanManageRole(GroupRoleCoach),
-				rotateInvite: access.CanRotateInvite(),
+				groupInvite:  access.CanCreateInvite(GroupRolePlayer, 0),
 				removeMember: access.CanRemoveMember(),
 				allMembers:   access.CanViewAllMembers(),
 				createTeam:   access.CanCreateTeam(),
@@ -187,6 +187,17 @@ func (s *teamRelationStub) TeamIDs(context.Context, int64, int64) ([]int64, erro
 	return s.ids, s.err
 }
 
+// childRelationStub is a guardian source: children and their teams.
+type childRelationStub struct {
+	teamRelationStub
+	children    []int64
+	childrenErr error
+}
+
+func (s *childRelationStub) ChildUserIDs(context.Context, int64, int64) ([]int64, error) {
+	return s.children, s.childrenErr
+}
+
 func TestGroupAccessServiceFor(t *testing.T) {
 	errBoom := errors.New("boom")
 	tests := []struct {
@@ -269,7 +280,7 @@ func TestGroupAccessServiceExtensionSources(t *testing.T) {
 		t.Fatalf("NewGroupAccessService() error = %v", err)
 	}
 	coached := &teamRelationStub{ids: []int64{8}}
-	children := &teamRelationStub{ids: []int64{9}}
+	children := &childRelationStub{teamRelationStub: teamRelationStub{ids: []int64{9}}, children: []int64{30}}
 	service.SetCoachedTeams(coached)
 	service.SetChildTeams(children)
 	access, err := service.For(context.Background(), 7, 5)
@@ -279,6 +290,25 @@ func TestGroupAccessServiceExtensionSources(t *testing.T) {
 	if !access.CoachesTeam(8) || !access.CanManageRoster(8) || !access.CanViewTeam(9) || access.CanManageRoster(9) {
 		t.Fatalf("extension grants not applied: %+v", access)
 	}
+	if !access.IsGuardianOf(30) || access.IsGuardianOf(31) || !slices.Equal(access.ChildUserIDs(), []int64{30}) || access.CanViewTeamEmails(9) {
+		t.Fatalf("child grants = %v, want child 30 without team emails", access.ChildUserIDs())
+	}
+	if !slices.Equal(access.VisibleTeamIDs(), []int64{8, 9}) {
+		t.Fatalf("VisibleTeamIDs() = %v, want coached and child teams", access.VisibleTeamIDs())
+	}
+
+	// Without children the team source is not asked.
+	children.children, children.calls = nil, 0
+	if access, err := service.For(context.Background(), 7, 5); err != nil || access.CanViewTeam(9) || children.calls != 0 {
+		t.Fatalf("childless For() = %v (team calls %d), want no child teams", err, children.calls)
+	}
+	children.children = []int64{30}
+
+	children.childrenErr = errors.New("boom")
+	if _, err := service.For(context.Background(), 7, 5); err == nil {
+		t.Fatal("For() error = nil, want the child source failure")
+	}
+	children.childrenErr = nil
 
 	// A member without the coach role is never asked for coached teams.
 	repository.access.Roles = []string{GroupRolePlayer}

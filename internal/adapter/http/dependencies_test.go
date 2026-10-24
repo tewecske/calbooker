@@ -92,6 +92,28 @@ func TestSessionAuthenticatorReturnsSafePrincipal(t *testing.T) {
 	}
 }
 
+func TestSessionAuthenticatorNeverHonorsAProfileSession(t *testing.T) {
+	cookie := testSessionCookie(t)
+	request := httptest.NewRequest(http.MethodGet, "/en/", nil)
+	request.Header.Set("Cookie", "calbooker_session=opaque-session")
+	authenticator, err := NewSessionAuthenticator(
+		testUserFinder{user: service.User{ID: 20, Kind: service.UserKindProfile}},
+		testSessionLookup{session: service.Session{ID: "opaque-session", UserID: 20, CreatedAt: 1, ExpiresAt: time.Now().Add(time.Hour).Unix()}},
+		cookie,
+	)
+	if err != nil {
+		t.Fatalf("NewSessionAuthenticator() error = %v", err)
+	}
+	if _, err := authenticator.Authenticate(context.Background(), request); !errors.Is(err, middleware.ErrUnauthenticated) {
+		t.Fatalf("profile session error = %v, want unauthenticated", err)
+	}
+	// The same session for a guest authenticates, so the kind decided it.
+	authenticator.users = testUserFinder{user: service.User{ID: 20, Kind: service.UserKindGuest}}
+	if _, err := authenticator.Authenticate(context.Background(), request); err != nil {
+		t.Fatalf("guest session error = %v, want nil", err)
+	}
+}
+
 type requestResponseWriter struct{ header http.Header }
 
 func (w requestResponseWriter) Header() http.Header       { return w.header }

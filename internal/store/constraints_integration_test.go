@@ -39,11 +39,16 @@ func seedConstraintGroup(t *testing.T, db *sql.DB, invite string, owner int64) i
 	t.Helper()
 	var id int64
 	if err := db.QueryRowContext(context.Background(), `
-		INSERT INTO groups (name, name_norm, invite_code, created_by, created_at)
-		VALUES ($1, $2, $3, $4, 100)
+		INSERT INTO groups (name, name_norm, created_by, created_at)
+		VALUES ($1, $2, $3, 100)
 		RETURNING id
-	`, "Group "+invite, "group "+invite, invite, owner).Scan(&id); err != nil {
+	`, "Group "+invite, "group "+invite, owner).Scan(&id); err != nil {
 		t.Fatalf("insert group %s: %v", invite, err)
+	}
+	if _, err := db.ExecContext(context.Background(), `
+		INSERT INTO group_invites (group_id, code, role, created_by, created_at) VALUES ($1, $2, 'player', $3, 100)
+	`, id, invite, owner); err != nil {
+		t.Fatalf("insert invite %s: %v", invite, err)
 	}
 	return id
 }
@@ -89,8 +94,8 @@ func TestSchemaUniqueConstraintsRejectDuplicates(t *testing.T) {
 		},
 		{
 			name:      "duplicate group invite code",
-			statement: "INSERT INTO groups (name, name_norm, invite_code, created_at) VALUES ('Duplicate', 'duplicate', $1, 100)",
-			args:      []any{"invite-unique-a"},
+			statement: "INSERT INTO group_invites (group_id, code, role, created_at) VALUES ($1, $2, 'player', 100)",
+			args:      []any{groupA, "invite-unique-a"},
 		},
 		{
 			name:      "duplicate oauth state",
@@ -173,7 +178,7 @@ func TestSchemaForeignKeysRejectOrphans(t *testing.T) {
 		{name: "identity owner", statement: "INSERT INTO oauth_identities (user_id, provider, subject, created_at) VALUES (9000000, 'example', 'orphan-subject', 100)"},
 		{name: "guest claim owner", statement: "INSERT INTO guest_claim_codes (user_id, code, created_at) VALUES (9000000, 'orphan-claim', 100)"},
 		{name: "oauth state owner", statement: "INSERT INTO oauth_states (state, provider, action, user_id, created_at, expires_at) VALUES ('orphan-state', 'google', 'link', 9000000, 100, 200)"},
-		{name: "group creator", statement: "INSERT INTO groups (name, name_norm, invite_code, created_by, created_at) VALUES ('Orphan', 'orphan', 'invite-orphan', 9000000, 100)"},
+		{name: "group creator", statement: "INSERT INTO groups (name, name_norm, created_by, created_at) VALUES ('Orphan', 'orphan', 9000000, 100)"},
 		{name: "audit actor", statement: "INSERT INTO audit_log (occurred_at, actor_user_id, actor_email, action) VALUES (100, 9000000, 'orphan@example.test', 'account.delete')"},
 		{name: "usage actor", statement: "INSERT INTO usage_events (created_at, method, route, status, user_id) VALUES (100, 'GET', '/healthz', 200, 9000000)"},
 	}

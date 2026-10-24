@@ -23,6 +23,7 @@
     "teams.roster.remove": {"text": "Eltávolítás"},
     "teams.roster.added": {"text": "Hozzáadva a csapathoz."},
     "teams.roster.removed": {"text": "Eltávolítva a csapatból."},
+    "teams.roster.parent_of": {"text": "Szülője:"},
     "teams.edit": {"text": "Csapat szerkesztése"},
     "teams.save": {"text": "Csapat mentése"},
     "teams.saved": {"text": "A csapat elmentve."},

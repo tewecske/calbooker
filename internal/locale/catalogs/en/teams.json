@@ -23,6 +23,7 @@
     "teams.roster.remove": {"text": "Remove"},
     "teams.roster.added": {"text": "Added to the team."},
     "teams.roster.removed": {"text": "Removed from the team."},
+    "teams.roster.parent_of": {"text": "Parent of"},
     "teams.edit": {"text": "Edit team"},
     "teams.save": {"text": "Save team"},
     "teams.saved": {"text": "Team saved."},

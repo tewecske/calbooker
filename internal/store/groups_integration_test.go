@@ -26,8 +26,8 @@ func TestGroupsAndMembershipsSchema(t *testing.T) {
 		t.Fatalf("insert user: %v", err)
 	}
 	if err := harness.DB.QueryRowContext(ctx, `
-		INSERT INTO groups (name, name_norm, invite_code, created_by, created_at)
-		VALUES ('Example Group', 'example group', 'invite-1', $1, 100)
+		INSERT INTO groups (name, name_norm, created_by, created_at)
+		VALUES ('Example Group', 'example group', $1, 100)
 		RETURNING id
 	`, userID).Scan(&groupID); err != nil {
 		t.Fatalf("insert group: %v", err)
@@ -66,9 +66,13 @@ func TestGroupsAndMembershipsSchema(t *testing.T) {
 		t.Fatal("empty time zone was accepted")
 	}
 	if _, err := harness.DB.ExecContext(ctx, `
-		INSERT INTO groups (name, name_norm, invite_code, created_at)
-		VALUES ('Other Group', 'other group', 'invite-1', 102)
-	`); err == nil {
+		INSERT INTO group_invites (group_id, code, role, created_at) VALUES ($1, 'invite-1', 'player', 102)
+	`, groupID); err != nil {
+		t.Fatalf("insert invite: %v", err)
+	}
+	if _, err := harness.DB.ExecContext(ctx, `
+		INSERT INTO group_invites (group_id, code, role, created_at) VALUES ($1, 'invite-1', 'coach', 103)
+	`, groupID); err == nil {
 		t.Fatal("duplicate invite code was accepted")
 	}
 }

@@ -43,6 +43,31 @@ Refinements made in #2 (confirmed by the owner on 2026-10-24):
 - A member may hold no roles; such a member sees only the group overview.
 - New groups default to the `Europe/Budapest` time zone.
 
+Refinements made in #3 (open for the owner to confirm):
+
+- The single group invite code is gone (`groups.invite_code` dropped in
+  migration 000004; existing codes became player invites). A new group has no
+  invite until staff create one on the Invites page.
+- Joining with a code as an existing member adds the code's role (and team);
+  if the member already has both, nothing changes and no use is counted.
+- Invites stay valid until revoked, expired, or used up, even if their
+  creator later loses the role that allowed them. Team invites carry only the
+  player or parent role. Coaches see and revoke only the player and parent
+  invites of teams they coach; managers see every invite but admin invites.
+- Codes are stored in clear (staff can share them again); audit entries name
+  an invite by ID only.
+- A child profile belongs to one group (`child_profiles.group_id`) and holds
+  only the player role there; a child in two clubs gets two profiles.
+  Profiles are created by admins, managers, and parents (a parent's profile
+  is linked to them), not by coaches. Profiles are deleted, not removed as
+  members; nothing deletes them automatically.
+- Only staff link a parent to an existing member account or unlink parents;
+  a guardian needs the parent role, and losing it removes the link.
+- Linked parents appear on their children's team rosters as parents. This is
+  derived from `guardians` at read time, not stored in `team_members`, and
+  such entries are removed by unlinking.
+- Audit entries name profiles by ID, never by the child's name or birth year.
+
 ## Data model
 
 All tables carry `group_id` (directly or through their parent) so every query
@@ -56,10 +81,11 @@ users (+ kind: 'account' | 'guest' | 'profile')    profiles never sign in, are n
 groups (+ time_zone)
 group_members (group_id, user_id)
 group_member_roles (group_id, user_id, role)        several rows per member
-group_invites (group_id, code, role, team_id?, expires_at?, max_uses?, uses, created_by)
+group_invites (group_id, code, role, team_id?, expires_at?, max_uses?, uses, created_by, revoked_at?)
 teams (group_id, name, birth_year_from, birth_year_to, description?, archived_at?)
 team_members (team_id, user_id, role: player | parent)
-guardians (group_id, parent_user_id, child_user_id)
+child_profiles (user_id, group_id, birth_year, created_by, version)   the users row has kind 'profile'
+guardians (group_id, parent_user_id, child_user_id)  parent needs the parent role; linked parents are derived onto rosters
 resources (group_id, name, kind, description?, max_concurrent_teams?, archived_at?)
 seasons (group_id, name, starts_on, ends_on)
 season_parts (season_id, name, starts_on, ends_on, alternating_weeks bool)

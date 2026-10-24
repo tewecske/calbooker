@@ -26,15 +26,15 @@ func TestDeletionRulesPreserveHistoryAndCascadeOwnedRows(t *testing.T) {
 		t.Fatalf("insert owner: %v", err)
 	}
 	if err := harness.DB.QueryRowContext(ctx, `
-		INSERT INTO groups (name, name_norm, invite_code, created_by, created_at)
-		VALUES ('Owned Group', 'owned group', 'invite-owned', $1, 100)
+		INSERT INTO groups (name, name_norm, created_by, created_at)
+		VALUES ('Owned Group', 'owned group', $1, 100)
 		RETURNING id
 	`, userID).Scan(&groupID); err != nil {
 		t.Fatalf("insert owned group: %v", err)
 	}
 	if err := harness.DB.QueryRowContext(ctx, `
-		INSERT INTO groups (name, name_norm, invite_code, created_by, created_at)
-		VALUES ('Deleted Group', 'deleted group', 'invite-deleted', $1, 100)
+		INSERT INTO groups (name, name_norm, created_by, created_at)
+		VALUES ('Deleted Group', 'deleted group', $1, 100)
 		RETURNING id
 	`, userID).Scan(&groupToDeleteID); err != nil {
 		t.Fatalf("insert group to delete: %v", err)

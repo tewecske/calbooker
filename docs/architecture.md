@@ -117,8 +117,11 @@ get `service.ErrGroupNotFound`, which handlers render as 404.
   `CanViewQualification(id)`, `CanViewAvailability(id)`, and
   `CanEditAvailability(id)` (staff, and the coach themself),
   `CanViewAllAvailability` (staff), `CanManagePlan` (admins, managers, site
-  administrators), `CanViewPlan` (those plus coaches). Add a question here
-  rather than checking roles in a handler.
+  administrators), `CanViewPlan` (those plus coaches),
+  `CanRespondFor(event, userID)` (a player for themself, a linked parent for
+  a child), `CanManageParticipants(event, teamCoachIDs)` (staff and the
+  event's coaches), `CanNominate`, and `CanRecordAttendance`. Add a question
+  here rather than checking roles in a handler.
 - Extension points: `GroupAccessService.SetCoachedTeams(source)` takes a
   `TeamRelationSource.TeamIDs(ctx, groupID, userID)`; `service.SeasonService`
   implements it from `season_team_coaches` of the group's current season and
@@ -293,6 +296,40 @@ get `service.ErrGroupNotFound`, which handlers render as 404.
   `/{language}/groups/{id}/events/{eventID}` with `POST .../cancel` and
   `.../delete` (`event.go`, `events.html`, catalogs `events.json`). Every
   member has the Events tab and sees the events visible to them.
+- Deleting an event with participant rows is refused
+  (`ErrEventHasParticipants`); `DeleteEvent` locks the event row and checks
+  in the same transaction.
+
+## Sign-up and attendance
+
+- `ParticipationService` (`internal/service/participation.go`, store
+  `internal/store/postgres/participants.go`, migration 000010) owns
+  `event_participants (group_id, event_id, user_id, status, attended,
+  updated_by, updated_at)`: status `signed_up`, `declined`, `nominated`, or
+  NULL for a walk-in; `attended` NULL until confirmed. The event is
+  referenced as `(group_id, event_id)` to `events` and the member as
+  `(group_id, user_id)` to `group_members`, both cascading.
+- Use cases: `Roster(access, EventDetail)` (the event's team players plus
+  everyone with a row, each with the answers the account may give now,
+  `Taken`/`Limit`, the phase `open`/`closed`/`started`/`ended`/`cancelled`,
+  emails only for those who manage participants, and walk-in candidates once
+  attendance is open); `Respond(actor, eventID, userID, status)` (status ""
+  removes; rules in `checkParticipation`); `RecordAttendance(actor, eventID,
+  marks)`; `ConfirmedAttendance(access, from, to)` for statistics (#11):
+  `[]AttendanceRecord{EventID, TeamIDs, UserID, StartsAt}` of non-cancelled
+  events starting in `[from, to)`, all for staff, otherwise only events of
+  the teams the account sees.
+- Concurrency: `ChangeParticipant` and `RecordAttendance` lock the event row
+  (`SELECT ... FOR UPDATE`), read the member's row and the places taken, and
+  let the service decide (`ParticipantDecision`) inside the transaction, so
+  two players cannot both take the last place.
+- Pages: the participants card on the event page (`templates/participants.html`,
+  catalogs `participation.json`) with `POST
+  /{language}/groups/{id}/events/{eventID}/participation` (`user_id`,
+  `status`: an answer or `none`) and `.../attendance` (`listed`, `attended`,
+  optional `walk_in`) in `internal/adapter/http/participation.go`. Both
+  re-render the event page (HTMX: the fragment with out-of-band alerts;
+  refusals 422).
 ## Coaches
 
 - `CoachService` (`internal/service/coach.go`, `availability.go`, store

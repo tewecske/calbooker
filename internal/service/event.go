@@ -318,7 +318,8 @@ type EventRepository interface {
 	// UpdateEvent writes the event, its teams, and its coaches at the
 	// expected revision; stale writes classify through ClassifyStaleWrite.
 	UpdateEvent(ctx context.Context, event Event, expectedVersion int64) (Event, error)
-	// DeleteEvent removes the event at the expected revision.
+	// DeleteEvent removes the event at the expected revision; an event with
+	// participant rows is ErrEventHasParticipants.
 	DeleteEvent(ctx context.Context, groupID, eventID, expectedVersion int64) error
 	// TeamCoachesOn returns the season coaches of every team in the season
 	// containing day (TeamID set), none when no season contains it.
@@ -600,7 +601,8 @@ func (s *EventService) SetCancelled(ctx context.Context, actor GroupActor, event
 }
 
 // Delete removes an event at the expected revision with its teams and
-// extra coaches.
+// extra coaches. An event with participants (any answer or attendance) is
+// refused with ErrEventHasParticipants; cancel it instead.
 func (s *EventService) Delete(ctx context.Context, actor GroupActor, eventID, expectedVersion int64) error {
 	event, err := s.findEditable(ctx, actor, eventID, expectedVersion)
 	if err != nil {
@@ -611,7 +613,7 @@ func (s *EventService) Delete(ctx context.Context, actor GroupActor, eventID, ex
 	case err == nil:
 	case errors.Is(err, ErrRecordNotFound), errors.Is(err, ErrEventNotFound):
 		return ErrEventNotFound
-	case errors.Is(err, ErrOptimisticLockConflict):
+	case errors.Is(err, ErrOptimisticLockConflict), errors.Is(err, ErrEventHasParticipants):
 		return err
 	default:
 		return fmt.Errorf("delete event: %w", err)

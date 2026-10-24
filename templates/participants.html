@@ -1,0 +1,99 @@
+{{define "participant-status-badge"}}<span class="badge badge-soft badge-sm{{if eq .Status "signed_up"}} badge-success{{else if eq .Status "nominated"}} badge-info{{else if eq .Status "declined"}} badge-error{{end}}" data-testid="participant-status">{{.StatusLabel}}</span>{{end}}
+
+{{define "event-participation"}}
+  {{with .Group}}{{$L := .L}}{{with .Event}}{{with .Participation}}{{$respond := .RespondURL}}
+    <section class="card card-border bg-base-100 shadow-sm" aria-labelledby="participation-heading" data-testid="participation" data-phase="{{.Phase}}">
+      <div class="card-body">
+        <h2 id="participation-heading" class="card-title flex-wrap">{{$L.participation_heading}} <span class="badge badge-soft" data-testid="participation-summary">{{.Summary}}</span></h2>
+        <p class="text-sm opacity-70" data-testid="participation-phase">{{.PhaseLabel}}</p>
+        {{if .Entries}}
+          <div class="overflow-x-auto">
+            <table class="table" data-testid="participants">
+              <thead>
+                <tr>
+                  <th scope="col">{{$L.participation_player}}</th>
+                  {{if .ShowEmails}}<th scope="col">{{$L.participation_email}}</th>{{end}}
+                  <th scope="col">{{$L.participation_answer}}</th>
+                  <th scope="col">{{$L.participation_attendance}}</th>
+                  <th scope="col">{{$L.participation_actions}}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {{range .Entries}}{{$uid := .UserID}}
+                  <tr data-testid="participant-{{.UserID}}" data-participant-id="{{.UserID}}" data-status="{{.Status}}"{{with .Attendance}} data-attended="{{.}}"{{end}}>
+                    <td>
+                      <span data-testid="participant-name">{{.Label}}</span>
+                      {{if .Self}} <span class="badge badge-primary badge-soft badge-xs">{{$L.participation_you}}</span>{{end}}
+                      {{if .Child}} <span class="badge badge-secondary badge-soft badge-xs">{{$L.participation_your_child}}</span>{{end}}
+                      {{if .Guest}} <span class="badge badge-ghost badge-xs">{{$L.participation_guest}}</span>{{end}}
+                      {{if .Profile}} <span class="badge badge-ghost badge-xs">{{$L.participation_profile}}</span>{{end}}
+                      {{if not .OnEventTeam}} <span class="badge badge-ghost badge-xs">{{$L.participation_other_team}}</span>{{end}}
+                    </td>
+                    {{if $.Group.Event.Participation.ShowEmails}}<td>{{.Email}}</td>{{end}}
+                    <td>{{template "participant-status-badge" .}}</td>
+                    <td data-testid="participant-attendance">{{if eq .Attendance "yes"}}<span class="badge badge-success badge-soft badge-sm">{{$L.participation_attended_yes}}</span>{{else if eq .Attendance "no"}}<span class="badge badge-warning badge-soft badge-sm">{{$L.participation_attended_no}}</span>{{end}}</td>
+                    <td>
+                      {{if or .Choices .CanRemove}}
+                        <div class="flex flex-wrap gap-2">
+                          {{range .Choices}}
+                            <form method="post" action="{{$respond}}" hx-post="{{$respond}}" hx-target="#page-content" hx-swap="outerHTML" hx-disabled-elt="this">
+                              <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
+                              <input type="hidden" name="user_id" value="{{$uid}}">
+                              <input type="hidden" name="status" value="{{.Status}}">
+                              <button class="btn btn-sm{{if .Primary}} btn-primary{{else}} btn-outline{{end}}" type="submit" aria-label="{{.AriaLabel}}" data-choice="{{.Status}}">{{.Label}}</button>
+                            </form>
+                          {{end}}
+                          {{if .CanRemove}}
+                            <form method="post" action="{{$respond}}" hx-post="{{$respond}}" hx-target="#page-content" hx-swap="outerHTML" hx-disabled-elt="this">
+                              <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
+                              <input type="hidden" name="user_id" value="{{$uid}}">
+                              <input type="hidden" name="status" value="none">
+                              <button class="btn btn-sm btn-ghost" type="submit" aria-label="{{.RemoveLabel}} – {{.Label}}" data-choice="none">{{.RemoveLabel}}</button>
+                            </form>
+                          {{end}}
+                        </div>
+                      {{end}}
+                    </td>
+                  </tr>
+                {{end}}
+              </tbody>
+            </table>
+          </div>
+        {{else}}
+          <p class="text-sm opacity-70" data-testid="participation-empty">{{$L.participation_empty}}</p>
+        {{end}}
+
+        {{if .AttendanceOpen}}
+          <div class="divider"></div>
+          <form class="grid gap-4" method="post" action="{{.AttendanceURL}}" hx-post="{{.AttendanceURL}}" hx-target="#page-content" hx-swap="outerHTML" hx-disabled-elt="this" data-testid="attendance-form">
+            <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
+            <fieldset class="fieldset rounded-box border border-base-300 p-4">
+              <legend class="fieldset-legend">{{$L.participation_attendance_heading}}</legend>
+              <p class="label whitespace-normal">{{$L.participation_attendance_help}}</p>
+              {{if .AttendanceRecorded}}<p class="text-sm opacity-70" data-testid="attendance-recorded">{{$L.participation_attendance_recorded}}</p>{{end}}
+              {{if .Entries}}
+                <div class="grid gap-2 sm:grid-cols-2">
+                  {{range .Entries}}
+                    <input type="hidden" name="listed" value="{{.UserID}}">
+                    <label class="label cursor-pointer justify-start gap-3" for="attended-{{.UserID}}">
+                      <input id="attended-{{.UserID}}" class="checkbox" type="checkbox" name="attended" value="{{.UserID}}"{{if .AttendanceChecked}} checked{{end}}>
+                      <span>{{.Label}}</span>
+                    </label>
+                  {{end}}
+                </div>
+              {{end}}
+              {{if .WalkIns}}
+                <label class="label" for="attendance-walk-in">{{$L.participation_walk_in}}</label>
+                <select id="attendance-walk-in" class="select w-full sm:max-w-xs" name="walk_in">
+                  <option value="">{{$L.participation_walk_in_none}}</option>
+                  {{range .WalkIns}}<option value="{{.Value}}">{{.Label}}</option>{{end}}
+                </select>
+              {{end}}
+            </fieldset>
+            <div><button class="btn btn-primary" type="submit">{{$L.participation_attendance_save}}</button></div>
+          </form>
+        {{end}}
+      </div>
+    </section>
+  {{end}}{{end}}{{end}}
+{{end}}

@@ -216,6 +216,7 @@ func registerGroupRoutes(mux *http.ServeMux, groups *groupHandler) {
 	registerEventRoutes(mux, groups)
 	registerCoachRoutes(mux, groups)
 	registerPlanRoutes(mux, groups)
+	registerParticipationRoutes(mux, groups)
 }
 
 func newGroupHandler(renderer *PageRenderer, dependencies Dependencies) *groupHandler {
@@ -241,7 +242,7 @@ func groupLabels(renderer *PageRenderer) map[locale.Code]map[string]string {
 	for _, language := range locale.Codes() {
 		values := make(map[string]string)
 		for _, id := range renderer.catalogs.Keys(language) {
-			if !strings.HasPrefix(id, "groups.") && !strings.HasPrefix(id, "teams.") && !strings.HasPrefix(id, "invites.") && !strings.HasPrefix(id, "children.") && !strings.HasPrefix(id, "resources.") && !strings.HasPrefix(id, "seasons.") && !strings.HasPrefix(id, "events.") && !strings.HasPrefix(id, "coaches.") && !strings.HasPrefix(id, "plan.") {
+			if !strings.HasPrefix(id, "groups.") && !strings.HasPrefix(id, "teams.") && !strings.HasPrefix(id, "invites.") && !strings.HasPrefix(id, "children.") && !strings.HasPrefix(id, "resources.") && !strings.HasPrefix(id, "seasons.") && !strings.HasPrefix(id, "events.") && !strings.HasPrefix(id, "coaches.") && !strings.HasPrefix(id, "plan.") && !strings.HasPrefix(id, "participation.") {
 				continue
 			}
 			if text, err := renderer.catalogs.Translate(language, id, nil); err == nil {
@@ -576,6 +577,8 @@ func (h *groupHandler) renderWriteError(writer http.ResponseWriter, request *htt
 		message = seasonErrorMessage(err)
 	case eventErrorMessage(err) != "":
 		message = eventErrorMessage(err)
+	case participationErrorMessage(err) != "":
+		message = participationErrorMessage(err)
 	case errors.Is(err, service.ErrInvalidGroup):
 		message = "groups.error.generic"
 	default:

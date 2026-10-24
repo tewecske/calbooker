@@ -140,8 +140,8 @@ Refinements made in #8 (open for the owner to confirm):
   teams in the season containing the event's first day.
 - Cancel is a soft state that can be reinstated; cancelled events stay
   listed and count for no warnings. Staff and the event's coaches may also
-  delete an event (until #9 adds participants; #9 decides whether events with
-  participants can be deleted). Cancelling or editing a generated event
+  delete an event, but not one with participants (#9: any answer or
+  attendance; cancel it instead). Cancelling or editing a generated event
   marks it edited by hand.
 - Audit entries name events by ID, title, kind, times, and team IDs
   (`group.event.*`), never by the location text.
@@ -202,6 +202,43 @@ Refinements made in #13 (open for the owner to confirm):
   with their resource ID, week, day, times, ages, and team limit
   (`group.plan.*`).
 
+Refinements made in #9 (open for the owner to confirm):
+
+- Participants are the players of the event's teams (`team_members` with the
+  player role: accounts, guests, and child profiles). Players answer for
+  themselves, linked parents for their children (profiles and child
+  accounts). Everyone who sees the event sees the list with display names and
+  answers; emails only for staff and the event's coaches.
+- "The event's coaches" who manage participants are staff (admins, managers,
+  site administrators), coaches of one of its teams this season, its extra
+  coaches, and the season coaches of its teams in the season of the event.
+  They change anyone's answer and record attendance; their changes to
+  someone else's row are audited (`group.event.participant_updated`,
+  `.participant_nominated`, `.participant_removed`,
+  `group.event.attendance_recorded`, naming members by ID). A player's or
+  parent's own answer is self-service and not audited.
+- `open` events: players and parents choose "I'll be there" or "Can't come"
+  and may switch. `nominated` events: coaches nominate (or mark not coming,
+  or remove); a nominated player or parent opts out, and may take the place
+  back ("I'll come after all") while sign-up is open and the limit allows.
+  Players do not sign themselves up for nominated events.
+- Signed up and nominated count against the limit; declined does not. At
+  the limit, players and parents cannot take a place; opting out and staff
+  and coach changes still work (staff may go over the limit). The limit is
+  enforced in the writing transaction with a row lock on the event.
+- After the deadline (from the deadline instant on) players and parents
+  cannot change their answer; staff and coaches can until the event starts.
+  From the start nobody changes answers. Cancelled events take no sign-up
+  changes and no attendance.
+- After the event ends, the event's coaches and staff confirm attendance on
+  a checklist prefilled from the answers (or the previous confirmation): a
+  ticked player attended, an unticked one did not. A walk-in can be any
+  member with the player role in the group, also from other teams; a walk-in
+  without an answer is stored with no status and removed again when
+  unticked. Attendance can be corrected later; before the end it is refused.
+- Rows are keyed by user ID, so a guest's answers survive the upgrade; a
+  member who leaves the group loses their rows.
+
 ## Data model
 
 All tables carry `group_id` (directly or through their parent) so every query
@@ -233,8 +270,8 @@ events (group_id, kind, title, starts_at, ends_at, resource_id?, location?, sign
         cancelled_at?, plan_training_id?, generated_for_week?, edited_at?, version)
 event_teams (event_id, team_id)
 event_coaches (event_id, coach_user_id)              extra coaches only
-event_participants (event_id, user_id, status: signed_up | declined | nominated,
-                    attended bool?, updated_by, updated_at)
+event_participants (group_id, event_id, user_id, status?: signed_up | declined | nominated,
+                    attended bool?, updated_by?, updated_at)   no status: a walk-in added at attendance
 ```
 
 Authorization lives in one service type, `GroupAccess` (built per request from

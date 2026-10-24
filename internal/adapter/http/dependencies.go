@@ -41,7 +41,9 @@ type Dependencies struct {
 	Events      EventUseCases
 	Coaches     CoachUseCases
 	Plan        PlanUseCases
-	JoinGroup   JoinRateLimitedGroupJoiner
+	// Participation is sign-up and attendance on event pages (#9).
+	Participation ParticipationUseCases
+	JoinGroup     JoinRateLimitedGroupJoiner
 
 	AdminAccounts       AdminAccountLister
 	AdminAccountEditor  AdminAccountEditor

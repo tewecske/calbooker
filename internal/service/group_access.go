@@ -387,6 +387,54 @@ func (a *GroupAccess) CanViewPlan() bool {
 	return a.CanManagePlan() || a.HasRole(GroupRoleCoach)
 }
 
+// CanRespondFor reports whether the account may give userID's own answer to
+// the event (#9): a player for themself, a linked parent for their child.
+// Whether userID plays on one of the event's teams is checked by the
+// participation service.
+func (a *GroupAccess) CanRespondFor(event Event, userID int64) bool {
+	if userID <= 0 || !a.CanViewEvent(event) {
+		return false
+	}
+	if userID == a.userID {
+		return a.HasRole(GroupRolePlayer)
+	}
+	return a.IsGuardianOf(userID)
+}
+
+// CanManageParticipants reports whether the account may change other
+// players' answers, nominate players, see participant emails, and record
+// attendance for the event: admins, managers, and site administrators, and
+// the event's coaches (coaches of one of its teams in the current season,
+// its extra coaches, and teamCoachIDs, the season coaches of its teams in
+// the season containing the event, from EventDetail.TeamCoaches).
+func (a *GroupAccess) CanManageParticipants(event Event, teamCoachIDs []int64) bool {
+	if !a.CanViewEvent(event) {
+		return false
+	}
+	if a.CanManageGroup() {
+		return true
+	}
+	if !a.HasRole(GroupRoleCoach) {
+		return false
+	}
+	if slices.ContainsFunc(event.TeamIDs(), a.CoachesTeam) {
+		return true
+	}
+	return slices.Contains(event.CoachUserIDs(), a.userID) || slices.Contains(teamCoachIDs, a.userID)
+}
+
+// CanNominate reports whether the account may nominate players for the
+// event: those who manage its participants, for nominated events only.
+func (a *GroupAccess) CanNominate(event Event, teamCoachIDs []int64) bool {
+	return event.SignupMode == EventSignupNominated && a.CanManageParticipants(event, teamCoachIDs)
+}
+
+// CanRecordAttendance reports whether the account may confirm who attended
+// the event (when, is the participation service's rule).
+func (a *GroupAccess) CanRecordAttendance(event Event, teamCoachIDs []int64) bool {
+	return a.CanManageParticipants(event, teamCoachIDs)
+}
+
 // CanManageRoster reports whether the account may add and remove players
 // and parents on a team: admins, managers, and the team's coaches.
 func (a *GroupAccess) CanManageRoster(teamID int64) bool {

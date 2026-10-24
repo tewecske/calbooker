@@ -10,7 +10,8 @@ import { join } from "node:path";
 // CALBOOKER_BROWSER_PROVIDER_URL, and CALBOOKER_BROWSER_CLIENT_NAME into
 // .env.local, so a worktree's specs follow its own port and Hydra client.
 
-const repositoryRoot = join(__dirname, "..", "..", "..");
+/** The repository (worktree) root. */
+export const repositoryRoot = join(__dirname, "..", "..", "..");
 
 // parseDotEnv reads the KEY=value lines a POSIX shell would source from
 // .env files written by hand or by dev-setup. Values may be wrapped in single
@@ -87,6 +88,13 @@ export const providerURL = trimSlash(
 
 /** The Hydra client name the provider shows on its sign-in and sign-up pages. */
 export const clientName = setting("CALBOOKER_BROWSER_CLIENT_NAME") ?? "Calbooker (development)";
+
+/**
+ * The Hydra client ID calbooker signs in with (dev-setup writes it into
+ * .env.local). The account pool keys its directory by it, because every lane
+ * shares the client name.
+ */
+export const clientID = setting("CALBOOKER_SSO_CLIENT_ID") ?? "";
 
 /**
  * A provider administrator for scenarios that act at the provider (goweb's

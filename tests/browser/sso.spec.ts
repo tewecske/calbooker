@@ -4,6 +4,7 @@ import {
   appURL,
   becomeGuest,
   createInvite,
+  poolUser,
   providerAdmin,
   providerURL,
   signInAtProvider,
@@ -29,10 +30,14 @@ const invitePattern = /^[A-HJKMNPQRSTUVWXYZ2-9]{12}$/;
 
 test.describe("single sign-on", () => {
   test.skip(!enabled, "set CALBOOKER_SSO_E2E=1 (make e2e) to run the single sign-on specs");
-  // Sign-up is rate limited per origin at the provider, and the scenarios
-  // share Hydra, so run them one after another.
+  // Sign-in and sign-up are rate limited per address at the provider
+  // (support/backoff.ts), and the scenarios share Hydra, so run them one
+  // after another.
   test.describe.configure({ mode: "serial" });
 
+  // Only the first visit and the guest upgrade need a brand-new provider
+  // account; every other scenario takes one from the account pool, with a
+  // role of its own when the scenario ends that account's sessions.
   test("first visit signs in through the provider and returns", async ({ browser }) => {
     const { context, page, email } = await newUser(browser);
     await expect(page.getByRole("heading", { level: 1, name: /your home/i })).toBeVisible();
@@ -45,7 +50,7 @@ test.describe("single sign-on", () => {
   });
 
   test("a second visit is silent", async ({ browser }) => {
-    const { context, page } = await newUser(browser);
+    const { context, page } = await poolUser(browser, "member");
     // Forget the calbooker session only; the provider and Hydra sessions stay.
     await context.clearCookies({ domain: new URL(appURL).hostname });
     await startSignIn(page);
@@ -54,7 +59,7 @@ test.describe("single sign-on", () => {
   });
 
   test("signing out also ends the provider session", async ({ browser }) => {
-    const { context, page } = await newUser(browser);
+    const { context, page } = await poolUser(browser, "signout");
     await page.locator("summary[aria-label='Account menu']").click();
     await page.getByRole("button", { name: /sign out/i }).click();
     await expect(page).toHaveURL(`${appURL}/en/sign-in`);
@@ -66,7 +71,7 @@ test.describe("single sign-on", () => {
 
   test("a session revocation at the provider signs calbooker out", async ({ browser }) => {
     test.skip(!providerAdminEmail || !providerAdminPassword, "requires CALBOOKER_BROWSER_PROVIDER_ADMIN_EMAIL and _PASSWORD");
-    const user = await newUser(browser);
+    const user = await poolUser(browser, "revoked");
     const adminContext = await browser.newContext();
     const admin = await adminContext.newPage();
     await admin.goto(`${providerURL}/en/sign-in`);
@@ -93,7 +98,7 @@ test.describe("single sign-on", () => {
   });
 
   test("a guest upgrade through single sign-on keeps the guest's groups", async ({ browser }) => {
-    const owner = await newUser(browser);
+    const owner = await poolUser(browser, "owner");
     await owner.page.goto(`${appURL}/en/groups`);
     await owner.page.locator("#group-new-name").fill(uniqueName("SSO"));
     await owner.page.locator("#group-new-name").locator("xpath=ancestor::form").getByRole("button").click();

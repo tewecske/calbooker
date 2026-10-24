@@ -111,6 +111,11 @@ it, or gets an explicit yes to start it, before the first subagent needs it.
 When the goweb `.env` uses the tailnet layout, `dev-setup` derives the host
 from it; check its printed `.env.local` values.
 
+Browser specs take full users from the account pool (`poolUser`, issue #21),
+and goweb's `make run-provider` raises the provider's sign-in/sign-up limit to
+600 per minute (`GOWEB_AUTH_RATE_LIMIT`, goweb PR #141), so lanes can run
+`make e2e` side by side.
+
 Playwright browsers come from Nix: home-manager sets
 `PLAYWRIGHT_BROWSERS_PATH` from nixpkgs `playwright-driver`, and
 `@playwright/test` must match the browser revisions in
@@ -154,10 +159,13 @@ Progress is in the Status table below. The original first steps were:
 | 2 | merged | #18 |
 | 3 | merged | #19 |
 | 4 | merged | #20 |
-| 5 | in progress (lane A) | |
-| — | browser account pool + rate-limit backoff in progress (lane B env) | |
+| 5 | merged | #23 |
+| 7 | in progress (lane B) | |
+| 8 | in progress (lane A) | |
+| 13 | in progress (lane C) | |
+| 21 | merged (browser account pool, rate-limit backoff) | #22 |
 | 6 | merged | #17 |
-| 7–15 | open | |
+| 9–12, 14, 15 | open | |
 
 ## Owner answers (2026-10-23)
 

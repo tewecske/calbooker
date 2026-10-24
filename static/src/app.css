@@ -106,6 +106,26 @@
 .wg-item-detail {
   @apply truncate opacity-80;
 }
+.wg-item-muted {
+  @apply opacity-60;
+}
+.wg-item-muted .wg-item-label {
+  @apply line-through;
+}
+/* A linked label covers the whole item, so the item is one click target. */
+.wg-item-link::after {
+  content: "";
+  @apply absolute inset-0;
+}
+.wg-item-link:focus-visible {
+  @apply outline-none;
+}
+.wg-item:has(.wg-item-link:focus-visible) {
+  @apply outline-2 outline-offset-1 outline-base-content;
+}
+.wg-item-badges {
+  @apply flex flex-wrap gap-0.5;
+}
 .wg-item-warn {
   @apply outline-2 outline-offset-[-2px] outline-warning;
 }

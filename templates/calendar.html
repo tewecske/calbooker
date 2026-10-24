@@ -1,0 +1,116 @@
+{{/* Weekly calendar of a group's events (internal/adapter/http/calendar.go).
+     Links and the filter form inside #calendar are boosted: HTMX fetches the
+     group page fragment and swaps #page-content, and the address bar follows;
+     without JavaScript they are plain links and a GET form. Wide screens get
+     the week grid, narrow ones a list of days. */}}
+{{define "group-calendar"}}
+  {{with .Group}}{{$L := .L}}{{with .Calendar}}
+    <section id="calendar" class="card card-border bg-base-100 shadow-sm" aria-labelledby="calendar-heading"
+             hx-boost="true" hx-target="#page-content" hx-swap="outerHTML" hx-push-url="true"
+             data-calendar data-week="{{.Week}}">
+      <div class="card-body gap-4">
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <h2 id="calendar-heading" class="card-title">{{$L.calendar_heading}}</h2>
+          <div class="flex flex-wrap items-center gap-2">
+            {{if .Groups}}
+              <details class="dropdown dropdown-end" data-testid="calendar-groups">
+                <summary class="btn btn-sm">{{$L.calendar_switch_group}}</summary>
+                <ul class="dropdown-content menu z-10 mt-1 w-56 rounded-box bg-base-100 p-2 shadow">
+                  {{range .Groups}}
+                    <li><a href="{{.URL}}"{{if .Current}} class="menu-active" aria-current="page"{{end}} data-calendar-group>{{.Name}}</a></li>
+                  {{end}}
+                </ul>
+              </details>
+            {{end}}
+            <a class="btn btn-sm{{if .CurrentWeek}} btn-active{{end}}" href="{{.TodayURL}}" data-testid="calendar-today">{{$L.calendar_today}}</a>
+          </div>
+        </div>
+
+        <nav class="flex items-center gap-2 md:hidden" aria-label="{{$L.calendar_week_navigation}}">
+          <a class="btn btn-sm btn-square" href="{{.PreviousURL}}" aria-label="{{.Grid.Labels.Previous}}" title="{{.Grid.Labels.Previous}}" data-testid="calendar-previous">
+            <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5"/></svg>
+          </a>
+          <span class="font-medium" data-testid="calendar-range">{{.RangeLabel}}</span>
+          <a class="btn btn-sm btn-square" href="{{.NextURL}}" aria-label="{{.Grid.Labels.Next}}" title="{{.Grid.Labels.Next}}" data-testid="calendar-next">
+            <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5"/></svg>
+          </a>
+        </nav>
+
+        <form class="flex flex-wrap items-end gap-2" method="get" action="{{.BaseURL}}" hx-get="{{.BaseURL}}" hx-trigger="change, submit"
+              aria-label="{{$L.calendar_filters}}" data-testid="calendar-filters">
+          <input type="hidden" name="week" value="{{.Week}}">
+          {{if .TeamOptions}}
+            <fieldset class="fieldset">
+              <label class="fieldset-legend" for="calendar-filter-team">{{$L.calendar_filter_team}}</label>
+              <select id="calendar-filter-team" class="select select-sm" name="team">
+                <option value="">{{$L.calendar_all_teams}}</option>
+                {{range .TeamOptions}}<option value="{{.Value}}"{{if .Selected}} selected{{end}}>{{.Label}}</option>{{end}}
+              </select>
+            </fieldset>
+          {{end}}
+          {{if .ResourceOptions}}
+            <fieldset class="fieldset">
+              <label class="fieldset-legend" for="calendar-filter-resource">{{$L.calendar_filter_resource}}</label>
+              <select id="calendar-filter-resource" class="select select-sm" name="resource">
+                <option value="">{{$L.calendar_all_resources}}</option>
+                {{range .ResourceOptions}}<option value="{{.Value}}"{{if .Selected}} selected{{end}}>{{.Label}}</option>{{end}}
+              </select>
+            </fieldset>
+          {{end}}
+          <fieldset class="fieldset">
+            <label class="fieldset-legend" for="calendar-filter-kind">{{$L.calendar_filter_kind}}</label>
+            <select id="calendar-filter-kind" class="select select-sm" name="kind">
+              <option value="">{{$L.calendar_all_kinds}}</option>
+              {{range .KindOptions}}<option value="{{.Value}}"{{if .Selected}} selected{{end}}>{{.Label}}</option>{{end}}
+            </select>
+          </fieldset>
+          <button class="btn btn-sm" type="submit">{{$L.calendar_filter}}</button>
+          {{if .Filtered}}<a class="btn btn-sm btn-ghost" href="{{.ClearURL}}" data-testid="calendar-clear">{{$L.calendar_clear}}</a>{{end}}
+        </form>
+
+        <p class="text-sm opacity-70" data-testid="calendar-time-zone">{{$L.events_times_in}} {{.TimeZone}}</p>
+        {{if .Empty}}
+          <p class="text-sm opacity-70" role="status" data-testid="calendar-empty">{{if .Filtered}}{{$L.calendar_empty_filtered}}{{else}}{{$L.calendar_empty}}{{end}}</p>
+        {{end}}
+
+        <div class="max-md:hidden" data-testid="calendar-grid-view">
+          {{template "weekgrid" .Grid}}
+        </div>
+
+        <section class="grid gap-3 md:hidden" aria-label="{{$L.calendar_day_list}}" data-testid="calendar-day-list">
+          {{range .Days}}
+            <article class="card card-border card-sm" aria-labelledby="calendar-day-{{.Date}}" data-calendar-day="{{.Date}}"{{if .Today}} data-calendar-today{{end}}>
+              <div class="card-body">
+                <h3 id="calendar-day-{{.Date}}" class="card-title text-base">
+                  {{.Name}} <span class="font-normal opacity-70">{{.DateLabel}}</span>
+                  {{if .Today}}<span class="badge badge-primary badge-sm">{{$L.calendar_today_marker}}</span>{{end}}
+                </h3>
+                {{if .Items}}
+                  <ul class="list">
+                    {{range .Items}}
+                      <li class="list-row px-0" data-event-id="{{.ID}}"{{if .Cancelled}} data-event-cancelled="true"{{end}}>
+                        <div class="text-sm tabular-nums opacity-80">{{.Time}}</div>
+                        <div class="grid gap-1{{if .Cancelled}} opacity-70{{end}}">
+                          <p class="flex flex-wrap items-center gap-1">
+                            <a class="link font-semibold{{if .Cancelled}} line-through{{end}}" href="{{.URL}}">{{.Title}}</a>
+                            {{template "event-kind-badge" .}}
+                            {{if .Cancelled}}<span class="badge badge-error badge-soft badge-sm">{{$L.events_cancelled}}</span>{{end}}
+                            {{if .Status}}<span class="badge badge-outline badge-sm" data-calendar-status="{{.StatusCode}}"><span class="sr-only">{{$L.calendar_your_status}} </span>{{.Status}}</span>{{end}}
+                          </p>
+                          {{if or .Teams .Place}}<p class="text-sm opacity-70">{{.Teams}}{{if and .Teams .Place}} · {{end}}{{.Place}}</p>{{end}}
+                          {{if .MultiDay}}<p class="text-xs opacity-70">{{$L.calendar_multi_day}} {{.When}}</p>{{end}}
+                        </div>
+                      </li>
+                    {{end}}
+                  </ul>
+                {{else}}
+                  <p class="text-sm opacity-70">{{$L.calendar_day_empty}}</p>
+                {{end}}
+              </div>
+            </article>
+          {{end}}
+        </section>
+      </div>
+    </section>
+  {{end}}{{end}}
+{{end}}

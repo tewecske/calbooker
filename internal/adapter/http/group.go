@@ -103,6 +103,7 @@ type GroupDetailView struct {
 	Season       *SeasonDetailView
 	Events       *EventsView
 	Event        *EventDetailView
+	Calendar     *CalendarView
 	Coaches      *CoachesView
 	Availability *AvailabilityView
 	Plan         *PlanView
@@ -214,6 +215,7 @@ func registerGroupRoutes(mux *http.ServeMux, groups *groupHandler) {
 	registerResourceRoutes(mux, groups)
 	registerSeasonRoutes(mux, groups)
 	registerEventRoutes(mux, groups)
+	registerCalendarRoutes(mux, groups)
 	registerCoachRoutes(mux, groups)
 	registerPlanRoutes(mux, groups)
 	registerParticipationRoutes(mux, groups)
@@ -242,7 +244,7 @@ func groupLabels(renderer *PageRenderer) map[locale.Code]map[string]string {
 	for _, language := range locale.Codes() {
 		values := make(map[string]string)
 		for _, id := range renderer.catalogs.Keys(language) {
-			if !strings.HasPrefix(id, "groups.") && !strings.HasPrefix(id, "teams.") && !strings.HasPrefix(id, "invites.") && !strings.HasPrefix(id, "children.") && !strings.HasPrefix(id, "resources.") && !strings.HasPrefix(id, "seasons.") && !strings.HasPrefix(id, "events.") && !strings.HasPrefix(id, "coaches.") && !strings.HasPrefix(id, "plan.") && !strings.HasPrefix(id, "participation.") {
+			if !strings.HasPrefix(id, "groups.") && !strings.HasPrefix(id, "teams.") && !strings.HasPrefix(id, "invites.") && !strings.HasPrefix(id, "children.") && !strings.HasPrefix(id, "resources.") && !strings.HasPrefix(id, "seasons.") && !strings.HasPrefix(id, "events.") && !strings.HasPrefix(id, "coaches.") && !strings.HasPrefix(id, "plan.") && !strings.HasPrefix(id, "participation.") && !strings.HasPrefix(id, "calendar.") {
 				continue
 			}
 			if text, err := renderer.catalogs.Translate(language, id, nil); err == nil {
@@ -670,6 +672,10 @@ func (h *groupHandler) renderSection(writer http.ResponseWriter, request *http.R
 		if !h.loadEvent(writer, request, current, group.ID, teamID, form, view) {
 			return
 		}
+	case groupSectionCalendar:
+		if !h.loadCalendar(writer, request, current, group, view) {
+			return
+		}
 	case groupSectionCoaches:
 		if !h.loadCoaches(writer, request, current, group.ID, form, view) {
 			return
@@ -709,6 +715,7 @@ func (h *groupHandler) groupShell(current groupRequest, group service.Group, sec
 		{groupSectionMembers, "groups.nav.members", "/members"},
 		{groupSectionTeams, "groups.nav.teams", "/teams"},
 		{groupSectionEvents, "events.nav", "/events"},
+		{groupSectionCalendar, "calendar.nav", "/calendar"},
 	}
 	if current.access.CanViewSeasons() {
 		items = append(items, struct{ id, label, route string }{groupSectionSeasons, "seasons.nav", "/seasons"})

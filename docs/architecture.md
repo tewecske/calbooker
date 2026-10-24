@@ -41,6 +41,10 @@ Each `WeekGridItem` has an opaque `ID`, `Weekday` (1 = Monday),
 model), optional `Resource` (a resource key), `Label`, optional `Detail`,
 `Variant` (`neutral`, `primary`, `secondary`, `accent`, `info`, `success`,
 `warning`, `error`), `Draggable`, and `Warning` with optional `WarningText`.
+Read-only grids may also set `URL` (the label becomes a link covering the
+item), `Muted` (faded, label struck through, for example a cancelled event),
+and `Badges` (short texts shown as small badges); all three are optional and
+default to the plain item.
 Render the result with `{{template "weekgrid" .Grid}}`.
 
 ### Layout
@@ -330,6 +334,43 @@ get `service.ErrGroupNotFound`, which handlers render as 404.
   optional `walk_in`) in `internal/adapter/http/participation.go`. Both
   re-render the event page (HTMX: the fragment with out-of-band alerts;
   refusals 422).
+
+## Calendar
+
+- `/{language}/groups/{id}/calendar?week=YYYY-MM-DD&team=&resource=&kind=`
+  (`internal/adapter/http/calendar.go`, `templates/calendar.html`, catalogs
+  `calendar.json`) shows one Monday-based week of events in the group's time
+  zone. `week` is any day of the wanted week (missing or invalid: the current
+  week). Every member has the Calendar tab.
+- Data comes only from `EventService.List(access, EventQuery{From, To})`
+  (the same as `ListBetween`), so visibility is the Visibility rule of
+  `GroupAccess.CanViewEvent`; cancelled events are included and shown muted
+  with a badge. Filters (`service.CalendarFilter`: team, resource, kind) are
+  applied to that list and never widen it. The team filter offers the teams
+  the account sees (`TeamService.List`); the resource filter offers the
+  group's resources to accounts with `CanViewResources` and, for everyone,
+  the resources named on the week's visible events. A requested team or
+  resource that is not offered is dropped.
+- Pure rules in `internal/service/calendar.go`: `NewCalendarWeek(day, zone)`
+  (Monday, and `From`/`To` as local midnight on Monday and the next Monday,
+  so a week across a clock change is 167 or 169 hours), `CalendarToday`,
+  `ParseCalendarDate` (years 1970 to 2200), `CalendarWeek.Segments(event)`
+  (one segment per local day in wall-clock minutes; events across midnight
+  or longer than a day are split per day and flagged as continuing; an event
+  at 01:30 on the night the clocks go back starts at minute 90),
+  `FilterCalendarEvents`, and `CalendarEventResources`.
+- The week grid shows 08:00 to 20:00, widened to whole hours so every
+  segment fits, in 30-minute rows; items are colored by kind and link to the
+  event page. Below the `md` breakpoint a list of days replaces the grid.
+  Links and the filter form inside `#calendar` are boosted (`hx-boost`,
+  target `#page-content`, URL pushed); without JavaScript they are plain
+  links and a GET form. The group switcher lists the account's groups when
+  there are several, keeping the week and the kind filter.
+- `CalendarItemView.Status`/`StatusCode` are the hook for the viewer's own
+  sign-up status: when set, the day list and the grid item show a badge.
+  They are not filled yet; that needs a week-wide query of the viewer's
+  `event_participants` rows (follow-up to #9).
+
 ## Coaches
 
 - `CoachService` (`internal/service/coach.go`, `availability.go`, store

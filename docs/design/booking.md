@@ -239,6 +239,26 @@ Refinements made in #9 (open for the owner to confirm):
 - Rows are keyed by user ID, so a guest's answers survive the upgrade; a
   member who leaves the group loses their rows.
 
+Refinements made in #10 (open for the owner to confirm):
+
+- The calendar is a group page (`/groups/{id}/calendar`) with a tab for
+  every member; it shows exactly the events the Events tab shows, one
+  Monday-based week at a time in the group's time zone, cancelled events
+  included (faded, struck through, with a badge).
+- Events across midnight or longer than a day are split into one block per
+  day; the day list notes "spans several days" with the whole time range.
+- Filters: team (the teams the viewer sees), resource, and kind. Staff and
+  coaches pick from the group's resources; players and parents from the
+  resources on their visible events of the shown week. Filters only narrow
+  what the viewer sees; a team or resource the viewer may not pick is
+  ignored.
+- Switching groups keeps the week and the kind filter and drops team and
+  resource filters. The switcher shows only for members of several groups.
+- Narrow screens (below `md`) get a list of days instead of the grid.
+- The viewer's own sign-up status has a hook (a badge on each calendar
+  entry) but is not filled yet: #9 answers per event (`Roster`), and the
+  calendar needs a week-wide "my answers" query; that is a follow-up.
+
 ## Data model
 
 All tables carry `group_id` (directly or through their parent) so every query

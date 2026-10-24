@@ -431,6 +431,7 @@ func TestWeekGridStepClassesExist(t *testing.T) {
 		fmt.Sprintf(".wg-col-%d{", weekGridLaneColumns),
 		fmt.Sprintf(".wg-cspan-%d{", weekGridLaneColumns),
 		".wg-hour-at-11{",
+		".wg-item-muted", ".wg-item-link", ".wg-item-badges",
 	)
 	for _, variant := range []WeekGridVariant{WeekGridNeutral, WeekGridPrimary, WeekGridSecondary, WeekGridAccent, WeekGridInfo, WeekGridSuccess, WeekGridWarning, WeekGridError} {
 		want = append(want, "."+variant.class())

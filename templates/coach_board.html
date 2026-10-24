@@ -1,0 +1,153 @@
+{{/* Coach assignment board of a season (internal/adapter/http/coach_board.go). */}}
+{{define "group-coach-board"}}
+  {{with .Group}}{{$L := .L}}{{with .CoachBoard}}
+    <p><a class="link" href="{{.SeasonURL}}">{{$L.coach_board_back}}</a></p>
+    {{template "coach-board" .}}
+  {{end}}{{end}}
+{{end}}
+
+{{/* The board. The dot is a *CoachBoardView; HTMX swaps #coach-board. */}}
+{{define "coach-board"}}{{$L := .L}}{{$board := .}}
+  <section id="coach-board" class="card card-border bg-base-100 shadow-sm" aria-labelledby="coach-board-heading" data-testid="coach-board"{{if .Changed}} data-changed="true"{{end}}>
+    <div class="card-body gap-4">
+      <h2 id="coach-board-heading" class="card-title">{{$L.coach_board_heading}}: {{.SeasonName}}</h2>
+      <p class="text-sm opacity-70">{{.SeasonDates}}{{if .CanEdit}} · {{with .PreviousSeason}}{{$L.coach_board_previous}}: {{.}}{{else}}{{$L.coach_board_no_previous}}{{end}}{{end}}</p>
+      {{if .CanEdit}}
+        <p class="text-sm opacity-70">{{$L.coach_board_intro}}</p>
+        {{template "coach-board-editor" .}}
+      {{else}}
+        <div role="status" class="alert alert-info alert-soft" data-testid="coach-board-read-only"><span>{{$L.coach_board_read_only}}</span></div>
+        {{if .Teams}}
+          <ul class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3" data-testid="coach-board-teams">
+            {{range .Teams}}
+              <li class="card card-border bg-base-100" data-testid="coach-board-team" data-team-id="{{.ID}}">
+                <div class="card-body gap-2 p-4">
+                  <h3 class="card-title text-base">{{.Name}}</h3>
+                  <ul class="grid gap-1" data-testid="coach-board-team-coaches">
+                    {{range .Chips}}
+                      <li class="flex items-center gap-2" data-testid="coach-board-chip" data-coach-id="{{.CoachID}}"><span>{{.Label}}</span>{{if .Head}}<span class="badge badge-primary badge-soft badge-sm">{{$L.coach_board_head}}</span>{{end}}</li>
+                    {{end}}
+                  </ul>
+                </div>
+              </li>
+            {{end}}
+          </ul>
+        {{else}}
+          <p class="text-sm opacity-70" data-testid="coach-board-empty">{{$L.coach_board_no_assignments}}</p>
+        {{end}}
+      {{end}}
+    </div>
+  </section>
+{{end}}
+
+{{/* Staff board: a form holding the whole assignment set. Without
+     JavaScript the add selects, remove buttons, head toggles, Suggest, and
+     Save still work as plain form posts. */}}
+{{define "coach-board-editor"}}{{$L := .L}}{{$board := .}}
+  <form class="grid gap-4" method="post" action="{{.ActionURL}}" hx-post="{{.ActionURL}}" hx-target="#coach-board" hx-swap="outerHTML" data-coach-board data-testid="coach-board-form">
+    <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
+    <input type="hidden" name="revision" value="{{.Revision}}">
+    <div class="flex flex-wrap items-center gap-2" data-testid="coach-board-actions">
+      <button class="btn btn-primary" type="submit" data-testid="coach-board-save">{{$L.coach_board_save}}</button>
+      <button class="btn" type="submit" name="suggest" value="fill" formaction="{{.DraftURL}}" hx-post="{{.DraftURL}}" hx-target="#coach-board" hx-swap="outerHTML" data-testid="coach-board-suggest">{{$L.coach_board_suggest}}</button>
+      <button class="btn btn-ghost" type="submit" name="suggest" value="replace" formaction="{{.DraftURL}}" hx-post="{{.DraftURL}}" hx-target="#coach-board" hx-swap="outerHTML" hx-confirm="{{.StartOverText}}" data-testid="coach-board-start-over">{{$L.coach_board_start_over}}</button>
+      {{if .Changed}}
+        <span class="badge badge-warning badge-soft" data-testid="coach-board-unsaved">{{$L.coach_board_unsaved}}</span>
+        <a class="link text-sm" href="{{.ActionURL}}" data-testid="coach-board-discard">{{$L.coach_board_discard}}</a>
+      {{end}}
+      <button type="button" class="hidden" hidden tabindex="-1" aria-hidden="true" data-cb-refresh hx-post="{{.DraftURL}}" hx-target="#coach-board" hx-swap="outerHTML"></button>
+    </div>
+    <p class="text-sm opacity-70">{{$L.coach_board_suggest_help}}</p>
+    <noscript>
+      <div class="flex flex-wrap items-center gap-2">
+        <p class="text-sm">{{$L.coach_board_no_js}}</p>
+        <button class="btn btn-sm" type="submit" formaction="{{.DraftURL}}">{{$L.coach_board_apply}}</button>
+      </div>
+    </noscript>
+    {{if .Warnings}}
+      <div role="alert" class="alert alert-warning alert-soft items-start" data-testid="coach-board-warnings">
+        <div>
+          <h3 class="font-semibold">{{$L.coach_board_warnings_heading}}</h3>
+          <ul class="mt-1 list-disc pl-5 text-sm">
+            {{range .Warnings}}<li data-testid="coach-board-warning">{{.}}</li>{{end}}
+          </ul>
+        </div>
+      </div>
+    {{end}}
+    <div class="grid gap-4 lg:grid-cols-[16rem_1fr]">
+      <section class="card card-border bg-base-200" aria-labelledby="coach-board-pool-heading">
+        <div class="card-body gap-2 p-4">
+          <h3 id="coach-board-pool-heading" class="font-semibold">{{$L.coach_board_pool}}</h3>
+          <p class="text-sm opacity-70">{{$L.coach_board_pool_help}}</p>
+          {{if .Pool}}
+            <ul class="grid min-h-12 gap-2" data-cb-pool data-testid="coach-board-pool">
+              {{range .Pool}}
+                <li class="card card-border card-sm cursor-grab bg-base-100" data-cb-coach="{{.ID}}" data-testid="coach-board-pool-coach">
+                  <div class="card-body gap-1 p-2">
+                    <span class="font-medium">{{.Label}}</span>
+                    <div class="flex flex-wrap gap-1">
+                      {{if .Qualification}}<span class="badge badge-soft badge-sm">{{.Qualification}}</span>{{else}}<span class="badge badge-warning badge-soft badge-sm">{{$L.coach_board_coach_no_qualification}}</span>{{end}}
+                      <span class="badge badge-ghost badge-sm" data-testid="coach-board-pool-teams">{{.Teams}}</span>
+                      {{if .NoAvailability}}<span class="badge badge-warning badge-soft badge-sm">{{$L.coach_board_coach_no_availability}}</span>{{end}}
+                    </div>
+                    <input type="hidden" name="a" value="" disabled data-cb-assignment>
+                  </div>
+                </li>
+              {{end}}
+            </ul>
+          {{else}}
+            <p class="text-sm opacity-70" data-testid="coach-board-no-coaches">{{$L.coach_board_no_coaches}}</p>
+          {{end}}
+        </div>
+      </section>
+      {{if .Teams}}
+        <ul class="grid content-start gap-4 sm:grid-cols-2 xl:grid-cols-3" data-testid="coach-board-teams">
+          {{range $team := .Teams}}
+            <li class="card card-border bg-base-100" data-testid="coach-board-team" data-team-id="{{.ID}}">
+              <div class="card-body gap-2 p-4">
+                <h3 class="card-title text-base"><a class="link link-hover" href="{{.URL}}">{{.Name}}</a>{{if .Archived}} <span class="badge badge-ghost badge-sm">{{$L.coach_board_archived}}</span>{{end}}</h3>
+                <p class="text-sm opacity-70" data-testid="coach-board-team-ages">{{.Ages}}</p>
+                <ul class="grid min-h-16 content-start gap-2 rounded-box border border-dashed border-base-300 p-2" data-cb-team="{{.ID}}" aria-label="{{.Name}}" data-testid="coach-board-team-coaches">
+                  {{range .Chips}}
+                    <li class="card card-border card-sm cursor-grab bg-base-200" data-cb-coach="{{.CoachID}}" data-cb-from="{{$team.ID}}" data-testid="coach-board-chip" data-coach-id="{{.CoachID}}">
+                      <div class="card-body gap-1 p-2">
+                        <div class="flex items-center gap-2">
+                          <span class="grow font-medium">{{.Label}}</span>
+                          {{if .New}}<span class="badge badge-info badge-soft badge-sm" data-testid="coach-board-new">{{$L.coach_board_new}}</span>{{end}}
+                          <button class="btn btn-ghost btn-xs" type="submit" name="remove" value="{{.Key}}" formaction="{{$board.DraftURL}}" hx-post="{{$board.DraftURL}}" hx-target="#coach-board" hx-swap="outerHTML" aria-label="{{.RemoveLabel}}" data-testid="coach-board-remove">{{$L.coach_board_remove}}</button>
+                        </div>
+                        <label class="label cursor-pointer gap-2 text-sm">
+                          <input class="toggle toggle-xs" type="checkbox" name="head" value="{{.Key}}"{{if .Head}} checked{{end}} aria-label="{{.HeadLabel}}" data-cb-head data-testid="coach-board-head">
+                          <span>{{$L.coach_board_head}}</span>
+                        </label>
+                        {{with .Explanation}}<p class="text-xs opacity-70" data-testid="coach-board-explanation">{{.}}</p>{{end}}
+                        {{range .Warnings}}<span class="badge badge-warning badge-soft badge-sm h-auto" data-testid="coach-board-chip-warning">{{.}}</span>{{end}}
+                        <input type="hidden" name="a" value="{{.Key}}" data-cb-assignment>
+                        {{with .SuggestedValue}}<input type="hidden" name="suggested" value="{{.}}" data-cb-suggested>{{end}}
+                      </div>
+                    </li>
+                  {{end}}
+                </ul>
+                {{if not .Chips}}<p class="text-sm opacity-70" data-testid="coach-board-team-empty">{{$L.coach_board_team_empty}}</p>{{end}}
+                {{if $board.AddOptions}}
+                  <select class="select select-sm w-full" name="add" aria-label="{{.AddLabel}}" hx-post="{{$board.DraftURL}}" hx-trigger="change" hx-target="#coach-board" hx-swap="outerHTML" data-testid="coach-board-add">
+                    <option value="">{{$L.coach_board_add}}</option>
+                    {{range $board.AddOptions}}<option value="{{$team.ID}}:{{.Value}}">{{.Label}}</option>{{end}}
+                  </select>
+                {{end}}
+              </div>
+            </li>
+          {{end}}
+        </ul>
+      {{else}}
+        <p class="text-sm opacity-70" data-testid="coach-board-no-teams">{{$L.coach_board_no_teams}}</p>
+      {{end}}
+    </div>
+  </form>
+{{end}}
+
+{{/* Answer to a board request from HTMX: alerts out of band and the board. */}}
+{{define "coach-board-swap"}}
+  {{template "alerts-oob" .}}
+  {{with .Group.CoachBoard}}{{template "coach-board" .}}{{end}}
+{{end}}

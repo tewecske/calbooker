@@ -154,3 +154,11 @@
 .wg-item-drag {
   @apply opacity-90 shadow-lg;
 }
+
+/* ---- Coach board (templates/coach_board.html) ---- SortableJS classes. */
+.cb-ghost {
+  @apply opacity-40;
+}
+.cb-drag {
+  @apply opacity-90 shadow-lg;
+}

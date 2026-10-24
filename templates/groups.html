@@ -101,7 +101,7 @@
 {{end}}
 
 {{define "group-detail-content"}}
-  <div class="grid gap-6 mt-6 w-full{{if and .Group (eq .Group.Section "plan")}} max-w-7xl{{else}} max-w-4xl{{end}}">
+  <div class="grid gap-6 mt-6 w-full{{if and .Group (or (eq .Group.Section "plan") (eq .Group.Section "coach-board"))}} max-w-7xl{{else}} max-w-4xl{{end}}">
     {{with .Group}}
       <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <a class="link" href="{{.ListURL}}">{{.L.groups_back}}</a>
@@ -132,6 +132,7 @@
       {{if or (eq .Section "availability") (eq .Section "availability-overview")}}{{template "group-availability" $}}{{end}}
       {{if eq .Section "plan"}}{{template "group-plan" $}}{{end}}
       {{if eq .Section "plan-slot"}}{{template "group-plan-slot" $}}{{end}}
+      {{if eq .Section "coach-board"}}{{template "group-coach-board" $}}{{end}}
     {{end}}
   </div>
 {{end}}

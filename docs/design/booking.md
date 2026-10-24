@@ -258,6 +258,26 @@ Refinements made in #10 (open for the owner to confirm):
 - The viewer's own sign-up status has a hook (a badge on each calendar
   entry) but is not filled yet: #9 answers per event (`Roster`), and the
   calendar needs a week-wide "my answers" query; that is a follow-up.
+Refinements made in #12 (open for the owner to confirm):
+
+- The coach board edits a draft in the page; nothing is saved until Save,
+  which replaces the season's whole assignment set. A save based on an older
+  set (someone changed assignments meanwhile) is refused with a conflict and
+  the draft stays on screen.
+- Suggest only fills active teams that have no coach and never removes or
+  changes what is on the board; "Start over from suggestion" replaces the
+  board (after a confirmation). Archived teams are never filled and show only
+  while they hold assignments.
+- The suggestion takes the team's previous-season coaches (with the head
+  mark) first, even if their qualification no longer covers the team (the
+  board then warns); otherwise one qualified coach, preferring coaches with
+  availability in the season, then the fewest teams, then name. Coaches from
+  qualification are not marked head. Unqualified teams stay empty.
+- Warnings (never blocking): no qualification, qualification does not cover
+  the team's ages, no availability in any part of the season.
+- Coaches see the board read only: only the teams that have coaches in the
+  season (as on the season page), coach names and head marks, no
+  qualifications, availability, or warnings.
 
 ## Data model
 

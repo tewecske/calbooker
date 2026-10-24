@@ -123,7 +123,10 @@
 
     <section class="card card-border bg-base-100 shadow-sm" aria-labelledby="season-coaches-heading">
       <div class="card-body">
-        <h2 id="season-coaches-heading" class="card-title">{{$L.seasons_coaches_heading}}</h2>
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <h2 id="season-coaches-heading" class="card-title">{{$L.seasons_coaches_heading}}</h2>
+          <a class="btn btn-sm" href="{{.CoachBoardURL}}" data-testid="season-coach-board-link">{{$L.coach_board_link}}</a>
+        </div>
         {{if .Coaches}}
           <div class="overflow-x-auto">
             <table class="table" data-testid="season-coaches">

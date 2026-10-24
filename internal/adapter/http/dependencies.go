@@ -39,6 +39,7 @@ type Dependencies struct {
 	Resources   ResourceUseCases
 	Seasons     SeasonUseCases
 	Events      EventUseCases
+	Plan        PlanUseCases
 	JoinGroup   JoinRateLimitedGroupJoiner
 
 	AdminAccounts       AdminAccountLister

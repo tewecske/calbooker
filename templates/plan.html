@@ -1,0 +1,229 @@
+{{/* Resource slot plan of a season part (internal/adapter/http/plan.go). */}}
+{{define "group-plan"}}
+  {{with .Group}}{{$L := .L}}{{with .Plan}}
+    <section class="card card-border bg-base-100 shadow-sm" aria-labelledby="plan-heading">
+      <div class="card-body gap-4">
+        <h2 id="plan-heading" class="card-title">{{$L.plan_heading}}</h2>
+        <p class="text-sm opacity-70">{{$L.plan_intro}}</p>
+        {{if .Empty}}
+          <p class="text-sm opacity-70" data-testid="plan-no-seasons">{{$L.plan_no_seasons}}{{if .CanEdit}} <a class="link" href="{{.SeasonsURL}}">{{$L.plan_add_season}}</a>{{end}}</p>
+        {{else}}
+          <form class="flex flex-wrap items-end gap-2" method="get" action="{{.PickerURL}}" data-testid="plan-part-picker">
+            <fieldset class="fieldset">
+              <label class="fieldset-legend" for="plan-part">{{$L.plan_part}}</label>
+              <select id="plan-part" class="select" name="part">
+                {{range .Parts}}<option value="{{.Value}}"{{if .Selected}} selected{{end}}>{{.Label}}</option>{{end}}
+              </select>
+            </fieldset>
+            <button class="btn" type="submit">{{$L.plan_show}}</button>
+          </form>
+          <p class="flex flex-wrap items-center gap-2" data-testid="plan-part-info" data-part-id="{{.PartID}}">
+            <span class="font-medium">{{.SeasonName}}: {{.PartName}}</span>
+            <span class="text-sm opacity-70">{{.PartDates}}</span>
+            {{if .Alternating}}<span class="badge badge-info badge-soft badge-sm">{{$L.plan_alternating}}</span>{{end}}
+          </p>
+          {{if not .CanEdit}}
+            <div role="status" class="alert alert-info alert-soft" data-testid="plan-read-only"><span>{{$L.plan_read_only}}</span></div>
+          {{else if .NoResources}}
+            <div role="status" class="alert alert-warning alert-soft" data-testid="plan-no-resources"><span>{{$L.plan_no_resources}} <a class="link" href="{{.ResourcesURL}}">{{$L.plan_add_resource}}</a></span></div>
+          {{else}}
+            <p class="text-sm opacity-70">{{if .Alternating}}{{$L.plan_add_help_week}}{{else}}{{$L.plan_add_help}}{{end}}</p>
+          {{end}}
+          {{if .ResourceFilter}}
+            <form method="get" action="{{.PickerURL}}" data-testid="plan-resource-filter">
+              <input type="hidden" name="part" value="{{.PartID}}">
+              {{with .Week}}<input type="hidden" name="week" value="{{.}}">{{end}}
+              <fieldset class="fieldset">
+                <legend class="fieldset-legend">{{$L.plan_columns}}</legend>
+                <div class="flex flex-wrap gap-3">
+                  {{range .ResourceFilter}}
+                    <label class="label cursor-pointer gap-2"><input class="checkbox checkbox-sm" type="checkbox" name="r" value="{{.Value}}"{{if .Checked}} checked{{end}}><span>{{.Label}}</span></label>
+                  {{end}}
+                </div>
+                <p class="label">{{$L.plan_columns_help}}</p>
+              </fieldset>
+              <button class="btn btn-sm" type="submit">{{$L.plan_show}}</button>
+            </form>
+          {{end}}
+          {{template "weekgrid" .Grid}}
+          <div id="plan-details">{{template "plan-details" .}}</div>
+        {{end}}
+      </div>
+    </section>
+
+    {{with .Copy}}
+      <section class="card card-border bg-base-100 shadow-sm" aria-labelledby="plan-copy-heading">
+        <div class="card-body">
+          <h2 id="plan-copy-heading" class="card-title">{{$L.plan_copy_heading}}</h2>
+          <p class="text-sm opacity-70">{{$L.plan_copy_intro}}</p>
+          {{if .Sources}}
+            <form class="grid gap-4" method="post" action="{{.ActionURL}}" hx-post="{{.ActionURL}}" hx-target="#page-content" hx-swap="outerHTML" hx-disabled-elt="this"{{if .SlotCount}} hx-confirm="{{.ReplaceText}}"{{end}} data-testid="plan-copy-form">
+              <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
+              <fieldset class="fieldset">
+                <label class="fieldset-legend" for="plan-copy-source">{{$L.plan_copy_source}}</label>
+                <select id="plan-copy-source" class="select w-full" name="source_part_id" required>
+                  {{range .Sources}}<option value="{{.Value}}"{{if .Selected}} selected{{end}}>{{.Label}}</option>{{end}}
+                </select>
+              </fieldset>
+              {{if .SlotCount}}
+                <label class="label cursor-pointer justify-start gap-3" for="plan-copy-replace">
+                  <input id="plan-copy-replace" class="checkbox" type="checkbox" name="replace" value="true" required>
+                  <span>{{.ReplaceText}}</span>
+                </label>
+              {{end}}
+              <div><button class="btn" type="submit">{{$L.plan_copy_submit}}</button></div>
+            </form>
+          {{else}}
+            <p class="text-sm opacity-70" data-testid="plan-copy-none">{{$L.plan_copy_none}}</p>
+          {{end}}
+        </div>
+      </section>
+    {{end}}
+  {{end}}{{end}}
+{{end}}
+
+{{/* Warnings and the slot list of the shown week. The dot is a *PlanView. */}}
+{{define "plan-details"}}{{$L := .L}}
+  <div class="grid gap-4">
+    {{if .Warnings}}
+      <div role="alert" class="alert alert-warning alert-soft items-start" data-testid="plan-warnings">
+        <div>
+          <h3 class="font-semibold">{{$L.plan_warnings_heading}}</h3>
+          <ul class="mt-1 list-disc pl-5 text-sm">
+            {{range .Warnings}}<li data-testid="plan-warning">{{.Text}}</li>{{end}}
+          </ul>
+        </div>
+      </div>
+    {{end}}
+    <h3 class="font-semibold" id="plan-slots-heading">{{$L.plan_slots_heading}}{{with .WeekLabel}} <span class="badge badge-soft badge-sm">{{.}}</span>{{end}}</h3>
+    {{if .Slots}}
+      <div class="overflow-x-auto">
+        <table class="table table-sm" data-testid="plan-slots" aria-labelledby="plan-slots-heading">
+          <thead><tr>
+            <th scope="col">{{$L.plan_slot_day}}</th><th scope="col">{{$L.plan_slot_time}}</th><th scope="col">{{$L.plan_slot_resource}}</th>
+            {{if .Alternating}}<th scope="col">{{$L.plan_slot_week}}</th>{{end}}
+            <th scope="col">{{$L.plan_slot_ages}}</th><th scope="col">{{$L.plan_slot_max_teams}}</th><th scope="col"><span class="sr-only">{{$L.plan_slot_open}}</span></th>
+          </tr></thead>
+          <tbody>
+            {{range .Slots}}
+              <tr data-slot-id="{{.ID}}"{{if .Warning}} data-slot-warning="true"{{end}}>
+                <td>{{.Day}}</td>
+                <td data-testid="plan-slot-time">{{.Time}}</td>
+                <td>{{.Resource}}</td>
+                {{if $.Alternating}}<td data-testid="plan-slot-week">{{.Week}}</td>{{end}}
+                <td>{{.Ages}}</td>
+                <td>{{.MaxTeams}}</td>
+                <td>{{if .Warning}}<span class="badge badge-warning badge-soft badge-sm">{{$L.plan_warning_badge}}</span> {{end}}<a class="link" href="{{.URL}}" aria-label="{{$L.plan_slot_open}}: {{.Day}} {{.Time}}, {{.Resource}}">{{$L.plan_slot_open}}</a></td>
+              </tr>
+            {{end}}
+          </tbody>
+        </table>
+      </div>
+    {{else}}
+      <p class="text-sm opacity-70" data-testid="plan-slots-empty">{{$L.plan_slots_empty}}</p>
+    {{end}}
+  </div>
+{{end}}
+
+{{/* Answer to a grid change: alerts, slot list (out of band), and the grid. */}}
+{{define "plan-swap"}}
+  {{template "alerts-oob" .}}
+  {{with .Group.Plan}}
+    <div id="plan-details" hx-swap-oob="true">{{template "plan-details" .}}</div>
+    {{template "weekgrid" .Grid}}
+  {{end}}
+{{end}}
+
+{{define "group-plan-slot"}}
+  {{with .Group}}{{$L := .L}}{{with .PlanSlot}}
+    <p><a class="link" href="{{.PlanURL}}">{{$L.plan_back}}</a></p>
+    <section class="card card-border bg-base-100 shadow-sm" aria-labelledby="plan-slot-heading">
+      <div class="card-body">
+        <h2 id="plan-slot-heading" class="card-title">{{$L.plan_slot_heading}}</h2>
+        <dl class="grid grid-cols-1 gap-2 text-sm sm:grid-cols-[auto_1fr]" data-testid="plan-slot-details">
+          <dt class="opacity-70">{{$L.plan_part}}</dt><dd>{{.SeasonName}}: {{.PartName}}</dd>
+          <dt class="opacity-70">{{$L.plan_slot_day}}</dt><dd>{{.Row.Day}}</dd>
+          <dt class="opacity-70">{{$L.plan_slot_time}}</dt><dd>{{.Row.Time}}</dd>
+          <dt class="opacity-70">{{$L.plan_slot_resource}}</dt><dd>{{.Row.Resource}}</dd>
+          {{with .Row.Week}}<dt class="opacity-70">{{$L.plan_slot_week}}</dt><dd>{{.}}</dd>{{end}}
+          <dt class="opacity-70">{{$L.plan_slot_ages}}</dt><dd>{{.Row.Ages}}</dd>
+          <dt class="opacity-70">{{$L.plan_slot_max_teams}}</dt><dd>{{if .Row.MaxTeams}}{{.Row.MaxTeams}}{{else}}{{$L.plan_max_teams_none}}{{end}}</dd>
+        </dl>
+      </div>
+    </section>
+
+    {{with .Form}}
+      <section class="card card-border bg-base-100 shadow-sm" aria-labelledby="plan-slot-edit-heading">
+        <div class="card-body">
+          <h2 id="plan-slot-edit-heading" class="card-title">{{$L.plan_slot_edit}}</h2>
+          <form class="grid gap-4" method="post" action="{{$.Group.PlanSlot.ActionURL}}" hx-post="{{$.Group.PlanSlot.ActionURL}}" hx-target="#page-content" hx-swap="outerHTML" hx-disabled-elt="this">
+            <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
+            <input type="hidden" name="version" value="{{$.Group.PlanSlot.Version}}">
+            <div class="grid gap-4 sm:grid-cols-2">
+              <fieldset class="fieldset">
+                <label class="fieldset-legend" for="plan-slot-resource">{{$L.plan_slot_resource}}</label>
+                <select id="plan-slot-resource" class="select w-full" name="resource_id" required aria-describedby="plan-slot-resource-error">
+                  {{range .Resources}}<option value="{{.Value}}"{{if .Selected}} selected{{end}}>{{.Label}}</option>{{end}}
+                </select>
+                {{with .ResourceError}}<p id="plan-slot-resource-error" class="text-sm text-error" role="alert">{{.}}</p>{{end}}
+              </fieldset>
+              {{if .Alternating}}
+                <fieldset class="fieldset">
+                  <label class="fieldset-legend" for="plan-slot-week">{{$L.plan_slot_week}}</label>
+                  <select id="plan-slot-week" class="select w-full" name="week" required aria-describedby="plan-slot-week-error">
+                    {{range .Weeks}}<option value="{{.Value}}"{{if .Selected}} selected{{end}}>{{.Label}}</option>{{end}}
+                  </select>
+                  {{with .WeekError}}<p id="plan-slot-week-error" class="text-sm text-error" role="alert">{{.}}</p>{{end}}
+                </fieldset>
+              {{else}}
+                <input type="hidden" name="week" value="all">
+              {{end}}
+            </div>
+            <div class="grid gap-4 sm:grid-cols-3">
+              <fieldset class="fieldset">
+                <label class="fieldset-legend" for="plan-slot-weekday">{{$L.plan_slot_day}}</label>
+                <select id="plan-slot-weekday" class="select w-full" name="weekday" required>
+                  {{range .Days}}<option value="{{.Value}}"{{if .Selected}} selected{{end}}>{{.Label}}</option>{{end}}
+                </select>
+              </fieldset>
+              <fieldset class="fieldset">
+                <label class="fieldset-legend" for="plan-slot-start">{{$L.plan_slot_start}}</label>
+                <input id="plan-slot-start" class="input w-full" type="time" name="start" step="300" required value="{{.Start}}" aria-describedby="plan-slot-time-error">
+              </fieldset>
+              <fieldset class="fieldset">
+                <label class="fieldset-legend" for="plan-slot-end">{{$L.plan_slot_end}}</label>
+                <input id="plan-slot-end" class="input w-full" type="time" name="end" step="300" required value="{{.End}}" aria-describedby="plan-slot-time-error">
+              </fieldset>
+            </div>
+            {{with .TimeError}}<p id="plan-slot-time-error" class="text-sm text-error" role="alert">{{.}}</p>{{end}}
+            <div class="grid gap-4 sm:grid-cols-3">
+              <fieldset class="fieldset">
+                <label class="fieldset-legend" for="plan-slot-min-age">{{$L.plan_slot_min_age}}</label>
+                <input id="plan-slot-min-age" class="input w-full" type="number" name="min_age" min="1" max="99" value="{{.MinAge}}" aria-describedby="plan-slot-ages-error">
+              </fieldset>
+              <fieldset class="fieldset">
+                <label class="fieldset-legend" for="plan-slot-max-age">{{$L.plan_slot_max_age}}</label>
+                <input id="plan-slot-max-age" class="input w-full" type="number" name="max_age" min="1" max="99" value="{{.MaxAge}}" aria-describedby="plan-slot-ages-error">
+              </fieldset>
+              <fieldset class="fieldset">
+                <label class="fieldset-legend" for="plan-slot-max-teams">{{$L.plan_slot_max_teams}}</label>
+                <input id="plan-slot-max-teams" class="input w-full" type="number" name="max_teams" min="1" max="99" value="{{.MaxTeams}}" aria-describedby="plan-slot-max-teams-help plan-slot-max-teams-error">
+                <p id="plan-slot-max-teams-help" class="label">{{$L.plan_slot_max_teams_help}}</p>
+                {{with .MaxTeamsError}}<p id="plan-slot-max-teams-error" class="text-sm text-error" role="alert">{{.}}</p>{{end}}
+              </fieldset>
+            </div>
+            <p class="label">{{$L.plan_slot_ages_help}}</p>
+            {{with .AgesError}}<p id="plan-slot-ages-error" class="text-sm text-error" role="alert">{{.}}</p>{{end}}
+            <div><button class="btn btn-primary" type="submit">{{$L.plan_slot_save}}</button></div>
+          </form>
+          <div class="divider"></div>
+          <form method="post" action="{{$.Group.PlanSlot.DeleteURL}}" hx-post="{{$.Group.PlanSlot.DeleteURL}}" hx-target="#page-content" hx-swap="outerHTML" hx-disabled-elt="this" hx-confirm="{{$L.plan_slot_delete_confirm}}">
+            <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
+            <input type="hidden" name="version" value="{{$.Group.PlanSlot.Version}}">
+            <button class="btn btn-outline btn-error" type="submit">{{$L.plan_slot_delete}}</button>
+          </form>
+        </div>
+      </section>
+    {{end}}
+  {{end}}{{end}}
+{{end}}

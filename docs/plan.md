@@ -160,12 +160,13 @@ Progress is in the Status table below. The original first steps were:
 | 3 | merged | #19 |
 | 4 | merged | #20 |
 | 5 | merged | #23 |
-| 7 | in progress (lane B) | |
-| 8 | in progress (lane A) | |
+| 7 | in review, rebasing (lane B) | #25 |
+| 8 | merged | #24 |
+| 9 | in progress (lane A) | |
 | 13 | in progress (lane C) | |
 | 21 | merged (browser account pool, rate-limit backoff) | #22 |
 | 6 | merged | #17 |
-| 9–12, 14, 15 | open | |
+| 10–12, 14, 15 | open | |
 
 ## Owner answers (2026-10-23)
 

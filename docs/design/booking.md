@@ -177,6 +177,31 @@ Refinements made in #7 (open for the owner to confirm):
 - Availability changes never change plans or events (owner decision); #12
   and #14 show the resulting warnings.
 
+Refinements made in #13 (open for the owner to confirm):
+
+- Admins, managers, and site administrators edit the resource slot plan;
+  coaches see it read only; players and parents do not see it (no
+  navigation entry, access denied).
+- Slots have a week of `A`, `B`, or `all`; A and B only in parts with
+  alternating weeks. Clicking the grid adds a slot for the shown week; the
+  slot's page turns it into an every-week slot. A slot in a part that later
+  stops alternating is shown in every week and becomes `all` when moved.
+- Ages are whole years from 1 to 99 (either end optional); the team limit
+  is 1 to 99 or none. Times are inside one day (end up to midnight).
+- A new part starts empty. Copying is explicit, offered from the previous
+  season's matching part and the part before, replaces the target's slots
+  after confirmation, and can be redone. Weeks are kept when the target
+  alternates; otherwise all copies become every-week slots and exact
+  duplicates are copied once. Slots on archived resources are skipped (the
+  page says how many).
+- Capacity warnings count a slot without a team limit as one team. They
+  never block a change.
+- Slots on archived resources stay, shown in a marked column and not
+  draggable; they can be edited or deleted, and moved to an active resource.
+- Removing a season part removes its slots. Audit entries name slots by ID
+  with their resource ID, week, day, times, ages, and team limit
+  (`group.plan.*`).
+
 ## Data model
 
 All tables carry `group_id` (directly or through their parent) so every query
@@ -201,7 +226,7 @@ season_parts (group_id, season_id, position 1 | 2, name, starts_on, ends_on, alt
 season_team_coaches (group_id, season_id, team_id, coach_user_id, is_head)   coach needs the coach role; one head coach per team and season
 coach_qualifications (group_id, coach_user_id, min_age, max_age)   ages 0..99; coach needs the coach role
 coach_availability (group_id, season_part_id, coach_user_id, week, weekday, start_minute, end_minute)   merged per week and weekday
-plan_slots (season_part_id, resource_id, week, weekday, start_minute, end_minute, min_age?, max_age?, max_teams?)
+plan_slots (group_id, season_part_id, resource_id, week, weekday, start_minute, end_minute, min_age?, max_age?, max_teams?, version)   A/B only in alternating parts; slots may overlap
 plan_trainings (season_part_id, team_id, resource_id, plan_slot_id?, week, weekday, start_minute, end_minute)
 events (group_id, kind, title, starts_at, ends_at, resource_id?, location?, signup_mode,
         max_participants?, signup_deadline?,

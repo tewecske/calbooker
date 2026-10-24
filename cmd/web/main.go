@@ -87,6 +87,7 @@ func main() {
 		Seasons:             applicationGraph.Season,
 		Events:              applicationGraph.Event,
 		Coaches:             applicationGraph.Coach,
+		Plan:                applicationGraph.PlanSlot,
 		JoinGroup:           applicationGraph.GroupJoin,
 		AdminAccounts:       applicationGraph.AdminAccounts,
 		AdminAccountEditor:  applicationGraph.AdminAccounts,

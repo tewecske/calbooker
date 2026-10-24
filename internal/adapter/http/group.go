@@ -83,26 +83,28 @@ type TimeZoneOption struct {
 // GroupDetailView is the shell of every group page: heading, section
 // navigation, and the current section's data.
 type GroupDetailView struct {
-	L          map[string]string
-	GroupID    int64
-	Name       string
-	Section    string
-	Nav        []GroupNavItem
-	RoleLabels []string
-	ListURL    string
-	Overview   *GroupOverviewView
-	Settings   *GroupSettingsView
-	Members    *GroupMembersView
-	Teams      *TeamsView
-	Team       *TeamDetailView
-	Invites    *InvitesView
-	Children   *ChildrenView
-	Resources  *ResourcesView
-	Resource   *ResourceDetailView
-	Seasons    *SeasonsView
-	Season     *SeasonDetailView
-	Events     *EventsView
-	Event      *EventDetailView
+	L            map[string]string
+	GroupID      int64
+	Name         string
+	Section      string
+	Nav          []GroupNavItem
+	RoleLabels   []string
+	ListURL      string
+	Overview     *GroupOverviewView
+	Settings     *GroupSettingsView
+	Members      *GroupMembersView
+	Teams        *TeamsView
+	Team         *TeamDetailView
+	Invites      *InvitesView
+	Children     *ChildrenView
+	Resources    *ResourcesView
+	Resource     *ResourceDetailView
+	Seasons      *SeasonsView
+	Season       *SeasonDetailView
+	Events       *EventsView
+	Event        *EventDetailView
+	Coaches      *CoachesView
+	Availability *AvailabilityView
 }
 
 // GroupNavItem is one group section link.
@@ -210,6 +212,7 @@ func registerGroupRoutes(mux *http.ServeMux, groups *groupHandler) {
 	registerResourceRoutes(mux, groups)
 	registerSeasonRoutes(mux, groups)
 	registerEventRoutes(mux, groups)
+	registerCoachRoutes(mux, groups)
 }
 
 func newGroupHandler(renderer *PageRenderer, dependencies Dependencies) *groupHandler {
@@ -235,7 +238,7 @@ func groupLabels(renderer *PageRenderer) map[locale.Code]map[string]string {
 	for _, language := range locale.Codes() {
 		values := make(map[string]string)
 		for _, id := range renderer.catalogs.Keys(language) {
-			if !strings.HasPrefix(id, "groups.") && !strings.HasPrefix(id, "teams.") && !strings.HasPrefix(id, "invites.") && !strings.HasPrefix(id, "children.") && !strings.HasPrefix(id, "resources.") && !strings.HasPrefix(id, "seasons.") && !strings.HasPrefix(id, "events.") {
+			if !strings.HasPrefix(id, "groups.") && !strings.HasPrefix(id, "teams.") && !strings.HasPrefix(id, "invites.") && !strings.HasPrefix(id, "children.") && !strings.HasPrefix(id, "resources.") && !strings.HasPrefix(id, "seasons.") && !strings.HasPrefix(id, "events.") && !strings.HasPrefix(id, "coaches.") {
 				continue
 			}
 			if text, err := renderer.catalogs.Translate(language, id, nil); err == nil {
@@ -661,6 +664,18 @@ func (h *groupHandler) renderSection(writer http.ResponseWriter, request *http.R
 		if !h.loadEvent(writer, request, current, group.ID, teamID, form, view) {
 			return
 		}
+	case groupSectionCoaches:
+		if !h.loadCoaches(writer, request, current, group.ID, form, view) {
+			return
+		}
+	case groupSectionAvailability:
+		if !h.loadAvailability(writer, request, current, group.ID, teamID, view) {
+			return
+		}
+	case groupSectionAvailabilityOverview:
+		if !h.loadAvailabilityOverview(writer, request, current, group.ID, view) {
+			return
+		}
 	}
 	h.renderGroupPage(writer, request, current, view, form, alerts, status)
 }
@@ -692,6 +707,9 @@ func (h *groupHandler) groupShell(current groupRequest, group service.Group, sec
 	if current.access.CanViewSeasons() {
 		items = append(items, struct{ id, label, route string }{groupSectionSeasons, "seasons.nav", "/seasons"})
 	}
+	if current.access.CanViewCoaches() {
+		items = append(items, struct{ id, label, route string }{groupSectionCoaches, "coaches.nav", "/coaches"})
+	}
 	if current.access.CanViewResources() {
 		items = append(items, struct{ id, label, route string }{groupSectionResources, "resources.nav", "/resources"})
 	}
@@ -705,7 +723,8 @@ func (h *groupHandler) groupShell(current groupRequest, group service.Group, sec
 		items = append(items, struct{ id, label, route string }{groupSectionSettings, "groups.nav.settings", "/settings"})
 	}
 	for _, item := range items {
-		currentSection := section == item.id || (section == groupSectionTeam && item.id == groupSectionTeams) || (section == groupSectionResource && item.id == groupSectionResources) || (section == groupSectionSeason && item.id == groupSectionSeasons) || (section == groupSectionEvent && item.id == groupSectionEvents)
+		currentSection := section == item.id || (section == groupSectionTeam && item.id == groupSectionTeams) || (section == groupSectionResource && item.id == groupSectionResources) || (section == groupSectionSeason && item.id == groupSectionSeasons) || (section == groupSectionEvent && item.id == groupSectionEvents) ||
+			(item.id == groupSectionCoaches && (section == groupSectionAvailability || section == groupSectionAvailabilityOverview))
 		view.Nav = append(view.Nav, GroupNavItem{ID: item.id, Label: h.t(language, item.label), URL: h.groupPath(language, group.ID, item.route), Current: currentSection})
 	}
 	return view

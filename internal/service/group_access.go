@@ -332,6 +332,47 @@ func (a *GroupAccess) CanViewEvent(event Event) bool {
 	return a.IsMember() && slices.Contains(event.CoachUserIDs(), a.userID)
 }
 
+// CanViewCoaches reports whether the account sees the coaches page: staff
+// (every coach) and coaches (only themselves).
+func (a *GroupAccess) CanViewCoaches() bool {
+	return a.CanManageGroup() || a.HasRole(GroupRoleCoach)
+}
+
+// CanManageQualifications reports whether the account may set and clear
+// coach qualifications (admins, managers, and site administrators).
+func (a *GroupAccess) CanManageQualifications() bool {
+	return a.CanManageGroup()
+}
+
+// CanViewQualification reports whether the account sees the qualification
+// of coachUserID: staff, and the coach themself (read only).
+func (a *GroupAccess) CanViewQualification(coachUserID int64) bool {
+	return a.CanManageQualifications() || a.isCoachSelf(coachUserID)
+}
+
+// CanViewAllAvailability reports whether the account sees every coach's
+// availability side by side (admins, managers, and site administrators).
+func (a *GroupAccess) CanViewAllAvailability() bool {
+	return a.CanManageGroup()
+}
+
+// CanViewAvailability reports whether the account sees the availability of
+// coachUserID: staff, and the coach themself. Coaches do not see other
+// coaches' availability.
+func (a *GroupAccess) CanViewAvailability(coachUserID int64) bool {
+	return a.CanViewAllAvailability() || a.isCoachSelf(coachUserID)
+}
+
+// CanEditAvailability reports whether the account may change the
+// availability of coachUserID: staff, and the coach themself.
+func (a *GroupAccess) CanEditAvailability(coachUserID int64) bool {
+	return a.CanManageGroup() || a.isCoachSelf(coachUserID)
+}
+
+func (a *GroupAccess) isCoachSelf(coachUserID int64) bool {
+	return coachUserID > 0 && coachUserID == a.UserID() && a.HasRole(GroupRoleCoach)
+}
+
 // CanManageRoster reports whether the account may add and remove players
 // and parents on a team: admins, managers, and the team's coaches.
 func (a *GroupAccess) CanManageRoster(teamID int64) bool {

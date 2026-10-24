@@ -131,11 +131,41 @@ in `.env.local`; every test works in its own throwaway schema. CI runs the same
 tests against a throwaway PostgreSQL.
 
 `make e2e` runs the Playwright specs in `tests/browser/` against the running
-stack. They sign up new accounts at the provider; the revocation scenario also
-needs a provider administrator in `CALBOOKER_BROWSER_PROVIDER_ADMIN_EMAIL` and
-`_PASSWORD` (goweb's bootstrap administrator). The calbooker URL, provider URL,
-and client name come from the environment or `.env.local` (written by
-`make dev-setup`); see `tests/README.md`.
+stack. The revocation scenario also needs a provider administrator in
+`CALBOOKER_BROWSER_PROVIDER_ADMIN_EMAIL` and `_PASSWORD` (goweb's bootstrap
+administrator). The calbooker URL, provider URL, client name, and client ID
+come from the environment or `.env.local` (written by `make dev-setup`); see
+`tests/README.md`.
+
+### Browser account pool and the provider rate limit
+
+The provider allows 10 sign-in and sign-up attempts per minute per client
+address, and every worktree on the machine shares that budget. The specs
+therefore keep a pool of provider accounts per worktree: the first run signs
+up one account per role (owner, coach, member, outsider, ...), and later runs
+reuse them from their saved browser state. A full run then submits two
+sign-ups (the first-visit and guest-upgrade scenarios, which must create new
+accounts) and one sign-in (the sign-out scenario's account), down from about
+eleven sign-ups.
+
+The pool lives in `tests/browser/.auth/<provider host>_<client ID>_<hash>/`
+(git-ignored, owner-only files): each role's email and random password and its
+storage state. It is never committed. To start over (for example after
+goweb's database was reset, or to inspect a clean run), delete it:
+
+```sh
+rm -rf tests/browser/.auth
+```
+
+A role whose saved password no longer works is replaced automatically, after
+one rate-limit wait. Pool accounts keep their calbooker data between runs in
+the worktree database, so specs name everything with `uniqueName` and never
+assume an empty account. When the provider answers "Too many attempts. Try
+again shortly." the helpers log `[provider backoff] ...`, wait out the
+one-minute window with jitter, and retry (up to four attempts); each provider
+form submission logs `[provider] sign-up submitted` or
+`[provider] sign-in submitted`, so `make e2e | grep -c '^\[provider\] '`
+counts a run's use of the budget.
 
 ### Playwright browsers
 

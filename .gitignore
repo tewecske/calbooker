@@ -29,3 +29,6 @@
 # Claude Code subagent worktrees
 /.claude/worktrees/
 /.claude/settings.local.json
+
+# Browser spec account pool: provider credentials and storage states
+/tests/browser/.auth/

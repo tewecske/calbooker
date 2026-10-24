@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { appURL, becomeGuest, createInvite, joinWithCode, signUpUser, ssoEnabled, uniqueName } from "./support";
+import { appURL, becomeGuest, createInvite, joinWithCode, poolUser, ssoEnabled, uniqueName } from "./support";
 
 // Resources (#4): admins and managers create, edit, archive, and restore
 // resources; coaches see a read-only list; players and parents do not see
@@ -12,7 +12,7 @@ test.describe("resources", () => {
   test.describe.configure({ mode: "serial" });
 
   test("an admin creates, edits, and archives a resource; a coach reads the list", async ({ browser }) => {
-    const owner = await signUpUser(browser, "calbooker-resources");
+    const owner = await poolUser(browser, "owner");
     const page = owner.page;
     const clubName = uniqueName("Club");
     const fieldName = uniqueName("Field");
@@ -81,7 +81,7 @@ test.describe("resources", () => {
     await expect(page.locator("#alerts")).toContainText("Resource archived.");
 
     // Before joining, the future coach gets 404 like any outsider.
-    const coach = await signUpUser(browser, "calbooker-resources-coach");
+    const coach = await poolUser(browser, "coach");
     expect((await coach.page.goto(`${groupURL}/resources`))?.status()).toBe(404);
 
     // A coach sees the list read only.

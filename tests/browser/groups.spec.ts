@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { appURL, becomeGuest, createInvite, signUpUser, ssoEnabled, uniqueName } from "./support";
+import { appURL, becomeGuest, createInvite, poolUser, ssoEnabled, uniqueName } from "./support";
 
 // Clubs with roles, a time zone, and teams (#2). Opt-in like the single
 // sign-on specs: CALBOOKER_SSO_E2E=1 (make e2e) with goweb's Hydra and
@@ -10,7 +10,7 @@ test.describe("groups", () => {
   test.describe.configure({ mode: "serial" });
 
   test("an admin sets up a club, a team, and a member with two roles; outsiders get 404", async ({ browser }) => {
-    const owner = await signUpUser(browser, "calbooker-club");
+    const owner = await poolUser(browser, "owner");
     const page = owner.page;
     const clubName = uniqueName("Club");
 
@@ -89,7 +89,7 @@ test.describe("groups", () => {
     await expect(guest.page.locator("#team-edit-name")).toHaveCount(0);
 
     // An outsider (another full user) gets 404 on every group page.
-    const outsider = await signUpUser(browser, "calbooker-outsider");
+    const outsider = await poolUser(browser, "outsider");
     for (const url of [groupURL, `${groupURL}/members`, `${groupURL}/teams`, teamURL, `${groupURL}/settings`]) {
       const response = await outsider.page.goto(url);
       expect(response?.status(), url).toBe(404);

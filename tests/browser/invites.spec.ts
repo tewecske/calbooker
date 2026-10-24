@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { appURL, becomeGuest, createInvite, joinWithCode, signUpUser, ssoEnabled, uniqueName } from "./support";
+import { appURL, becomeGuest, createInvite, joinWithCode, poolUser, ssoEnabled, uniqueName } from "./support";
 
 // Role-specific invites, child profiles, and guardians (#3). Opt-in like the
 // other single sign-on specs: CALBOOKER_SSO_E2E=1 (make e2e) with goweb's
@@ -10,7 +10,7 @@ test.describe("invites and children", () => {
   test.describe.configure({ mode: "serial" });
 
   test("an admin invites a player to a team, a guest joins it, and a parent adds a child", async ({ browser }) => {
-    const owner = await signUpUser(browser, "calbooker-invites");
+    const owner = await poolUser(browser, "owner");
     const page = owner.page;
     const clubName = uniqueName("Club");
     const teamName = uniqueName("Lions");
@@ -89,7 +89,7 @@ test.describe("invites and children", () => {
     await expect(parent.page.getByTestId("child-team")).toHaveText(teamName);
 
     // Outsiders still get 404 on the new pages.
-    const outsider = await signUpUser(browser, "calbooker-invites-outsider");
+    const outsider = await poolUser(browser, "outsider");
     for (const url of [`${groupURL}/invites`, `${groupURL}/children`]) {
       const response = await outsider.page.goto(url);
       expect(response?.status(), url).toBe(404);

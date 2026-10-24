@@ -74,7 +74,7 @@ func TestNewBuildsCompleteGraphWithoutDatabaseIO(t *testing.T) {
 		"guest session": graph.GuestSession, "guest claims service": graph.GuestClaim,
 		"guest redemption": graph.GuestRedemption, "guest rate limited": graph.GuestRateLimited,
 		"guest cleanup": graph.GuestCleanup, "theme": graph.Theme, "locale settings": graph.LocaleSettings,
-		"groups": graph.Group, "group join": graph.GroupJoin, "admin accounts": graph.AdminAccounts,
+		"groups": graph.Group, "group join": graph.GroupJoin, "events": graph.Event, "admin accounts": graph.AdminAccounts,
 		"admin diagnostics": graph.AdminDiagnostics, "audit": graph.Audit, "maintenance": graph.Maintenance,
 		"retention": graph.RetentionService, "rate limits": graph.RateLimits, "usage": graph.Usage,
 	} {

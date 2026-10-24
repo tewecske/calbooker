@@ -38,6 +38,7 @@ type Dependencies struct {
 	Profiles    ProfileUseCases
 	Resources   ResourceUseCases
 	Seasons     SeasonUseCases
+	Events      EventUseCases
 	JoinGroup   JoinRateLimitedGroupJoiner
 
 	AdminAccounts       AdminAccountLister

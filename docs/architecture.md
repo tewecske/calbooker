@@ -108,8 +108,12 @@ get `service.ErrGroupNotFound`, which handlers render as 404.
   guardians), `CanManageGuardians` (staff), `CanViewChildren`,
   `CanManageResources` (admins, managers, site administrators),
   `CanViewResources` (those plus coaches), `CanManageSeasons` (admins,
-  managers, site administrators), `CanViewSeasons` (those plus coaches). Add
-  a question here rather than checking roles in a handler.
+  managers, site administrators), `CanViewSeasons` (those plus coaches),
+  `CanCreateEvents` (staff, and coaches with a team this season),
+  `CanCreateEvent(teamIDs)` (staff; coaches only for teams they all coach),
+  `CanEditEvent(event)` (the same for the event's teams), `CanViewEvent(event)`
+  (the Visibility rule plus the event's extra coaches). Add a question here
+  rather than checking roles in a handler.
 - Extension points: `GroupAccessService.SetCoachedTeams(source)` takes a
   `TeamRelationSource.TeamIDs(ctx, groupID, userID)`; `service.SeasonService`
   implements it from `season_team_coaches` of the group's current season and
@@ -231,3 +235,56 @@ get `service.ErrGroupNotFound`, which handlers render as 404.
   (`POST .../teams/{teamID}/coaches/add`, `/head`, `/remove`). Coaches see the
   season pages read only; players and parents get access denied and no
   navigation entry.
+
+## Events
+
+- `EventService` (`internal/service/event.go`, store
+  `internal/store/postgres/events.go`, migration 000007) owns `events` (kind
+  `training`/`match`/`championship`/`other`, title, `starts_at`/`ends_at` as
+  `timestamptz`, exactly one of `resource_id` and a free-text `location`,
+  `signup_mode` `open`/`nominated`, optional `max_participants` 1 to 999 and
+  `signup_deadline` before the start, `cancelled_at`, `plan_training_id`
+  without a foreign key until #14, `generated_for_week` (a Monday),
+  `edited_at`, `version`), `event_teams` (one or more), and `event_coaches`
+  (extra coaches on top of the teams' season coaches). The version covers the
+  event with its teams and coaches.
+- References stay inside the group: `(group_id, resource_id)` to
+  `resources (group_id, id)`, `(group_id, team_id)` to `teams`, and
+  `(group_id, coach_user_id, 'coach')` to `group_member_roles` (losing the
+  coach role removes the extra coach entries). Later tables (#9, #11, #15)
+  reference an event as `(group_id, event_id)` to `events (group_id, id)`.
+- Times: the form takes wall-clock times (`<input type="datetime-local">`)
+  in the group's time zone; `EventInstant(wall, zone)` converts them and
+  `EventLocalTime(instant, zone)` converts back. A time skipped by a
+  daylight-saving change (02:00 to 02:59 on the last Sunday of March in
+  Europe/Budapest) is refused (`ErrEventTimeSkipped` in an `EventFieldError`
+  naming the field); a time that happens twice (the same hour in October) is
+  its first occurrence, still on summer time. Events keep their wall-clock
+  times, so an event across a change lasts an hour less or more. An event lasts
+  at most 31 days.
+- Use cases: `List(access, EventQuery{From, To, TeamID, Descending, Limit})`
+  and `ListBetween(access, from, to)` (events overlapping `[from, to)`,
+  cancelled ones included, only those the account sees; for the weekly
+  calendars of #10), `Find(access, id)` and `Detail(access, id)` (event,
+  group time zone, the teams' season coaches in the season containing the
+  event's first day, and warnings for accounts that edit it; invisible events
+  are `ErrEventNotFound`, 404), `FormOptions(access, event)` (teams the account
+  may use, active resources, coach-role members), `Create`, `Update` (at the
+  revision; returns warnings), `SetCancelled` (cancel or reinstate; a
+  cancelled event stays and is shown), and `Delete`, audited as
+  `group.event.created`, `.updated`, `.cancelled`, `.restored`, `.deleted`
+  (detail: ID, title, kind, UTC times, team IDs, resource ID or "location",
+  extra coach IDs; never the location text). Editing or cancelling a
+  generated event sets `edited_at`, which regeneration (#15) keeps.
+- Warnings never block a write: the resource is over its
+  `max_concurrent_teams` when the most teams on it at one moment of the event
+  (its own plus overlapping non-cancelled events on the resource) exceed the
+  limit; a coach is busy when one of the event's coaches (extra or season
+  coach of its teams) also coaches an overlapping non-cancelled event.
+  `Create` and `Update` return them; the event page shows them to accounts
+  that may edit the event.
+- Pages: `/{language}/groups/{id}/events` (upcoming, `?when=past`,
+  `?team=<id>`; the create form for those who create events) and
+  `/{language}/groups/{id}/events/{eventID}` with `POST .../cancel` and
+  `.../delete` (`event.go`, `events.html`, catalogs `events.json`). Every
+  member has the Events tab and sees the events visible to them.

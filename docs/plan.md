@@ -161,7 +161,7 @@ Progress is in the Status table below. The original first steps were:
 | 4 | merged | #20 |
 | 5 | merged | #23 |
 | 7 | merged | #25 |
-| 10 | in progress (lane B) | |
+| 10 | merged | #28 |
 | 8 | merged | #24 |
 | 9 | merged | #27 |
 | 13 | merged | #26 |

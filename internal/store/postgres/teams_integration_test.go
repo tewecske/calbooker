@@ -17,11 +17,11 @@ func TestTeamRepositoryLifecycle(t *testing.T) {
 	teams := mustTeamRepository(t, harness)
 	adminID := insertIntegrationUser(t, harness, "admin@example.test")
 
-	group, _, err := memberships.CreateGroupWithAdmin(ctx, service.Group{Name: "Club", NameNorm: "club", InviteCode: "INVITE000010", CreatedAt: 100}, adminID)
+	group, _, err := memberships.CreateGroupWithAdmin(ctx, service.Group{Name: "Club", NameNorm: "club", CreatedAt: 100}, adminID)
 	if err != nil {
 		t.Fatalf("CreateGroupWithAdmin() error = %v", err)
 	}
-	other, _, err := memberships.CreateGroupWithAdmin(ctx, service.Group{Name: "Other", NameNorm: "other", InviteCode: "INVITE000011", CreatedAt: 100}, adminID)
+	other, _, err := memberships.CreateGroupWithAdmin(ctx, service.Group{Name: "Other", NameNorm: "other", CreatedAt: 100}, adminID)
 	if err != nil {
 		t.Fatalf("CreateGroupWithAdmin(other) error = %v", err)
 	}
@@ -82,7 +82,7 @@ func TestTeamRosterFollowsGroupRoles(t *testing.T) {
 	adminID := insertIntegrationUser(t, harness, "admin@example.test")
 	playerID := insertIntegrationGuest(t, harness)
 
-	group, _, err := memberships.CreateGroupWithAdmin(ctx, service.Group{Name: "Club", NameNorm: "club", InviteCode: "INVITE000012", CreatedAt: 100}, adminID)
+	group, _, err := memberships.CreateGroupWithAdmin(ctx, service.Group{Name: "Club", NameNorm: "club", CreatedAt: 100}, adminID)
 	if err != nil {
 		t.Fatalf("CreateGroupWithAdmin() error = %v", err)
 	}
@@ -146,7 +146,7 @@ func TestGuestRetentionKeepsProfilesAndGroupGuests(t *testing.T) {
 	if err := harness.DB.QueryRowContext(ctx, "INSERT INTO users (kind, display_name, created_at) VALUES ('profile', 'Kid', 1) RETURNING id").Scan(&profileID); err != nil {
 		t.Fatalf("insert profile: %v", err)
 	}
-	group, _, err := memberships.CreateGroupWithAdmin(ctx, service.Group{Name: "Club", NameNorm: "club", InviteCode: "INVITE000013", CreatedAt: 100}, adminID)
+	group, _, err := memberships.CreateGroupWithAdmin(ctx, service.Group{Name: "Club", NameNorm: "club", CreatedAt: 100}, adminID)
 	if err != nil {
 		t.Fatalf("CreateGroupWithAdmin() error = %v", err)
 	}

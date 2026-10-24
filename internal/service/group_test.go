@@ -70,9 +70,6 @@ func TestGroupServiceCreate(t *testing.T) {
 			if !slices.Equal(summary.Roles, []string{GroupRoleAdmin}) || summary.Group.TimeZone != test.wantZone {
 				t.Fatalf("summary = %+v, want admin in %s", summary, test.wantZone)
 			}
-			if len(summary.Group.InviteCode) != groupInviteCodeLength {
-				t.Fatalf("invite code length = %d, want %d", len(summary.Group.InviteCode), groupInviteCodeLength)
-			}
 			if summary.Group.CreatedBy == nil || *summary.Group.CreatedBy != test.user.ID || memberships.adminUserID != test.user.ID {
 				t.Fatalf("creator = %v / %d, want %d", summary.Group.CreatedBy, memberships.adminUserID, test.user.ID)
 			}
@@ -80,18 +77,6 @@ func TestGroupServiceCreate(t *testing.T) {
 				t.Fatalf("audit = %+v, want one group.created record with origin", auditor.records)
 			}
 		})
-	}
-}
-
-func TestGroupServiceCreateRetriesInviteCollision(t *testing.T) {
-	memberships := newMembershipStub()
-	memberships.collisions = 2
-	service, _ := newTestGroupService(t, &groupRepositoryStub{}, memberships, usersWith(User{ID: 7}))
-	if _, err := service.Create(context.Background(), 7, "", "Example", ""); err != nil {
-		t.Fatalf("Create() error = %v, want nil", err)
-	}
-	if memberships.createCalls != 3 {
-		t.Fatalf("create calls = %d, want 3", memberships.createCalls)
 	}
 }
 
@@ -118,24 +103,13 @@ func TestGroupServiceListIncludesEveryGroupForSiteAdministrator(t *testing.T) {
 	}
 }
 
-func TestGroupServiceOverviewShowsInviteOnlyToManagers(t *testing.T) {
-	groups := &groupRepositoryStub{group: Group{ID: 5, Name: "Club", InviteCode: "ABCDEFGHJKLM", TimeZone: "Europe/Budapest"}}
+func TestGroupServiceOverviewForMembers(t *testing.T) {
+	groups := &groupRepositoryStub{group: Group{ID: 5, Name: "Club", TimeZone: "Europe/Budapest"}}
 	service, _ := newTestGroupService(t, groups, newMembershipStub(), usersWith(User{ID: 7}))
-	for _, test := range []struct {
-		grants     GroupAccessGrants
-		wantInvite bool
-	}{
-		{memberWith(GroupRoleAdmin), true},
-		{memberWith(GroupRoleManager), true},
-		{memberWith(GroupRoleCoach), false},
-		{memberWith(GroupRolePlayer), false},
-	} {
-		overview, err := service.Overview(context.Background(), accessFor(test.grants))
-		if err != nil {
-			t.Fatalf("Overview() error = %v", err)
-		}
-		if (overview.InviteCode != "") != test.wantInvite {
-			t.Fatalf("roles %v invite = %q, want shown %v", test.grants.Roles, overview.InviteCode, test.wantInvite)
+	for _, grants := range []GroupAccessGrants{memberWith(GroupRoleAdmin), memberWith(GroupRolePlayer)} {
+		overview, err := service.Overview(context.Background(), accessFor(grants))
+		if err != nil || overview.Group.ID != 5 {
+			t.Fatalf("Overview() = %+v, %v", overview, err)
 		}
 	}
 	if _, err := service.Overview(context.Background(), accessFor(GroupAccessGrants{})); !errors.Is(err, ErrGroupNotFound) {
@@ -208,51 +182,6 @@ func TestNormalizeTimeZone(t *testing.T) {
 		if _, err := NormalizeTimeZone(zone); err != nil {
 			t.Errorf("offered time zone %q is invalid: %v", zone, err)
 		}
-	}
-}
-
-func TestGroupServiceRotateInvite(t *testing.T) {
-	groups := &groupRepositoryStub{group: Group{ID: 5, InviteCode: "OLDCODE12345", Version: 1}}
-	service, auditor := newTestGroupService(t, groups, newMembershipStub(), usersWith(User{ID: 7}))
-	if _, err := service.RotateInvite(context.Background(), actorWith(memberWith(GroupRolePlayer))); !errors.Is(err, ErrGroupForbidden) {
-		t.Fatalf("player RotateInvite() error = %v, want ErrGroupForbidden", err)
-	}
-	code, err := service.RotateInvite(context.Background(), actorWith(memberWith(GroupRoleManager)))
-	if err != nil {
-		t.Fatalf("RotateInvite() error = %v", err)
-	}
-	if len(code) != groupInviteCodeLength || code == "OLDCODE12345" {
-		t.Fatalf("rotated code = %q, want a fresh invite code", code)
-	}
-	if len(auditor.records) != 1 || auditor.records[0].Action != AuditActionGroupInvite || strings.Contains(auditor.records[0].Detail, code) {
-		t.Fatalf("audit = %+v, want one record without the code", auditor.records)
-	}
-}
-
-func TestGroupServiceJoin(t *testing.T) {
-	groups := &groupRepositoryStub{group: Group{ID: 5, InviteCode: "ABCDEFGHJKLM"}}
-	memberships := newMembershipStub()
-	service, _ := newTestGroupService(t, groups, memberships, usersWith(User{ID: 8}))
-	joined, err := service.Join(context.Background(), 8, " abcdefghjklm ")
-	if err != nil {
-		t.Fatalf("Join() error = %v", err)
-	}
-	if joined.GroupID != 5 || !slices.Equal(joined.Roles, []string{GroupRolePlayer}) {
-		t.Fatalf("Join() = %+v, want a player of group 5", joined)
-	}
-
-	memberships.memberships[7] = GroupMembership{GroupID: 5, UserID: 7, Roles: []string{GroupRoleAdmin}}
-	again, err := service.Join(context.Background(), 7, "ABCDEFGHJKLM")
-	if err != nil || !slices.Equal(again.Roles, []string{GroupRoleAdmin}) || memberships.createCalls != 1 {
-		t.Fatalf("existing member Join() = %+v, %v (creates %d); want unchanged admin", again, err, memberships.createCalls)
-	}
-
-	groups.findByCodeErr = ErrGroupNotFound
-	if _, err := service.Join(context.Background(), 9, "UNKNOWN00000"); !errors.Is(err, ErrGroupInviteNotFound) {
-		t.Fatalf("Join(unknown) error = %v, want ErrGroupInviteNotFound", err)
-	}
-	if _, err := service.Join(context.Background(), 9, "  "); !errors.Is(err, ErrGroupInviteNotFound) {
-		t.Fatalf("Join(empty) error = %v, want ErrGroupInviteNotFound", err)
 	}
 }
 
@@ -399,8 +328,15 @@ func TestGroupServiceRemoveMemberAndLeave(t *testing.T) {
 	memberships.memberships[7] = GroupMembership{GroupID: 5, UserID: 7, Roles: []string{GroupRoleManager}, Version: 1}
 	memberships.memberships[8] = GroupMembership{GroupID: 5, UserID: 8, Roles: []string{GroupRolePlayer}}
 	memberships.memberships[9] = GroupMembership{GroupID: 5, UserID: 9, Roles: []string{GroupRoleAdmin}}
-	service, auditor := newTestGroupService(t, &groupRepositoryStub{}, memberships, usersWith(User{ID: 7}))
+	memberships.memberships[20] = GroupMembership{GroupID: 5, UserID: 20, Roles: []string{GroupRolePlayer}}
+	service, auditor := newTestGroupService(t, &groupRepositoryStub{}, memberships, usersWith(User{ID: 7}, User{ID: 8}, User{ID: 20, Kind: UserKindProfile}))
 	manager := actorWith(memberWith(GroupRoleManager))
+
+	// Child profiles are deleted through the profile service, never removed
+	// as members (that would orphan the profile).
+	if err := service.RemoveMember(context.Background(), manager, 20, 0); !errors.Is(err, ErrProfileMembership) {
+		t.Fatalf("RemoveMember(profile) error = %v, want ErrProfileMembership", err)
+	}
 
 	if err := service.RemoveMember(context.Background(), manager, 7, 0); !errors.Is(err, ErrInvalidGroup) {
 		t.Fatalf("RemoveMember(self) error = %v, want ErrInvalidGroup", err)
@@ -439,8 +375,8 @@ func TestGroupServiceRemoveMemberAndLeave(t *testing.T) {
 func TestGroupServiceSiteAdministratorActionsAreMarked(t *testing.T) {
 	groups := &groupRepositoryStub{group: Group{ID: 5, Version: 1}}
 	service, auditor := newTestGroupService(t, groups, newMembershipStub(), usersWith(User{ID: 7, IsAdmin: true}))
-	if _, err := service.RotateInvite(context.Background(), actorWith(GroupAccessGrants{SiteAdmin: true})); err != nil {
-		t.Fatalf("RotateInvite() error = %v", err)
+	if _, err := service.UpdateSettings(context.Background(), actorWith(GroupAccessGrants{SiteAdmin: true}), 1, "Club", "UTC"); err != nil {
+		t.Fatalf("UpdateSettings() error = %v", err)
 	}
 	if len(auditor.records) != 1 || !strings.Contains(auditor.records[0].Detail, "site administrator") {
 		t.Fatalf("audit = %+v, want site administrator marker", auditor.records)
@@ -511,7 +447,6 @@ type groupRepositoryStub struct {
 	summaries       []GroupSummary
 	allSummaries    []GroupSummary
 	findErr         error
-	findByCodeErr   error
 	updateErr       error
 	expectedVersion int64
 }
@@ -519,13 +454,6 @@ type groupRepositoryStub struct {
 func (r *groupRepositoryStub) FindGroupByID(context.Context, int64) (Group, error) {
 	if r.findErr != nil {
 		return Group{}, r.findErr
-	}
-	return r.group, nil
-}
-
-func (r *groupRepositoryStub) FindGroupByInviteCode(context.Context, string) (Group, error) {
-	if r.findByCodeErr != nil {
-		return Group{}, r.findByCodeErr
 	}
 	return r.group, nil
 }
@@ -553,7 +481,6 @@ func (r *groupRepositoryStub) UpdateGroup(_ context.Context, group Group, expect
 type groupMembershipRepositoryStub struct {
 	memberships    map[int64]GroupMembership
 	members        []GroupMember
-	collisions     int
 	createCalls    int
 	createErr      error
 	addErr         error
@@ -574,10 +501,6 @@ func (r *groupMembershipRepositoryStub) CreateGroupWithAdmin(_ context.Context, 
 	r.adminUserID = userID
 	if r.createErr != nil {
 		return Group{}, GroupMembership{}, r.createErr
-	}
-	if r.collisions > 0 {
-		r.collisions--
-		return Group{}, GroupMembership{}, ErrGroupInviteTaken
 	}
 	group.ID = int64(r.createCalls)
 	return group, GroupMembership{GroupID: group.ID, UserID: userID, Roles: []string{GroupRoleAdmin}}, nil

@@ -1,0 +1,125 @@
+{{define "group-children"}}
+  {{with .Group}}{{$L := .L}}{{with .Children}}{{$children := .}}
+    <section class="card card-border bg-base-100 shadow-sm" aria-labelledby="children-heading">
+      <div class="card-body">
+        <h2 id="children-heading" class="card-title">{{if .IsStaff}}{{$L.children_heading_all}}{{else}}{{$L.children_heading}}{{end}}</h2>
+        {{if .Children}}
+          <ul class="list rounded-box border border-base-300" data-testid="children">
+            {{range .Children}}
+              {{$child := .}}
+              <li class="list-row items-start" data-child-id="{{.UserID}}">
+                <div class="list-col-grow grid gap-1">
+                  <div class="font-medium" data-testid="child-name">{{.Label}}
+                    {{if .IsProfile}} <span class="badge badge-outline badge-sm">{{$L.children_profile_badge}}</span>{{else}} <span class="badge badge-ghost badge-sm">{{$L.children_account_badge}}</span>{{end}}
+                  </div>
+                  {{if .BirthYear}}<div class="text-sm opacity-70">{{$L.children_birth_year}}: <span data-testid="child-birth-year">{{.BirthYear}}</span></div>{{end}}
+                  <div class="text-sm">{{$L.children_teams}}:
+                    {{range $index, $team := .Teams}}{{if $index}}, {{end}}<span data-testid="child-team">{{$team}}</span>{{else}}<span class="opacity-70">{{$L.children_no_teams}}</span>{{end}}
+                  </div>
+                  <div class="flex flex-wrap items-center gap-1 text-sm">{{$L.children_guardians}}:
+                    {{range .Guardians}}
+                      {{if $children.IsStaff}}
+                        <form method="post" action="{{$children.UnlinkURL}}" hx-post="{{$children.UnlinkURL}}" hx-target="#page-content" hx-swap="outerHTML" hx-disabled-elt="this">
+                          <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
+                          <input type="hidden" name="parent_id" value="{{.UserID}}">
+                          <input type="hidden" name="child_id" value="{{$child.UserID}}">
+                          <button class="badge badge-soft gap-1" type="submit" data-guardian="{{.UserID}}" aria-label="{{$L.children_unlink}}: {{.Label}}">{{.Label}} <span aria-hidden="true">×</span></button>
+                        </form>
+                      {{else}}
+                        <span class="badge badge-soft" data-guardian="{{.UserID}}">{{.Label}}</span>
+                      {{end}}
+                    {{else}}
+                      <span class="opacity-70">{{$L.children_no_guardians}}</span>
+                    {{end}}
+                  </div>
+                  {{if .CanEdit}}
+                    <details class="collapse collapse-arrow bg-base-200 mt-2">
+                      <summary class="collapse-title text-sm font-medium">{{$L.children_edit}}</summary>
+                      <div class="collapse-content grid gap-3">
+                        <form class="grid gap-3 sm:grid-cols-[1fr_10rem_auto] sm:items-end" method="post" action="{{.EditURL}}" hx-post="{{.EditURL}}" hx-target="#page-content" hx-swap="outerHTML" hx-disabled-elt="this">
+                          <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
+                          <input type="hidden" name="version" value="{{.Version}}">
+                          <fieldset class="fieldset">
+                            <label class="fieldset-legend" for="child-{{.UserID}}-name">{{$L.children_name}}</label>
+                            <input id="child-{{.UserID}}-name" class="input w-full" name="display_name" required maxlength="64" value="{{.Label}}">
+                          </fieldset>
+                          <fieldset class="fieldset">
+                            <label class="fieldset-legend" for="child-{{.UserID}}-birth-year">{{$L.children_birth_year}}</label>
+                            <input id="child-{{.UserID}}-birth-year" class="input w-full" type="number" name="birth_year" required min="1900" max="2200" value="{{.BirthYear}}">
+                          </fieldset>
+                          <div><button class="btn btn-sm" type="submit">{{$L.children_save}}</button></div>
+                        </form>
+                        <form method="post" action="{{.DeleteURL}}" hx-post="{{.DeleteURL}}" hx-target="#page-content" hx-swap="outerHTML" hx-disabled-elt="this"
+                              hx-confirm="{{$L.children_delete_confirm}}">
+                          <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
+                          <input type="hidden" name="version" value="{{.Version}}">
+                          <button class="btn btn-sm btn-outline btn-error" type="submit">{{$L.children_delete}}</button>
+                        </form>
+                      </div>
+                    </details>
+                  {{end}}
+                </div>
+              </li>
+            {{end}}
+          </ul>
+        {{else}}
+          <p class="text-sm opacity-70">{{$L.children_empty}}</p>
+        {{end}}
+      </div>
+    </section>
+
+    {{if .CanCreate}}
+      <section class="card card-border bg-base-100 shadow-sm" aria-labelledby="child-create-heading">
+        <div class="card-body">
+          <h2 id="child-create-heading" class="card-title">{{$L.children_create}}</h2>
+          <p class="text-sm opacity-70">{{if .IsStaff}}{{$L.children_create_help_staff}}{{else}}{{$L.children_create_help}}{{end}}</p>
+          <form class="grid gap-4 sm:grid-cols-2" method="post" action="{{.CreateURL}}" hx-post="{{.CreateURL}}" hx-target="#page-content" hx-swap="outerHTML" hx-disabled-elt="this">
+            <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
+            <fieldset class="fieldset">
+              <label class="fieldset-legend" for="child-new-name">{{$L.children_name}}</label>
+              <input id="child-new-name" class="input w-full" name="display_name" required maxlength="64" value="{{.Name}}" aria-describedby="child-new-name-error">
+              {{with .NameError}}<p id="child-new-name-error" class="text-sm text-error" role="alert">{{.}}</p>{{end}}
+            </fieldset>
+            <fieldset class="fieldset">
+              <label class="fieldset-legend" for="child-new-birth-year">{{$L.children_birth_year}}</label>
+              <input id="child-new-birth-year" class="input w-full" type="number" name="birth_year" required min="1900" max="2200" value="{{.BirthYear}}" aria-describedby="child-new-birth-year-error">
+              {{with .YearError}}<p id="child-new-birth-year-error" class="text-sm text-error" role="alert">{{.}}</p>{{end}}
+            </fieldset>
+            {{if .IsStaff}}
+              <fieldset class="fieldset">
+                <label class="fieldset-legend" for="child-new-guardian">{{$L.children_guardian}}</label>
+                <select id="child-new-guardian" class="select w-full" name="guardian_id">{{template "select-options" .GuardianOption}}</select>
+              </fieldset>
+              <fieldset class="fieldset">
+                <label class="fieldset-legend" for="child-new-team">{{$L.children_team}}</label>
+                <select id="child-new-team" class="select w-full" name="team_id">{{template "select-options" .TeamOptions}}</select>
+              </fieldset>
+            {{end}}
+            <div class="sm:col-span-2"><button class="btn btn-primary" type="submit">{{$L.children_create}}</button></div>
+          </form>
+        </div>
+      </section>
+    {{end}}
+
+    {{if and .IsStaff .ParentOptions}}
+      <section class="card card-border bg-base-100 shadow-sm" aria-labelledby="guardian-link-heading">
+        <div class="card-body">
+          <h2 id="guardian-link-heading" class="card-title">{{$L.children_link}}</h2>
+          <p class="text-sm opacity-70">{{$L.children_link_help}}</p>
+          <form class="grid gap-4 sm:grid-cols-[1fr_1fr_auto] sm:items-end" method="post" action="{{.LinkURL}}" hx-post="{{.LinkURL}}" hx-target="#page-content" hx-swap="outerHTML" hx-disabled-elt="this">
+            <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
+            <fieldset class="fieldset">
+              <label class="fieldset-legend" for="guardian-parent">{{$L.children_parent}}</label>
+              <select id="guardian-parent" class="select w-full" name="parent_id" required>{{template "select-options" .ParentOptions}}</select>
+            </fieldset>
+            <fieldset class="fieldset">
+              <label class="fieldset-legend" for="guardian-child">{{$L.children_child}}</label>
+              <select id="guardian-child" class="select w-full" name="child_id" required>{{template "select-options" .ChildOptions}}</select>
+            </fieldset>
+            <div><button class="btn" type="submit">{{$L.children_link_submit}}</button></div>
+          </form>
+        </div>
+      </section>
+    {{end}}
+  {{end}}{{end}}
+{{end}}

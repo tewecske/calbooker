@@ -51,7 +51,9 @@ type RosterListView struct {
 	RemoveURL   string
 	RemoveLabel string
 	EmptyLabel  string
-	CSRFToken   string
+	// ParentOfLabel introduces the children of a parent row.
+	ParentOfLabel string
+	CSRFToken     string
 }
 
 // TeamRowView is one team list row.
@@ -94,6 +96,11 @@ type RosterRowView struct {
 	Label  string
 	Email  string
 	Role   string
+	// Linked is true for a parent shown only through a guardian link; it
+	// is removed by unlinking, not from the roster.
+	Linked bool
+	// ParentOf names the players on this team the parent is a guardian of.
+	ParentOf string
 }
 
 // RosterCandidateView is one member and role that can be added to the roster;
@@ -320,14 +327,29 @@ func (h *groupHandler) loadTeam(writer http.ResponseWriter, request *http.Reques
 	}
 	csrf := csrfToken(request)
 	team.PlayerList = RosterListView{CanManage: team.CanManageRoster, RemoveURL: team.RosterRemoveURL, RemoveLabel: h.t(language, "teams.roster.remove"), EmptyLabel: h.t(language, "teams.roster.no_players"), CSRFToken: csrf}
-	team.ParentList = RosterListView{CanManage: team.CanManageRoster, RemoveURL: team.RosterRemoveURL, RemoveLabel: h.t(language, "teams.roster.remove"), EmptyLabel: h.t(language, "teams.roster.no_parents"), CSRFToken: csrf}
+	team.ParentList = RosterListView{CanManage: team.CanManageRoster, RemoveURL: team.RosterRemoveURL, RemoveLabel: h.t(language, "teams.roster.remove"), EmptyLabel: h.t(language, "teams.roster.no_parents"), ParentOfLabel: h.t(language, "teams.roster.parent_of"), CSRFToken: csrf}
 	onRoster := make(map[string]bool, len(detail.Roster))
+	playerLabels := make(map[int64]string)
 	for _, entry := range detail.Roster {
-		row := RosterRowView{UserID: entry.UserID, Label: h.memberLabel(language, entry.UserID, entry.DisplayName, entry.Username, entry.Email), Role: entry.Role}
+		if entry.Role == service.GroupRolePlayer {
+			playerLabels[entry.UserID] = h.memberLabel(language, entry.UserID, entry.DisplayName, entry.Username, entry.Email)
+		}
+	}
+	for _, entry := range detail.Roster {
+		row := RosterRowView{UserID: entry.UserID, Label: h.memberLabel(language, entry.UserID, entry.DisplayName, entry.Username, entry.Email), Role: entry.Role, Linked: entry.Linked}
 		if entry.Email != nil {
 			row.Email = *entry.Email
 		}
-		onRoster[rosterValue(entry.UserID, entry.Role)] = true
+		children := make([]string, 0, len(entry.ChildUserIDs))
+		for _, childID := range entry.ChildUserIDs {
+			if label, ok := playerLabels[childID]; ok {
+				children = append(children, label)
+			}
+		}
+		row.ParentOf = strings.Join(children, ", ")
+		if !entry.Linked {
+			onRoster[rosterValue(entry.UserID, entry.Role)] = true
+		}
 		if entry.Role == service.GroupRoleParent {
 			team.ParentList.Rows = append(team.ParentList.Rows, row)
 		} else {

@@ -68,9 +68,11 @@ type GroupAccessGrants struct {
 	// CoachedTeamIDs are the teams the member coaches in the current season
 	// (filled once season coaches exist, #5).
 	CoachedTeamIDs []int64
-	// ChildTeamIDs are the teams of the member's linked children (filled once
-	// guardians exist, #3).
+	// ChildTeamIDs are the teams of the member's linked children (the teams
+	// on which a child of the member is a player).
 	ChildTeamIDs []int64
+	// ChildUserIDs are the members the account is a guardian of.
+	ChildUserIDs []int64
 }
 
 // GroupAccess is the single authorization point for one account in one
@@ -85,6 +87,7 @@ type GroupAccess struct {
 	ownTeams  []TeamRole
 	coached   []int64
 	children  []int64
+	childIDs  []int64
 }
 
 // NewGroupAccess builds the access of userID in groupID from its grants.
@@ -98,6 +101,7 @@ func NewGroupAccess(groupID, userID int64, grants GroupAccessGrants) *GroupAcces
 		ownTeams:  slices.Clone(grants.OwnTeams),
 		coached:   slices.Clone(grants.CoachedTeamIDs),
 		children:  slices.Clone(grants.ChildTeamIDs),
+		childIDs:  slices.Clone(grants.ChildUserIDs),
 	}
 }
 
@@ -164,10 +168,66 @@ func (a *GroupAccess) CanManageRole(role string) bool {
 	return a.CanManageGroup()
 }
 
-// CanRotateInvite reports whether the account may see and rotate the
-// group's invite code.
-func (a *GroupAccess) CanRotateInvite() bool {
+// CanManageInvites reports whether the account may open the invite page:
+// admins, managers, site administrators, and coaches (who see only invites
+// for teams they coach).
+func (a *GroupAccess) CanManageInvites() bool {
+	return a.CanManageGroup() || a.HasRole(GroupRoleCoach)
+}
+
+// CanCreateInvite reports whether the account may create, see, and revoke an
+// invite for role and, when teamID > 0, that team. Only admins invite
+// admins; admins and managers invite any other role; coaches invite players
+// and parents to teams they coach. Team invites carry only player or parent.
+func (a *GroupAccess) CanCreateInvite(role string, teamID int64) bool {
+	if !ValidGroupRole(role) {
+		return false
+	}
+	rosterRole := role == GroupRolePlayer || role == GroupRoleParent
+	if teamID > 0 && !rosterRole {
+		return false
+	}
+	if a.CanManageRole(role) {
+		return true
+	}
+	return rosterRole && teamID > 0 && a.CoachesTeam(teamID)
+}
+
+// ChildUserIDs returns the members the account is a guardian of.
+func (a *GroupAccess) ChildUserIDs() []int64 {
+	if !a.IsMember() {
+		return nil
+	}
+	return slices.Clone(a.childIDs)
+}
+
+// IsGuardianOf reports whether the account is a linked parent of userID.
+func (a *GroupAccess) IsGuardianOf(userID int64) bool {
+	return a.IsMember() && userID > 0 && slices.Contains(a.childIDs, userID)
+}
+
+// CanCreateProfile reports whether the account may create a child profile:
+// admins, managers, site administrators, and members with the parent role
+// (whose new profiles are linked to them).
+func (a *GroupAccess) CanCreateProfile() bool {
+	return a.CanManageGroup() || a.HasRole(GroupRoleParent)
+}
+
+// CanEditProfile reports whether the account may change or delete the child
+// profile userID: staff and the profile's guardians.
+func (a *GroupAccess) CanEditProfile(userID int64) bool {
+	return a.CanManageGroup() || a.IsGuardianOf(userID)
+}
+
+// CanManageGuardians reports whether the account may link any parent to any
+// child and remove links (admins, managers, site administrators).
+func (a *GroupAccess) CanManageGuardians() bool {
 	return a.CanManageGroup()
+}
+
+// CanViewChildren reports whether the account sees the children page.
+func (a *GroupAccess) CanViewChildren() bool {
+	return a.CanCreateProfile() || len(a.ChildUserIDs()) > 0
 }
 
 // CanRemoveMember reports whether the account may remove other members.
@@ -246,6 +306,13 @@ type TeamRelationSource interface {
 	TeamIDs(ctx context.Context, groupID, userID int64) ([]int64, error)
 }
 
+// ChildRelationSource lists a parent's children and, through TeamIDs, the
+// teams on which those children play (guardians).
+type ChildRelationSource interface {
+	TeamRelationSource
+	ChildUserIDs(ctx context.Context, groupID, parentUserID int64) ([]int64, error)
+}
+
 // MemberAccess is the stored part of a member's grants.
 type MemberAccess struct {
 	Roles    []string
@@ -267,7 +334,7 @@ type GroupAccessService struct {
 	repository GroupAccessRepository
 	users      UserRepository
 	coached    TeamRelationSource
-	children   TeamRelationSource
+	children   ChildRelationSource
 }
 
 // NewGroupAccessService constructs the access builder.
@@ -289,9 +356,9 @@ func (s *GroupAccessService) SetCoachedTeams(source TeamRelationSource) {
 	}
 }
 
-// SetChildTeams attaches the source of children's teams (guardians). It is
-// intended to be called once during startup.
-func (s *GroupAccessService) SetChildTeams(source TeamRelationSource) {
+// SetChildTeams attaches the source of children and their teams
+// (guardians). It is intended to be called once during startup.
+func (s *GroupAccessService) SetChildTeams(source ChildRelationSource) {
 	if s != nil {
 		s.children = source
 	}
@@ -340,8 +407,13 @@ func (s *GroupAccessService) For(ctx context.Context, userID, groupID int64) (*G
 		}
 	}
 	if grants.Member && s.children != nil {
-		if grants.ChildTeamIDs, err = s.children.TeamIDs(ctx, groupID, userID); err != nil {
-			return nil, fmt.Errorf("find children's teams: %w", err)
+		if grants.ChildUserIDs, err = s.children.ChildUserIDs(ctx, groupID, userID); err != nil {
+			return nil, fmt.Errorf("find children: %w", err)
+		}
+		if len(grants.ChildUserIDs) > 0 {
+			if grants.ChildTeamIDs, err = s.children.TeamIDs(ctx, groupID, userID); err != nil {
+				return nil, fmt.Errorf("find children's teams: %w", err)
+			}
 		}
 	}
 	return NewGroupAccess(groupID, userID, grants), nil

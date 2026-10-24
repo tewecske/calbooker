@@ -102,7 +102,7 @@ func TestOptimisticLockOutcomesForGroupEditors(t *testing.T) {
 	conflict := ErrOptimisticLockConflict
 
 	newService := func(groups *groupRepositoryStub, memberships *groupMembershipRepositoryStub) *GroupService {
-		service, err := NewGroupService(groups, memberships, usersWith(User{ID: 7}))
+		service, err := NewGroupService(groups, memberships, usersWith(User{ID: 7}, User{ID: 8}))
 		if err != nil {
 			t.Fatalf("NewGroupService() error = %v", err)
 		}
@@ -123,15 +123,6 @@ func TestOptimisticLockOutcomesForGroupEditors(t *testing.T) {
 			run: func(writeErr error) error {
 				groups := &groupRepositoryStub{group: Group{ID: 5, Name: "Old", NameNorm: "old", TimeZone: "UTC", Version: 1}, updateErr: writeErr}
 				_, err := newService(groups, newMembershipStub()).UpdateSettings(context.Background(), adminActor(), 1, "Renamed", "UTC")
-				return err
-			},
-			missing: ErrGroupNotFound,
-		},
-		{
-			name: "group invite rotation",
-			run: func(writeErr error) error {
-				groups := &groupRepositoryStub{group: Group{ID: 5, InviteCode: "OLDCODE12345", Version: 1}, updateErr: writeErr}
-				_, err := newService(groups, newMembershipStub()).RotateInvite(context.Background(), adminActor())
 				return err
 			},
 			missing: ErrGroupNotFound,

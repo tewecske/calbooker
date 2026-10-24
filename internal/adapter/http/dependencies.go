@@ -34,6 +34,8 @@ type Dependencies struct {
 	Groups      GroupUseCases
 	GroupAccess GroupAccessProvider
 	Teams       TeamUseCases
+	Invites     InviteUseCases
+	Profiles    ProfileUseCases
 	JoinGroup   JoinRateLimitedGroupJoiner
 
 	AdminAccounts       AdminAccountLister
@@ -222,6 +224,10 @@ func (a *SessionAuthenticator) Authenticate(ctx context.Context, request *http.R
 	user, err := a.users.FindUserByID(ctx, session.UserID)
 	if err != nil || user.ID != session.UserID {
 		return middleware.Principal{}, ErrSessionAuthentication
+	}
+	// Child profiles never sign in; a session for one is never honored.
+	if user.Kind == service.UserKindProfile {
+		return middleware.Principal{}, middleware.ErrUnauthenticated
 	}
 	return middleware.Principal{ID: strconv.FormatInt(user.ID, 10), IsAdmin: user.IsAdmin}, nil
 }

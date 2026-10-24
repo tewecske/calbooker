@@ -33,6 +33,8 @@ type Graph struct {
 	Groups                *postgresstore.GroupRepository
 	GroupMemberships      *postgresstore.GroupMembershipRepository
 	Teams                 *postgresstore.TeamRepository
+	Invites               *postgresstore.InviteRepository
+	Profiles              *postgresstore.ProfileRepository
 	AdminUsers            *postgresstore.AdminUserRepository
 	AuditLogs             *postgresstore.AuditLogRepository
 	Retention             *postgresstore.RetentionRepository
@@ -52,6 +54,8 @@ type Graph struct {
 	Group                 *service.GroupService
 	GroupAccess           *service.GroupAccessService
 	Team                  *service.TeamService
+	Invite                *service.InviteService
+	Profile               *service.ProfileService
 	GroupJoin             *service.RateLimitedGroupJoiner
 	AdminAccounts         *service.AdminAccountService
 	AdminDiagnostics      *service.AdminDiagnosticsService
@@ -147,6 +151,14 @@ func New(database *sql.DB, appConfig config.Config) (*Graph, error) {
 	if err != nil {
 		return nil, fmt.Errorf("construct team repository: %w", err)
 	}
+	invitesRepository, err := postgresstore.NewInviteRepository(database)
+	if err != nil {
+		return nil, fmt.Errorf("construct invite repository: %w", err)
+	}
+	profilesRepository, err := postgresstore.NewProfileRepository(database)
+	if err != nil {
+		return nil, fmt.Errorf("construct profile repository: %w", err)
+	}
 	adminUsersRepository, err := postgresstore.NewAdminUserRepository(database)
 	if err != nil {
 		return nil, fmt.Errorf("construct admin user repository: %w", err)
@@ -241,15 +253,24 @@ func New(database *sql.DB, appConfig config.Config) (*Graph, error) {
 	if err != nil {
 		return nil, fmt.Errorf("construct group access service: %w", err)
 	}
+	groupAccess.SetChildTeams(profilesRepository)
 	teamService, err := service.NewTeamService(teamsRepository, groupMembershipsRepository, users)
 	if err != nil {
 		return nil, fmt.Errorf("construct team service: %w", err)
+	}
+	inviteService, err := service.NewInviteService(invitesRepository, teamsRepository, users)
+	if err != nil {
+		return nil, fmt.Errorf("construct invite service: %w", err)
+	}
+	profileService, err := service.NewProfileService(profilesRepository, groupMembershipsRepository, teamsRepository, users)
+	if err != nil {
+		return nil, fmt.Errorf("construct profile service: %w", err)
 	}
 	groupJoinLimiter, _, err := newSharedRateLimiter(database, "group-join", service.RateLimitConfig{Limit: 20, Window: time.Minute})
 	if err != nil {
 		return nil, fmt.Errorf("construct group join rate limiter: %w", err)
 	}
-	groupJoinService, err := service.NewRateLimitedGroupJoiner(groupService, groupJoinLimiter)
+	groupJoinService, err := service.NewRateLimitedGroupJoiner(inviteService, groupJoinLimiter)
 	if err != nil {
 		return nil, fmt.Errorf("construct group join service: %w", err)
 	}
@@ -259,6 +280,8 @@ func New(database *sql.DB, appConfig config.Config) (*Graph, error) {
 	}
 	groupService.SetAuditor(auditService)
 	teamService.SetAuditor(auditService)
+	inviteService.SetAuditor(auditService)
+	profileService.SetAuditor(auditService)
 	adminAccounts, err := service.NewAdminAccountService(users, adminUsersRepository, auditService, sessionService)
 	if err != nil {
 		return nil, fmt.Errorf("construct admin account service: %w", err)
@@ -327,6 +350,8 @@ func New(database *sql.DB, appConfig config.Config) (*Graph, error) {
 		Groups:                groupsRepository,
 		GroupMemberships:      groupMembershipsRepository,
 		Teams:                 teamsRepository,
+		Invites:               invitesRepository,
+		Profiles:              profilesRepository,
 		AdminUsers:            adminUsersRepository,
 		AuditLogs:             auditLogRepository,
 		Retention:             retentionRepository,
@@ -346,6 +371,8 @@ func New(database *sql.DB, appConfig config.Config) (*Graph, error) {
 		Group:                 groupService,
 		GroupAccess:           groupAccess,
 		Team:                  teamService,
+		Invite:                inviteService,
+		Profile:               profileService,
 		GroupJoin:             groupJoinService,
 		AdminAccounts:         adminAccounts,
 		AdminDiagnostics:      adminDiagnostics,

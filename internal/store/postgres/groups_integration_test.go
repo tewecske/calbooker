@@ -24,17 +24,13 @@ func TestGroupRepositoryCreateAndList(t *testing.T) {
 	ownerID := insertIntegrationUser(t, harness, "owner@example.test")
 	otherID := insertIntegrationUser(t, harness, "other@example.test")
 
-	group := service.Group{Name: "Example", NameNorm: "example", InviteCode: "INVITE000001", TimeZone: "Europe/Vienna", CreatedBy: &ownerID, CreatedAt: 100}
+	group := service.Group{Name: "Example", NameNorm: "example", TimeZone: "Europe/Vienna", CreatedBy: &ownerID, CreatedAt: 100}
 	created, membership, err := memberships.CreateGroupWithAdmin(ctx, group, ownerID)
 	if err != nil {
 		t.Fatalf("CreateGroupWithAdmin() error = %v", err)
 	}
 	if created.ID <= 0 || created.TimeZone != "Europe/Vienna" || !slices.Equal(membership.Roles, []string{service.GroupRoleAdmin}) || membership.UserID != ownerID {
 		t.Fatalf("created = %+v membership = %+v, want owner admin in Vienna", created, membership)
-	}
-
-	if _, _, err := memberships.CreateGroupWithAdmin(ctx, group, otherID); !errors.Is(err, service.ErrGroupInviteTaken) {
-		t.Fatalf("duplicate invite code error = %v, want ErrGroupInviteTaken", err)
 	}
 
 	summaries, err := groups.ListGroupsForUser(ctx, ownerID)
@@ -59,7 +55,7 @@ func TestGroupRepositoryCreateAndList(t *testing.T) {
 	}
 
 	// A group created without a time zone gets the default.
-	defaulted, _, err := memberships.CreateGroupWithAdmin(ctx, service.Group{Name: "Default", NameNorm: "default", InviteCode: "INVITE000005", CreatedAt: 100}, otherID)
+	defaulted, _, err := memberships.CreateGroupWithAdmin(ctx, service.Group{Name: "Default", NameNorm: "default", CreatedAt: 100}, otherID)
 	if err != nil || defaulted.TimeZone != service.DefaultGroupTimeZone {
 		t.Fatalf("defaulted group = %+v, %v; want %s", defaulted, err, service.DefaultGroupTimeZone)
 	}
@@ -73,7 +69,7 @@ func TestGroupRepositoryOptimisticLockDistinguishesMissing(t *testing.T) {
 	ownerID := insertIntegrationUser(t, harness, "owner@example.test")
 
 	created, _, err := memberships.CreateGroupWithAdmin(ctx, service.Group{
-		Name: "Locked", NameNorm: "locked", InviteCode: "INVITE000002", CreatedBy: &ownerID, CreatedAt: 100,
+		Name: "Locked", NameNorm: "locked", CreatedBy: &ownerID, CreatedAt: 100,
 	}, ownerID)
 	if err != nil {
 		t.Fatalf("CreateGroupWithAdmin() error = %v", err)
@@ -105,7 +101,7 @@ func TestMembershipRolesAndLastAdmin(t *testing.T) {
 	memberID := insertIntegrationUser(t, harness, "member@example.test")
 
 	group, _, err := memberships.CreateGroupWithAdmin(ctx, service.Group{
-		Name: "Team", NameNorm: "team", InviteCode: "INVITE000003", CreatedBy: &adminID, CreatedAt: 100,
+		Name: "Team", NameNorm: "team", CreatedBy: &adminID, CreatedAt: 100,
 	}, adminID)
 	if err != nil {
 		t.Fatalf("CreateGroupWithAdmin() error = %v", err)
@@ -179,7 +175,7 @@ func TestMembershipAccessAndMemberList(t *testing.T) {
 	guestID := insertIntegrationGuest(t, harness)
 	outsiderID := insertIntegrationUser(t, harness, "outsider@example.test")
 
-	group, _, err := memberships.CreateGroupWithAdmin(ctx, service.Group{Name: "Access", NameNorm: "access", InviteCode: "INVITE000004", CreatedAt: 100}, adminID)
+	group, _, err := memberships.CreateGroupWithAdmin(ctx, service.Group{Name: "Access", NameNorm: "access", CreatedAt: 100}, adminID)
 	if err != nil {
 		t.Fatalf("CreateGroupWithAdmin() error = %v", err)
 	}
@@ -220,70 +216,6 @@ func TestMembershipAccessAndMemberList(t *testing.T) {
 	}
 	if members[1].Kind != service.UserKindGuest || !slices.Equal(members[1].TeamIDs, []int64{team.ID}) || members[1].Email != nil {
 		t.Fatalf("guest member = %+v, want guest kind and team", members[1])
-	}
-}
-
-func TestGroupRepositoryInviteLookup(t *testing.T) {
-	ctx := context.Background()
-	harness := migratedHarness(t)
-	memberships := mustMembershipRepository(t, harness)
-	groups := mustGroupRepository(t, harness)
-	adminID := insertIntegrationUser(t, harness, "admin@example.test")
-
-	group, _, err := memberships.CreateGroupWithAdmin(ctx, service.Group{
-		Name: "Roster", NameNorm: "roster", InviteCode: "INVITE000006", CreatedBy: &adminID, CreatedAt: 100,
-	}, adminID)
-	if err != nil {
-		t.Fatalf("CreateGroupWithAdmin() error = %v", err)
-	}
-	found, err := groups.FindGroupByInviteCode(ctx, "INVITE000006")
-	if err != nil || found.ID != group.ID {
-		t.Fatalf("FindGroupByInviteCode() = %+v, %v", found, err)
-	}
-	if _, err := groups.FindGroupByInviteCode(ctx, "UNKNOWN00000"); !errors.Is(err, service.ErrGroupNotFound) {
-		t.Fatalf("unknown invite error = %v, want ErrGroupNotFound", err)
-	}
-}
-
-func TestGroupServiceRotateInviteChangesCode(t *testing.T) {
-	ctx := context.Background()
-	harness := migratedHarness(t)
-	groups := mustGroupRepository(t, harness)
-	memberships := mustMembershipRepository(t, harness)
-	users, err := NewUserRepository(harness.DB)
-	if err != nil {
-		t.Fatalf("NewUserRepository() error = %v", err)
-	}
-	ownerID := insertIntegrationUser(t, harness, "rotate@example.test")
-
-	group, _, err := memberships.CreateGroupWithAdmin(ctx, service.Group{
-		Name: "Rotate", NameNorm: "rotate", InviteCode: "INVITE000099", CreatedBy: &ownerID, CreatedAt: 100,
-	}, ownerID)
-	if err != nil {
-		t.Fatalf("CreateGroupWithAdmin() error = %v", err)
-	}
-	accessService, err := service.NewGroupAccessService(memberships, users)
-	if err != nil {
-		t.Fatalf("NewGroupAccessService() error = %v", err)
-	}
-	access, err := accessService.For(ctx, ownerID, group.ID)
-	if err != nil || !access.CanRotateInvite() {
-		t.Fatalf("For() = %+v, %v; want the owner's admin access", access, err)
-	}
-	serviceGroups, err := service.NewGroupService(groups, memberships, users)
-	if err != nil {
-		t.Fatalf("NewGroupService() error = %v", err)
-	}
-	before := group.InviteCode
-	after, err := serviceGroups.RotateInvite(ctx, service.GroupActor{Access: access, Origin: "192.0.2.1"})
-	if err != nil {
-		t.Fatalf("RotateInvite() error = %v", err)
-	}
-	if after == before || after == "" {
-		t.Fatalf("rotated code = %q, want a new code different from %q", after, before)
-	}
-	if _, err := groups.FindGroupByInviteCode(ctx, before); err == nil {
-		t.Fatal("previous invite code is still redeemable")
 	}
 }
 

@@ -84,6 +84,11 @@ type TeamRosterEntry struct {
 	Username    *string
 	DisplayName *string
 	Email       *string
+	// ChildUserIDs are the players on the team this parent is a guardian
+	// of. Linked is true when the parent is on the roster only through
+	// those links (derived from guardians, not a stored roster entry).
+	ChildUserIDs []int64
+	Linked       bool
 }
 
 // TeamDetail is a team with its roster and, for accounts that may change the

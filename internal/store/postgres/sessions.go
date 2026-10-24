@@ -101,6 +101,14 @@ func (r *SessionRepository) CreateSession(ctx context.Context, session service.S
 	if err := lockUserSessions(ctx, tx, session.UserID); err != nil {
 		return mapSessionError(err)
 	}
+	// Child profiles never sign in, whatever path asked for the session.
+	var isProfile bool
+	if err := tx.QueryRowContext(ctx, `SELECT kind = 'profile' FROM users WHERE id = $1`, session.UserID).Scan(&isProfile); err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return mapSessionError(err)
+	}
+	if isProfile {
+		return service.ErrProfileCannotSignIn
+	}
 	_, err = tx.ExecContext(ctx, `
 		INSERT INTO sessions (id, user_id, created_at, expires_at, revoked_at, sso_sid, sso_id_token)
 		VALUES ($1, $2, $3, $4, $5, NULLIF($6, ''), NULLIF($7, ''))

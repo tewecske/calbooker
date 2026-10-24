@@ -27,7 +27,7 @@ func NewGroupRepository(db *sql.DB) (*GroupRepository, error) {
 
 var _ service.GroupRepository = (*GroupRepository)(nil)
 
-const groupColumns = `id, name, name_norm, invite_code, time_zone, created_by, created_at, version`
+const groupColumns = `id, name, name_norm, time_zone, created_by, created_at, version`
 
 const groupSelect = `SELECT ` + groupColumns + ` FROM groups`
 
@@ -52,22 +52,10 @@ func (r *GroupRepository) FindGroupByID(ctx context.Context, id int64) (service.
 	return findGroup(db.QueryRowContext(ctx, groupSelect+" WHERE id = $1", id))
 }
 
-// FindGroupByInviteCode returns the group that owns one active invite code.
-func (r *GroupRepository) FindGroupByInviteCode(ctx context.Context, code string) (service.Group, error) {
-	db, err := r.database(ctx)
-	if err != nil {
-		return service.Group{}, err
-	}
-	if code == "" {
-		return service.Group{}, service.ErrGroupInviteNotFound
-	}
-	return findGroup(db.QueryRowContext(ctx, groupSelect+" WHERE invite_code = $1", code))
-}
-
 // groupSummarySelect lists groups with member counts and the account's roles
 // ($1). The join decides whether non-member groups are included.
 const groupSummarySelect = `
-	SELECT g.id, g.name, g.name_norm, g.invite_code, g.time_zone, g.created_by, g.created_at, g.version,
+	SELECT g.id, g.name, g.name_norm, g.time_zone, g.created_by, g.created_at, g.version,
 		(SELECT count(*) FROM group_members counted WHERE counted.group_id = g.id),
 		(SELECT string_agg(r.role, ',') FROM group_member_roles r WHERE r.group_id = g.id AND r.user_id = $1)
 	FROM groups g`
@@ -113,7 +101,7 @@ func (r *GroupRepository) listSummaries(ctx context.Context, query string, userI
 			memberCount int64
 		)
 		if err := rows.Scan(
-			&summary.Group.ID, &summary.Group.Name, &summary.Group.NameNorm, &summary.Group.InviteCode, &summary.Group.TimeZone,
+			&summary.Group.ID, &summary.Group.Name, &summary.Group.NameNorm, &summary.Group.TimeZone,
 			&createdBy, &summary.Group.CreatedAt, &summary.Group.Version, &memberCount, &roles,
 		); err != nil {
 			return nil, mapGroupError(err)
@@ -137,10 +125,10 @@ func (r *GroupRepository) UpdateGroup(ctx context.Context, group service.Group, 
 	}
 	updated, scanErr := findGroup(db.QueryRowContext(ctx, `
 		UPDATE groups
-		SET name = $1, name_norm = $2, invite_code = $3, time_zone = $4, version = version + 1
-		WHERE id = $5 AND version = $6
+		SET name = $1, name_norm = $2, time_zone = $3, version = version + 1
+		WHERE id = $4 AND version = $5
 		RETURNING `+groupColumns,
-		group.Name, group.NameNorm, group.InviteCode, group.TimeZone, group.ID, expectedVersion))
+		group.Name, group.NameNorm, group.TimeZone, group.ID, expectedVersion))
 	if scanErr == nil {
 		return updated, nil
 	}
@@ -197,8 +185,7 @@ var (
 )
 
 // CreateGroupWithAdmin inserts a group and its creator as administrator in
-// one transaction. A duplicate invite code is reported as taken so callers can
-// regenerate it.
+// one transaction.
 func (r *GroupMembershipRepository) CreateGroupWithAdmin(ctx context.Context, group service.Group, userID int64) (service.Group, service.GroupMembership, error) {
 	db, err := r.database(ctx)
 	if err != nil {
@@ -497,10 +484,10 @@ func createGroup(ctx context.Context, executor groupExecutor, group service.Grou
 		group.TimeZone = service.DefaultGroupTimeZone
 	}
 	return findGroup(executor.QueryRowContext(ctx, `
-		INSERT INTO groups (name, name_norm, invite_code, time_zone, created_by, created_at, version)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		INSERT INTO groups (name, name_norm, time_zone, created_by, created_at, version)
+		VALUES ($1, $2, $3, $4, $5, $6)
 		RETURNING `+groupColumns,
-		group.Name, group.NameNorm, group.InviteCode, group.TimeZone, group.CreatedBy, group.CreatedAt, group.Version))
+		group.Name, group.NameNorm, group.TimeZone, group.CreatedBy, group.CreatedAt, group.Version))
 }
 
 func findGroup(row rowScanner) (service.Group, error) {
@@ -508,10 +495,10 @@ func findGroup(row rowScanner) (service.Group, error) {
 		group     service.Group
 		createdBy sql.NullInt64
 	)
-	if err := row.Scan(&group.ID, &group.Name, &group.NameNorm, &group.InviteCode, &group.TimeZone, &createdBy, &group.CreatedAt, &group.Version); err != nil {
+	if err := row.Scan(&group.ID, &group.Name, &group.NameNorm, &group.TimeZone, &createdBy, &group.CreatedAt, &group.Version); err != nil {
 		return service.Group{}, mapGroupError(err)
 	}
-	if group.ID <= 0 || group.Version < 0 || group.Name == "" || group.NameNorm == "" || group.InviteCode == "" || group.TimeZone == "" {
+	if group.ID <= 0 || group.Version < 0 || group.Name == "" || group.NameNorm == "" || group.TimeZone == "" {
 		return service.Group{}, ErrInvalidData
 	}
 	group.CreatedBy = nullableInt64(createdBy)
@@ -668,8 +655,6 @@ func mapGroupError(err error) error {
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) && pgErr.Code == "23505" {
 		switch pgErr.ConstraintName {
-		case "groups_invite_code_key", "groups_invite_code_unique_idx":
-			return service.ErrGroupInviteTaken
 		case "group_members_group_user_unique":
 			return service.ErrMembershipExists
 		}

@@ -18,7 +18,7 @@ func TestMembershipRoleUpdateDistinguishesStaleFromMissing(t *testing.T) {
 	memberID := insertIntegrationUser(t, harness, "lock-member@example.test")
 
 	group, _, err := memberships.CreateGroupWithAdmin(ctx, service.Group{
-		Name: "Locked Roles", NameNorm: "locked roles", InviteCode: "INVITE000010", CreatedBy: &adminID, CreatedAt: 100,
+		Name: "Locked Roles", NameNorm: "locked roles", CreatedBy: &adminID, CreatedAt: 100,
 	}, adminID)
 	if err != nil {
 		t.Fatalf("CreateGroupWithAdmin() error = %v", err)
@@ -59,7 +59,7 @@ func TestMembershipDeleteDistinguishesStaleFromMissing(t *testing.T) {
 	memberID := insertIntegrationUser(t, harness, "delete-member@example.test")
 
 	group, _, err := memberships.CreateGroupWithAdmin(ctx, service.Group{
-		Name: "Locked Deletes", NameNorm: "locked deletes", InviteCode: "INVITE000011", CreatedBy: &adminID, CreatedAt: 100,
+		Name: "Locked Deletes", NameNorm: "locked deletes", CreatedBy: &adminID, CreatedAt: 100,
 	}, adminID)
 	if err != nil {
 		t.Fatalf("CreateGroupWithAdmin() error = %v", err)

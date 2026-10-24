@@ -8,14 +8,14 @@ import (
 )
 
 type groupJoinServiceStub struct {
-	membership GroupMembership
+	redemption InviteRedemption
 	err        error
 	calls      int
 }
 
-func (s *groupJoinServiceStub) Join(context.Context, int64, string) (GroupMembership, error) {
+func (s *groupJoinServiceStub) Join(context.Context, int64, string) (InviteRedemption, error) {
 	s.calls++
-	return s.membership, s.err
+	return s.redemption, s.err
 }
 
 func TestRateLimitedGroupJoinerAllowsThenRejects(t *testing.T) {
@@ -23,7 +23,7 @@ func TestRateLimitedGroupJoinerAllowsThenRejects(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewRateLimiter() error = %v", err)
 	}
-	inner := &groupJoinServiceStub{membership: GroupMembership{GroupID: 4, UserID: 7, Roles: []string{GroupRolePlayer}}}
+	inner := &groupJoinServiceStub{redemption: InviteRedemption{Membership: GroupMembership{GroupID: 4, UserID: 7, Roles: []string{GroupRolePlayer}}}}
 	service, err := NewRateLimitedGroupJoiner(inner, limiter)
 	if err != nil {
 		t.Fatalf("NewRateLimitedGroupJoiner() error = %v", err)
@@ -33,7 +33,7 @@ func TestRateLimitedGroupJoinerAllowsThenRejects(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Join() first error = %v", err)
 	}
-	if first.GroupID != 4 {
+	if first.Membership.GroupID != 4 {
 		t.Fatalf("Join() = %+v, want delegated membership", first)
 	}
 	if _, err := service.Join(context.Background(), 7, "ABCDEFGHJKLM"); !errors.Is(err, ErrRateLimited) {

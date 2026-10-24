@@ -151,9 +151,10 @@ Progress is in the Status table below. The original first steps were:
 | # | State | PR |
 | --- | --- | --- |
 | 1 | merged | #16 |
-| 2 | in progress (lane solo/A) | |
+| 2 | merged | #18 |
+| 3 | in progress (lane solo/A) | |
 | 6 | merged | #17 |
-| 3–5, 7–15 | open | |
+| 4, 5, 7–15 | open | |
 
 ## Owner answers (2026-10-23)
 

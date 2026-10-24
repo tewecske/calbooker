@@ -83,6 +83,8 @@ type EventDetailView struct {
 	CancelURL       string
 	DeleteURL       string
 	EditForm        *EventFormView
+	// Participation is the sign-up and attendance card (#9).
+	Participation *ParticipationView
 }
 
 // EventCoachView is one coach of an event.
@@ -366,6 +368,9 @@ func (h *groupHandler) loadEvent(writer http.ResponseWriter, request *http.Reque
 			return false
 		}
 		page.EditForm = h.eventFormView(language, "event-edit", row.URL, options, &event, form)
+	}
+	if !h.loadParticipation(writer, request, current, detail, page) {
+		return false
 	}
 	view.Event = page
 	return true

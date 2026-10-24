@@ -178,7 +178,8 @@ func (r *EventRepository) UpdateEvent(ctx context.Context, event service.Event, 
 }
 
 // DeleteEvent removes the event at the expected revision; its teams and
-// coaches cascade.
+// coaches cascade. An event with participant rows is refused
+// (service.ErrEventHasParticipants).
 func (r *EventRepository) DeleteEvent(ctx context.Context, groupID, eventID, expectedVersion int64) error {
 	db, err := r.database(ctx)
 	if err != nil {
@@ -189,6 +190,16 @@ func (r *EventRepository) DeleteEvent(ctx context.Context, groupID, eventID, exp
 		return mapEventError(err)
 	}
 	defer func() { _ = tx.Rollback() }()
+	// Participant writes lock the event row too, so no sign-up slips in
+	// between the check and the delete.
+	if _, err := tx.ExecContext(ctx, `SELECT 1 FROM events WHERE group_id = $1 AND id = $2 FOR UPDATE`, groupID, eventID); err != nil {
+		return mapEventError(err)
+	}
+	if has, err := eventHasParticipants(ctx, tx, groupID, eventID); err != nil {
+		return err
+	} else if has {
+		return service.ErrEventHasParticipants
+	}
 	result, err := tx.ExecContext(ctx, `DELETE FROM events WHERE group_id = $1 AND id = $2 AND version = $3`, groupID, eventID, expectedVersion)
 	if err != nil {
 		return mapEventError(err)

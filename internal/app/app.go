@@ -40,6 +40,7 @@ type Graph struct {
 	Events                *postgresstore.EventRepository
 	Coaches               *postgresstore.CoachRepository
 	PlanSlots             *postgresstore.PlanSlotRepository
+	Participants          *postgresstore.ParticipantRepository
 	AdminUsers            *postgresstore.AdminUserRepository
 	AuditLogs             *postgresstore.AuditLogRepository
 	Retention             *postgresstore.RetentionRepository
@@ -66,6 +67,7 @@ type Graph struct {
 	Event                 *service.EventService
 	Coach                 *service.CoachService
 	PlanSlot              *service.PlanSlotService
+	Participation         *service.ParticipationService
 	GroupJoin             *service.RateLimitedGroupJoiner
 	AdminAccounts         *service.AdminAccountService
 	AdminDiagnostics      *service.AdminDiagnosticsService
@@ -188,6 +190,10 @@ func New(database *sql.DB, appConfig config.Config) (*Graph, error) {
 	planSlotsRepository, err := postgresstore.NewPlanSlotRepository(database)
 	if err != nil {
 		return nil, fmt.Errorf("construct plan slot repository: %w", err)
+	}
+	participantsRepository, err := postgresstore.NewParticipantRepository(database)
+	if err != nil {
+		return nil, fmt.Errorf("construct participant repository: %w", err)
 	}
 	adminUsersRepository, err := postgresstore.NewAdminUserRepository(database)
 	if err != nil {
@@ -319,6 +325,10 @@ func New(database *sql.DB, appConfig config.Config) (*Graph, error) {
 	if err != nil {
 		return nil, fmt.Errorf("construct plan slot service: %w", err)
 	}
+	participationService, err := service.NewParticipationService(eventService, participantsRepository, users)
+	if err != nil {
+		return nil, fmt.Errorf("construct participation service: %w", err)
+	}
 	groupJoinLimiter, _, err := newSharedRateLimiter(database, "group-join", service.RateLimitConfig{Limit: 20, Window: time.Minute})
 	if err != nil {
 		return nil, fmt.Errorf("construct group join rate limiter: %w", err)
@@ -340,6 +350,7 @@ func New(database *sql.DB, appConfig config.Config) (*Graph, error) {
 	eventService.SetAuditor(auditService)
 	coachService.SetAuditor(auditService)
 	planSlotService.SetAuditor(auditService)
+	participationService.SetAuditor(auditService)
 	adminAccounts, err := service.NewAdminAccountService(users, adminUsersRepository, auditService, sessionService)
 	if err != nil {
 		return nil, fmt.Errorf("construct admin account service: %w", err)
@@ -415,6 +426,7 @@ func New(database *sql.DB, appConfig config.Config) (*Graph, error) {
 		Events:                eventsRepository,
 		Coaches:               coachesRepository,
 		PlanSlots:             planSlotsRepository,
+		Participants:          participantsRepository,
 		AdminUsers:            adminUsersRepository,
 		AuditLogs:             auditLogRepository,
 		Retention:             retentionRepository,
@@ -441,6 +453,7 @@ func New(database *sql.DB, appConfig config.Config) (*Graph, error) {
 		Event:                 eventService,
 		Coach:                 coachService,
 		PlanSlot:              planSlotService,
+		Participation:         participationService,
 		GroupJoin:             groupJoinService,
 		AdminAccounts:         adminAccounts,
 		AdminDiagnostics:      adminDiagnostics,

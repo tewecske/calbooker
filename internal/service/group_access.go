@@ -66,7 +66,8 @@ type GroupAccessGrants struct {
 	// OwnTeams are the teams the member is on as a player or parent.
 	OwnTeams []TeamRole
 	// CoachedTeamIDs are the teams the member coaches in the current season
-	// (filled once season coaches exist, #5).
+	// (season_team_coaches of the season containing today in the group's
+	// time zone; SeasonService.TeamIDs).
 	CoachedTeamIDs []int64
 	// ChildTeamIDs are the teams of the member's linked children (the teams
 	// on which a child of the member is a player).
@@ -263,6 +264,21 @@ func (a *GroupAccess) CanManageResources() bool {
 // see a resource only where an event or plan names it.
 func (a *GroupAccess) CanViewResources() bool {
 	return a.CanManageResources() || a.HasRole(GroupRoleCoach)
+}
+
+// CanManageSeasons reports whether the account may create, edit, and delete
+// seasons and their parts and assign season coaches (admins, managers, and
+// site administrators).
+func (a *GroupAccess) CanManageSeasons() bool {
+	return a.CanManageGroup()
+}
+
+// CanViewSeasons reports whether the account sees the season pages and
+// every season's coaches: those who manage seasons, and coaches (read
+// only). Players and parents see only the current season's coaches on
+// their teams.
+func (a *GroupAccess) CanViewSeasons() bool {
+	return a.CanManageSeasons() || a.HasRole(GroupRoleCoach)
 }
 
 // CanManageRoster reports whether the account may add and remove players

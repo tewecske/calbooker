@@ -1,0 +1,250 @@
+{{define "season-part-fields"}}
+  {{$id := printf "%s-part%d" .Prefix .Position}}{{$key := printf "part%d_" .Position}}
+  <fieldset class="fieldset rounded-box border border-base-300 p-4" data-testid="{{$id}}">
+    <legend class="fieldset-legend">{{.Legend}}</legend>
+    {{if .Optional}}<p class="label">{{.L.seasons_part2_help}}</p>{{end}}
+    <label class="label" for="{{$id}}-name">{{.L.seasons_part_name}}</label>
+    <input id="{{$id}}-name" class="input w-full" name="{{$key}}name" maxlength="64" value="{{.Name}}"{{if not .Optional}} required{{end}} aria-describedby="{{$id}}-name-error">
+    {{with .NameError}}<p id="{{$id}}-name-error" class="text-sm text-error" role="alert">{{.}}</p>{{end}}
+    <div class="grid gap-4 sm:grid-cols-2">
+      <div class="grid gap-1">
+        <label class="label" for="{{$id}}-starts-on">{{.L.seasons_starts_on}}</label>
+        <input id="{{$id}}-starts-on" class="input w-full" type="date" name="{{$key}}starts_on" value="{{.StartsOn}}"{{if not .Optional}} required{{end}} aria-describedby="{{$id}}-dates-error">
+      </div>
+      <div class="grid gap-1">
+        <label class="label" for="{{$id}}-ends-on">{{.L.seasons_ends_on}}</label>
+        <input id="{{$id}}-ends-on" class="input w-full" type="date" name="{{$key}}ends_on" value="{{.EndsOn}}"{{if not .Optional}} required{{end}} aria-describedby="{{$id}}-dates-error">
+      </div>
+    </div>
+    {{with .DatesError}}<p id="{{$id}}-dates-error" class="text-sm text-error" role="alert">{{.}}</p>{{end}}
+    <label class="label cursor-pointer justify-start gap-3 mt-2" for="{{$id}}-alternating">
+      <input id="{{$id}}-alternating" class="checkbox" type="checkbox" name="{{$key}}alternating" value="true"{{if .Alternating}} checked{{end}} aria-describedby="{{$id}}-alternating-help">
+      <span>{{.L.seasons_alternating}}</span>
+    </label>
+    <p id="{{$id}}-alternating-help" class="label">{{.L.seasons_alternating_help}}</p>
+  </fieldset>
+{{end}}
+
+{{define "season-fields"}}
+  <fieldset class="fieldset">
+    <label class="fieldset-legend" for="{{.Prefix}}-name">{{.L.seasons_name}}</label>
+    <input id="{{.Prefix}}-name" class="input w-full" name="name" required maxlength="64" value="{{.Name}}" aria-describedby="{{.Prefix}}-name-help {{.Prefix}}-name-error">
+    <p id="{{.Prefix}}-name-help" class="label">{{.L.seasons_name_help}}</p>
+    {{with .NameError}}<p id="{{$.Prefix}}-name-error" class="text-sm text-error" role="alert">{{.}}</p>{{end}}
+  </fieldset>
+  <div class="grid gap-4 sm:grid-cols-2">
+    <fieldset class="fieldset">
+      <label class="fieldset-legend" for="{{.Prefix}}-starts-on">{{.L.seasons_starts_on}}</label>
+      <input id="{{.Prefix}}-starts-on" class="input w-full" type="date" name="starts_on" required value="{{.StartsOn}}" aria-describedby="{{.Prefix}}-dates-error">
+    </fieldset>
+    <fieldset class="fieldset">
+      <label class="fieldset-legend" for="{{.Prefix}}-ends-on">{{.L.seasons_ends_on}}</label>
+      <input id="{{.Prefix}}-ends-on" class="input w-full" type="date" name="ends_on" required value="{{.EndsOn}}" aria-describedby="{{.Prefix}}-dates-error">
+    </fieldset>
+  </div>
+  {{with .DatesError}}<p id="{{$.Prefix}}-dates-error" class="text-sm text-error" role="alert">{{.}}</p>{{end}}
+  <div class="grid gap-4 md:grid-cols-2">
+    {{range .Parts}}{{template "season-part-fields" .}}{{end}}
+  </div>
+{{end}}
+
+{{define "group-seasons"}}
+  {{with .Group}}{{$L := .L}}{{with .Seasons}}
+    <section class="card card-border bg-base-100 shadow-sm" aria-labelledby="group-seasons-heading">
+      <div class="card-body">
+        <h2 id="group-seasons-heading" class="card-title">{{$L.seasons_heading}}</h2>
+        <p class="text-sm opacity-70">{{$L.seasons_intro}}</p>
+        {{if .Rows}}
+          <div class="overflow-x-auto">
+            <table class="table" data-testid="seasons">
+              <thead><tr><th scope="col">{{$L.seasons_name}}</th><th scope="col">{{$L.seasons_dates}}</th><th scope="col">{{$L.seasons_parts}}</th></tr></thead>
+              <tbody>
+                {{range .Rows}}
+                  <tr data-season-id="{{.ID}}"{{if .Current}} data-season-current="true"{{end}}>
+                    <td><a class="link" href="{{.URL}}">{{.Name}}</a>{{if .Current}} <span class="badge badge-success badge-soft badge-sm">{{$L.seasons_current}}</span>{{end}}</td>
+                    <td data-testid="season-dates">{{.StartsOn}} – {{.EndsOn}}</td>
+                    <td>
+                      <ul class="grid gap-1 text-sm">
+                        {{range .Parts}}<li data-part-position="{{.Position}}">{{.Name}} <span class="opacity-70">{{.StartsOn}} – {{.EndsOn}}</span>{{if .Alternating}} <span class="badge badge-info badge-soft badge-xs">{{$L.seasons_alternating_badge}}</span>{{end}}</li>{{end}}
+                      </ul>
+                    </td>
+                  </tr>
+                {{end}}
+              </tbody>
+            </table>
+          </div>
+        {{else}}
+          <p class="text-sm opacity-70" data-testid="seasons-empty">{{$L.seasons_empty}}</p>
+        {{end}}
+        {{if not .CreateForm}}
+          <div role="status" class="alert alert-info alert-soft" data-testid="seasons-read-only"><span>{{$L.seasons_read_only}}</span></div>
+        {{end}}
+      </div>
+    </section>
+
+    {{with .CreateForm}}
+      <section class="card card-border bg-base-100 shadow-sm" aria-labelledby="season-create-heading">
+        <div class="card-body">
+          <h2 id="season-create-heading" class="card-title">{{$L.seasons_create}}</h2>
+          <form class="grid gap-4" method="post" action="{{.ActionURL}}" hx-post="{{.ActionURL}}" hx-target="#page-content" hx-swap="outerHTML" hx-disabled-elt="this">
+            <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
+            {{template "season-fields" .}}
+            <div><button class="btn btn-primary" type="submit">{{$L.seasons_create}}</button></div>
+          </form>
+        </div>
+      </section>
+    {{end}}
+  {{end}}{{end}}
+{{end}}
+
+{{define "group-season"}}
+  {{with .Group}}{{$L := .L}}{{with .Season}}
+    <p><a class="link" href="{{.ListURL}}">{{$L.seasons_back}}</a></p>
+    <section class="card card-border bg-base-100 shadow-sm" aria-labelledby="season-heading">
+      <div class="card-body">
+        <h2 id="season-heading" class="card-title">{{.Name}}{{if .Current}} <span class="badge badge-success badge-soft" data-testid="season-current-badge">{{$L.seasons_current}}</span>{{end}}</h2>
+        <dl class="grid grid-cols-1 gap-2 text-sm sm:grid-cols-[auto_1fr]">
+          <dt class="opacity-70">{{$L.seasons_dates}}</dt><dd data-testid="season-dates">{{.StartsOn}} – {{.EndsOn}}</dd>
+        </dl>
+        <h3 class="font-semibold mt-2">{{$L.seasons_parts}}</h3>
+        <ul class="list rounded-box border border-base-300" data-testid="season-parts">
+          {{range .Parts}}
+            <li class="list-row items-center" data-part-position="{{.Position}}" data-part-id="{{.ID}}">
+              <div class="list-col-grow">
+                <div class="font-medium">{{.Name}}</div>
+                <div class="text-sm opacity-70" data-testid="season-part-dates">{{.StartsOn}} – {{.EndsOn}}</div>
+              </div>
+              {{if .Alternating}}<span class="badge badge-info badge-soft badge-sm" data-testid="season-part-alternating">{{$L.seasons_alternating_badge}}</span>{{end}}
+            </li>
+          {{end}}
+        </ul>
+      </div>
+    </section>
+
+    <section class="card card-border bg-base-100 shadow-sm" aria-labelledby="season-coaches-heading">
+      <div class="card-body">
+        <h2 id="season-coaches-heading" class="card-title">{{$L.seasons_coaches_heading}}</h2>
+        {{if .Coaches}}
+          <div class="overflow-x-auto">
+            <table class="table" data-testid="season-coaches">
+              <thead><tr><th scope="col">{{$L.seasons_coaches_team}}</th><th scope="col">{{$L.seasons_coaches_coach}}</th></tr></thead>
+              <tbody>
+                {{range .Coaches}}
+                  <tr data-team-id="{{.TeamID}}" data-coach-id="{{.UserID}}">
+                    <td><a class="link" href="{{.TeamURL}}">{{.TeamName}}</a></td>
+                    <td>{{.Label}}{{if .IsHead}} <span class="badge badge-primary badge-soft badge-sm">{{$L.seasons_coaches_head_badge}}</span>{{end}}{{with .Email}}<div class="text-sm opacity-70">{{.}}</div>{{end}}</td>
+                  </tr>
+                {{end}}
+              </tbody>
+            </table>
+          </div>
+        {{else}}
+          <p class="text-sm opacity-70" data-testid="season-coaches-empty">{{$L.seasons_coaches_none}}</p>
+        {{end}}
+        <p class="text-sm opacity-70">{{$L.seasons_coaches_help}}</p>
+      </div>
+    </section>
+
+    {{if .CanEdit}}
+      <section class="card card-border bg-base-100 shadow-sm" aria-labelledby="season-edit-heading">
+        <div class="card-body">
+          <h2 id="season-edit-heading" class="card-title">{{$L.seasons_edit}}</h2>
+          <form class="grid gap-4" method="post" action="{{.EditForm.ActionURL}}" hx-post="{{.EditForm.ActionURL}}" hx-target="#page-content" hx-swap="outerHTML" hx-disabled-elt="this">
+            <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
+            <input type="hidden" name="version" value="{{.Version}}">
+            {{template "season-fields" .EditForm}}
+            <div><button class="btn btn-primary" type="submit">{{$L.seasons_save}}</button></div>
+          </form>
+          <div class="divider"></div>
+          <form method="post" action="{{.DeleteURL}}" hx-post="{{.DeleteURL}}" hx-target="#page-content" hx-swap="outerHTML" hx-disabled-elt="this" hx-confirm="{{$L.seasons_delete_confirm}}">
+            <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
+            <input type="hidden" name="version" value="{{.Version}}">
+            <button class="btn btn-outline btn-error" type="submit">{{$L.seasons_delete}}</button>
+          </form>
+        </div>
+      </section>
+    {{end}}
+  {{end}}{{end}}
+{{end}}
+
+{{define "team-coaches"}}{{$L := .L}}
+  <section class="card card-border bg-base-100 shadow-sm" aria-labelledby="team-coaches-heading" data-testid="team-coaches">
+    <div class="card-body">
+      <h2 id="team-coaches-heading" class="card-title">{{$L.seasons_coaches_heading}}</h2>
+      {{if .Seasons}}
+        {{range .Seasons}}{{$season := .}}
+          <div class="grid gap-2" data-testid="team-coaches-season" data-season-id="{{.ID}}"{{if .Current}} data-season-current="true"{{end}}>
+            <h3 class="font-semibold">{{.Name}} <span class="text-sm font-normal opacity-70">{{.StartsOn}} – {{.EndsOn}}</span>{{if .Current}} <span class="badge badge-success badge-soft badge-sm">{{$L.seasons_current}}</span>{{end}}</h3>
+            {{if .Coaches}}
+              <ul class="list rounded-box border border-base-300">
+                {{range .Coaches}}
+                  <li class="list-row items-center" data-coach-id="{{.UserID}}"{{if .IsHead}} data-coach-head="true"{{end}}>
+                    <div class="list-col-grow">
+                      <div>{{.Label}}{{if .IsHead}} <span class="badge badge-primary badge-soft badge-sm">{{$L.seasons_coaches_head_badge}}</span>{{end}}</div>
+                      {{with .Email}}<div class="text-sm opacity-70">{{.}}</div>{{end}}
+                    </div>
+                    {{if $.CanManage}}
+                      <div class="flex flex-wrap gap-2">
+                        <form method="post" action="{{$.HeadURL}}" hx-post="{{$.HeadURL}}" hx-target="#page-content" hx-swap="outerHTML" hx-disabled-elt="this">
+                          <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
+                          <input type="hidden" name="season_id" value="{{$season.ID}}">
+                          <input type="hidden" name="coach_user_id" value="{{.UserID}}">
+                          {{if .IsHead}}
+                            <input type="hidden" name="head" value="false">
+                            <button class="btn btn-xs btn-outline" type="submit" aria-label="{{$L.seasons_coaches_unset_head}}: {{.Label}}">{{$L.seasons_coaches_unset_head}}</button>
+                          {{else}}
+                            <input type="hidden" name="head" value="true">
+                            <button class="btn btn-xs btn-outline" type="submit" aria-label="{{$L.seasons_coaches_set_head}}: {{.Label}}">{{$L.seasons_coaches_set_head}}</button>
+                          {{end}}
+                        </form>
+                        <form method="post" action="{{$.RemoveURL}}" hx-post="{{$.RemoveURL}}" hx-target="#page-content" hx-swap="outerHTML" hx-disabled-elt="this">
+                          <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
+                          <input type="hidden" name="season_id" value="{{$season.ID}}">
+                          <input type="hidden" name="coach_user_id" value="{{.UserID}}">
+                          <button class="btn btn-xs btn-outline btn-error" type="submit" aria-label="{{$L.seasons_coaches_remove}}: {{.Label}}">{{$L.seasons_coaches_remove}}</button>
+                        </form>
+                      </div>
+                    {{end}}
+                  </li>
+                {{end}}
+              </ul>
+            {{else}}
+              <p class="text-sm opacity-70">{{$L.seasons_coaches_none}}</p>
+            {{end}}
+          </div>
+        {{end}}
+      {{else}}
+        <p class="text-sm opacity-70" data-testid="team-coaches-no-seasons">{{$L.seasons_coaches_no_seasons}}{{if .CanManage}} <a class="link" href="{{.SeasonsURL}}">{{$L.seasons_coaches_create_season}}</a>{{end}}</p>
+      {{end}}
+      {{if and .CanManage .Seasons}}
+        <div class="divider"></div>
+        {{if .Candidates}}
+          <form class="grid gap-4 sm:grid-cols-[1fr_1fr_auto] sm:items-end" method="post" action="{{.AddURL}}" hx-post="{{.AddURL}}" hx-target="#page-content" hx-swap="outerHTML" hx-disabled-elt="this">
+            <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
+            <fieldset class="fieldset">
+              <label class="fieldset-legend" for="team-coach-season">{{$L.seasons_coaches_season}}</label>
+              <select id="team-coach-season" class="select w-full" name="season_id" required>
+                {{range .SeasonOptions}}<option value="{{.Value}}"{{if .Selected}} selected{{end}}>{{.Label}}</option>{{end}}
+              </select>
+            </fieldset>
+            <fieldset class="fieldset">
+              <label class="fieldset-legend" for="team-coach-user">{{$L.seasons_coaches_coach}}</label>
+              <select id="team-coach-user" class="select w-full" name="coach_user_id" required>
+                {{range .Candidates}}<option value="{{.Value}}">{{.Label}}</option>{{end}}
+              </select>
+            </fieldset>
+            <div class="grid gap-2">
+              <label class="label cursor-pointer justify-start gap-3" for="team-coach-head">
+                <input id="team-coach-head" class="checkbox" type="checkbox" name="head" value="true">
+                <span>{{$L.seasons_coaches_head}}</span>
+              </label>
+              <button class="btn" type="submit">{{$L.seasons_coaches_assign}}</button>
+            </div>
+          </form>
+        {{else}}
+          <p class="text-sm opacity-70" data-testid="team-coaches-no-candidates">{{$L.seasons_coaches_no_candidates}}</p>
+        {{end}}
+      {{end}}
+    </div>
+  </section>
+{{end}}

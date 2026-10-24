@@ -147,6 +147,8 @@
       </div>
     </section>
 
+    {{with .Coaches}}{{template "team-coaches" .}}{{end}}
+
     {{if .CanEdit}}
       <section class="card card-border bg-base-100 shadow-sm" aria-labelledby="team-edit-heading">
         <div class="card-body">

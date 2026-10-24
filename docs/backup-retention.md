@@ -13,6 +13,7 @@ the expectations for datastore backups. See the
 | Child profiles | `users` (`kind = 'profile'`), `child_profiles`, `guardians` | not removed by retention | A profile stays until its guardians or group staff delete it on the children page; deleting it removes its membership, roster entries, and guardian links. Profiles never sign in, so they never age out like guests. |
 | Group invites | `group_invites` | not removed by retention | Revoked, expired, and used-up invites are kept for the invite page; they are removed with their team or group. |
 | Resources | `resources` | not removed by retention | Archived resources are kept so plans and events keep their resource; they are removed with their group. |
+| Seasons | `seasons`, `season_parts`, `season_team_coaches` | not removed by retention | Past seasons are kept for history and statistics; staff delete a season by hand (its parts and coach assignments go with it), and everything is removed with its group. A coach's assignments go when the coach role is removed. |
 | Sign-in flow states | `oauth_states` | not age-based | `token_retention` removes consumed or expired states. |
 | Usage events | `usage_events` | `CALBOOKER_USAGE_RETENTION` (`2160h`) | `usage_retention` removes events older than the cutoff. |
 | Rate-limit windows | `rate_limit_buckets` | live for one window | `rate_limit_retention` removes expired windows. Keys are stored only as hashes. Not worth backing up. |

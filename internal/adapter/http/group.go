@@ -99,6 +99,8 @@ type GroupDetailView struct {
 	Children   *ChildrenView
 	Resources  *ResourcesView
 	Resource   *ResourceDetailView
+	Seasons    *SeasonsView
+	Season     *SeasonDetailView
 }
 
 // GroupNavItem is one group section link.
@@ -204,6 +206,7 @@ func registerGroupRoutes(mux *http.ServeMux, groups *groupHandler) {
 	registerInviteRoutes(mux, groups)
 	registerChildRoutes(mux, groups)
 	registerResourceRoutes(mux, groups)
+	registerSeasonRoutes(mux, groups)
 }
 
 func newGroupHandler(renderer *PageRenderer, dependencies Dependencies) *groupHandler {
@@ -229,7 +232,7 @@ func groupLabels(renderer *PageRenderer) map[locale.Code]map[string]string {
 	for _, language := range locale.Codes() {
 		values := make(map[string]string)
 		for _, id := range renderer.catalogs.Keys(language) {
-			if !strings.HasPrefix(id, "groups.") && !strings.HasPrefix(id, "teams.") && !strings.HasPrefix(id, "invites.") && !strings.HasPrefix(id, "children.") && !strings.HasPrefix(id, "resources.") {
+			if !strings.HasPrefix(id, "groups.") && !strings.HasPrefix(id, "teams.") && !strings.HasPrefix(id, "invites.") && !strings.HasPrefix(id, "children.") && !strings.HasPrefix(id, "resources.") && !strings.HasPrefix(id, "seasons.") {
 				continue
 			}
 			if text, err := renderer.catalogs.Translate(language, id, nil); err == nil {
@@ -508,7 +511,7 @@ func (h *groupHandler) groupRequest(writer http.ResponseWriter, request *http.Re
 func (h *groupHandler) renderWriteError(writer http.ResponseWriter, request *http.Request, current groupRequest, section string, teamID int64, err error, form FormData) {
 	message, status := "", http.StatusUnprocessableEntity
 	switch {
-	case errors.Is(err, service.ErrGroupNotFound), errors.Is(err, service.ErrTeamNotFound), errors.Is(err, service.ErrResourceNotFound):
+	case errors.Is(err, service.ErrGroupNotFound), errors.Is(err, service.ErrTeamNotFound), errors.Is(err, service.ErrResourceNotFound), errors.Is(err, service.ErrSeasonNotFound):
 		h.renderGroupNotFound(writer, request, current.language)
 		return
 	case errors.Is(err, service.ErrGroupForbidden):
@@ -558,6 +561,10 @@ func (h *groupHandler) renderWriteError(writer http.ResponseWriter, request *htt
 	case errors.Is(err, service.ErrInvalidResourceName), errors.Is(err, service.ErrResourceNameTaken), errors.Is(err, service.ErrInvalidResourceKind),
 		errors.Is(err, service.ErrInvalidResourceDescription), errors.Is(err, service.ErrInvalidResourceCapacity):
 		_, message = resourceErrorField(err)
+	case errors.Is(err, service.ErrSeasonCoachNotFound):
+		message, status = "seasons.error.coach_not_found", http.StatusNotFound
+	case seasonErrorMessage(err) != "":
+		message = seasonErrorMessage(err)
 	case errors.Is(err, service.ErrInvalidGroup):
 		message = "groups.error.generic"
 	default:
@@ -633,12 +640,20 @@ func (h *groupHandler) renderSection(writer http.ResponseWriter, request *http.R
 		if !h.loadResource(writer, request, current, group.ID, teamID, form, view) {
 			return
 		}
+	case groupSectionSeasons:
+		if !h.loadSeasons(writer, request, current, group.ID, form, view) {
+			return
+		}
+	case groupSectionSeason:
+		if !h.loadSeason(writer, request, current, group.ID, teamID, form, view) {
+			return
+		}
 	}
 	h.renderGroupPage(writer, request, current, view, form, alerts, status)
 }
 
 func (h *groupHandler) renderLoadError(writer http.ResponseWriter, request *http.Request, language locale.Code, err error) {
-	if errors.Is(err, service.ErrGroupNotFound) || errors.Is(err, service.ErrTeamNotFound) || errors.Is(err, service.ErrResourceNotFound) {
+	if errors.Is(err, service.ErrGroupNotFound) || errors.Is(err, service.ErrTeamNotFound) || errors.Is(err, service.ErrResourceNotFound) || errors.Is(err, service.ErrSeasonNotFound) {
 		h.renderGroupNotFound(writer, request, language)
 		return
 	}
@@ -660,6 +675,9 @@ func (h *groupHandler) groupShell(current groupRequest, group service.Group, sec
 		{groupSectionMembers, "groups.nav.members", "/members"},
 		{groupSectionTeams, "groups.nav.teams", "/teams"},
 	}
+	if current.access.CanViewSeasons() {
+		items = append(items, struct{ id, label, route string }{groupSectionSeasons, "seasons.nav", "/seasons"})
+	}
 	if current.access.CanViewResources() {
 		items = append(items, struct{ id, label, route string }{groupSectionResources, "resources.nav", "/resources"})
 	}
@@ -673,7 +691,7 @@ func (h *groupHandler) groupShell(current groupRequest, group service.Group, sec
 		items = append(items, struct{ id, label, route string }{groupSectionSettings, "groups.nav.settings", "/settings"})
 	}
 	for _, item := range items {
-		currentSection := section == item.id || (section == groupSectionTeam && item.id == groupSectionTeams) || (section == groupSectionResource && item.id == groupSectionResources)
+		currentSection := section == item.id || (section == groupSectionTeam && item.id == groupSectionTeams) || (section == groupSectionResource && item.id == groupSectionResources) || (section == groupSectionSeason && item.id == groupSectionSeasons)
 		view.Nav = append(view.Nav, GroupNavItem{ID: item.id, Label: h.t(language, item.label), URL: h.groupPath(language, group.ID, item.route), Current: currentSection})
 	}
 	return view

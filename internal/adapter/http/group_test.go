@@ -437,8 +437,8 @@ func TestGroupTemplateLabelsExist(t *testing.T) {
 		t.Fatalf("NewPageRenderer() error = %v", err)
 	}
 	labels := groupLabels(renderer)
-	pattern := regexp.MustCompile(`[.$]L\.((?:groups|teams|invites|children|resources|seasons)_[a-z0-9_]+)`)
-	for _, name := range []string{"groups.html", "teams.html", "invites.html", "children.html", "resources.html", "seasons.html"} {
+	pattern := regexp.MustCompile(`[.$]L\.((?:groups|teams|invites|children|resources|seasons|events)_[a-z0-9_]+)`)
+	for _, name := range []string{"groups.html", "teams.html", "invites.html", "children.html", "resources.html", "seasons.html", "events.html"} {
 		source, err := os.ReadFile(filepath.Join("..", "..", "..", "templates", name))
 		if err != nil {
 			t.Fatalf("read %s: %v", name, err)

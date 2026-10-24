@@ -125,6 +125,8 @@
       {{if eq .Section "resource"}}{{template "group-resource" $}}{{end}}
       {{if eq .Section "seasons"}}{{template "group-seasons" $}}{{end}}
       {{if eq .Section "season"}}{{template "group-season" $}}{{end}}
+      {{if eq .Section "events"}}{{template "group-events" $}}{{end}}
+      {{if eq .Section "event"}}{{template "group-event" $}}{{end}}
     {{end}}
   </div>
 {{end}}

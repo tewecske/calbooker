@@ -1,13 +1,13 @@
 import { expect, test } from "@playwright/test";
 
-import { appURL, becomeGuest, createInvite, joinWithCode, signUpUser, ssoEnabled, uniqueName } from "./support";
+import { appURL, becomeGuest, createInvite, joinWithCode, poolUser, ssoEnabled, uniqueName } from "./support";
 
 // Seasons (#5): admins and managers create seasons with one or two parts and
 // assign coaches to teams per season; coaches of the current season manage
 // their teams' rosters and player invites. Opt-in like the other single
 // sign-on specs: CALBOOKER_SSO_E2E=1 (make e2e) with goweb's Hydra and
-// provider running and calbooker started with make run. Signs up only two
-// provider accounts (owner and coach); the player is a guest.
+// provider running and calbooker started with make run. The owner and coach
+// come from the account pool; the player is a guest.
 
 /** The calendar date `days` from now as YYYY-MM-DD (UTC; the margins are wide). */
 function dateFromToday(days: number): string {
@@ -21,7 +21,7 @@ test.describe("seasons", () => {
 
   test("an admin creates a two-part season and assigns a coach, who then manages the team", async ({ browser }) => {
     test.setTimeout(120_000);
-    const owner = await signUpUser(browser, "calbooker-seasons");
+    const owner = await poolUser(browser, "owner");
     const page = owner.page;
     const clubName = uniqueName("Club");
     const teamName = uniqueName("Lions");
@@ -85,7 +85,7 @@ test.describe("seasons", () => {
     await expect(page.locator("#season-new-dates-error")).toContainText("overlap another season");
 
     // The coach joins; before an assignment the team stays hidden.
-    const coach = await signUpUser(browser, "calbooker-seasons-coach");
+    const coach = await poolUser(browser, "coach");
     const coachCode = await createInvite(page, groupURL, { role: "coach" });
     await joinWithCode(coach.page, appURL, coachCode);
     await coach.page.waitForURL(groupURL);

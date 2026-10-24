@@ -118,6 +118,34 @@ Refinements made in #5 (open for the owner to confirm):
 - Audit entries name seasons by ID and name and coach assignments by season,
   team, and member ID (`group.season.*`).
 
+Refinements made in #8 (open for the owner to confirm):
+
+- An event has exactly one of a resource and a free-text location; neither
+  is refused. Archived resources are not offered and are refused for new
+  events, but an event keeps the archived resource it already has.
+- Times are entered as wall-clock times in the group's time zone. A time
+  skipped by a daylight-saving change is refused with a message; a time that
+  happens twice is its first occurrence (summer time). An event lasts at
+  most 31 days. The sign-up deadline, when set, is before the start; the
+  participant limit is 1 to 999.
+- Coaches create and edit events only for teams they all coach in the current
+  season; an event with a team they do not coach is read only for them.
+  Extra coaches must hold the coach role. An extra coach sees the event even
+  without seeing its teams.
+- Every member has the Events tab and sees the events of their own,
+  coached, and children's teams (staff: all); other events answer 404.
+- Warnings (resource over its team limit, coach busy) are shown on the event
+  page to those who may edit the event, not to players and parents. The
+  coaches of an event are its extra coaches plus the season coaches of its
+  teams in the season containing the event's first day.
+- Cancel is a soft state that can be reinstated; cancelled events stay
+  listed and count for no warnings. Staff and the event's coaches may also
+  delete an event (until #9 adds participants; #9 decides whether events with
+  participants can be deleted). Cancelling or editing a generated event
+  marks it edited by hand.
+- Audit entries name events by ID, title, kind, times, and team IDs
+  (`group.event.*`), never by the location text.
+
 ## Data model
 
 All tables carry `group_id` (directly or through their parent) so every query

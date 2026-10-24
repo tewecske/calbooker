@@ -1,0 +1,235 @@
+{{define "event-kind-badge"}}<span class="badge badge-soft badge-sm{{if eq .Kind "match"}} badge-info{{else if eq .Kind "championship"}} badge-accent{{else if eq .Kind "training"}} badge-neutral{{end}}" data-event-kind="{{.Kind}}">{{.KindLabel}}</span>{{end}}
+
+{{define "event-fields"}}{{$L := .L}}{{$p := .Prefix}}
+  <p class="text-sm opacity-70" data-testid="{{$p}}-time-zone">{{$L.events_times_in}} {{.TimeZone}}</p>
+  <div class="grid gap-4 sm:grid-cols-[2fr_1fr]">
+    <fieldset class="fieldset">
+      <label class="fieldset-legend" for="{{$p}}-title">{{$L.events_title}}</label>
+      <input id="{{$p}}-title" class="input w-full" name="title" required maxlength="128" value="{{.Title}}" aria-describedby="{{$p}}-title-error">
+      {{with .TitleError}}<p id="{{$p}}-title-error" class="text-sm text-error" role="alert">{{.}}</p>{{end}}
+    </fieldset>
+    <fieldset class="fieldset">
+      <label class="fieldset-legend" for="{{$p}}-kind">{{$L.events_kind}}</label>
+      <select id="{{$p}}-kind" class="select w-full" name="kind" required aria-describedby="{{$p}}-kind-error">
+        {{range .KindOptions}}<option value="{{.Value}}"{{if .Selected}} selected{{end}}>{{.Label}}</option>{{end}}
+      </select>
+      {{with .KindError}}<p id="{{$p}}-kind-error" class="text-sm text-error" role="alert">{{.}}</p>{{end}}
+    </fieldset>
+  </div>
+  <div class="grid gap-4 sm:grid-cols-2">
+    <fieldset class="fieldset">
+      <label class="fieldset-legend" for="{{$p}}-starts-at">{{$L.events_starts_at}}</label>
+      <input id="{{$p}}-starts-at" class="input w-full" type="datetime-local" name="starts_at" required value="{{.StartsAt}}" aria-describedby="{{$p}}-starts-at-error">
+      {{with .StartsAtError}}<p id="{{$p}}-starts-at-error" class="text-sm text-error" role="alert">{{.}}</p>{{end}}
+    </fieldset>
+    <fieldset class="fieldset">
+      <label class="fieldset-legend" for="{{$p}}-ends-at">{{$L.events_ends_at}}</label>
+      <input id="{{$p}}-ends-at" class="input w-full" type="datetime-local" name="ends_at" required value="{{.EndsAt}}" aria-describedby="{{$p}}-ends-at-error">
+      {{with .EndsAtError}}<p id="{{$p}}-ends-at-error" class="text-sm text-error" role="alert">{{.}}</p>{{end}}
+    </fieldset>
+  </div>
+  <fieldset class="fieldset rounded-box border border-base-300 p-4" data-testid="{{$p}}-teams" aria-describedby="{{$p}}-teams-error">
+    <legend class="fieldset-legend">{{$L.events_teams}}</legend>
+    {{if .Teams}}
+      <div class="grid gap-2 sm:grid-cols-2">
+        {{range .Teams}}
+          <label class="label cursor-pointer justify-start gap-3" for="{{$p}}-team-{{.Value}}">
+            <input id="{{$p}}-team-{{.Value}}" class="checkbox" type="checkbox" name="team_id" value="{{.Value}}"{{if .Checked}} checked{{end}}>
+            <span>{{.Label}}</span>
+          </label>
+        {{end}}
+      </div>
+    {{else}}
+      <p class="label" data-testid="{{$p}}-no-teams">{{$L.events_no_teams}}</p>
+    {{end}}
+    {{with .TeamsError}}<p id="{{$p}}-teams-error" class="text-sm text-error" role="alert">{{.}}</p>{{end}}
+  </fieldset>
+  <fieldset class="fieldset rounded-box border border-base-300 p-4">
+    <legend class="fieldset-legend">{{$L.events_place}}</legend>
+    <p class="label">{{$L.events_place_help}}</p>
+    <div class="grid gap-4 sm:grid-cols-2">
+      <div class="grid gap-1">
+        <label class="label" for="{{$p}}-resource">{{$L.events_resource}}</label>
+        <select id="{{$p}}-resource" class="select w-full" name="resource_id" aria-describedby="{{$p}}-place-error">
+          {{range .ResourceOptions}}<option value="{{.Value}}"{{if .Selected}} selected{{end}}>{{.Label}}</option>{{end}}
+        </select>
+      </div>
+      <div class="grid gap-1">
+        <label class="label" for="{{$p}}-location">{{$L.events_location}}</label>
+        <input id="{{$p}}-location" class="input w-full" name="location" maxlength="255" value="{{.Location}}" aria-describedby="{{$p}}-location-error {{$p}}-place-error">
+      </div>
+    </div>
+    {{with .PlaceError}}<p id="{{$p}}-place-error" class="text-sm text-error" role="alert">{{.}}</p>{{end}}
+    {{with .LocationError}}<p id="{{$p}}-location-error" class="text-sm text-error" role="alert">{{.}}</p>{{end}}
+  </fieldset>
+  <fieldset class="fieldset rounded-box border border-base-300 p-4">
+    <legend class="fieldset-legend">{{$L.events_signup}}</legend>
+    <div class="grid gap-4 sm:grid-cols-3">
+      <div class="grid gap-1">
+        <label class="label" for="{{$p}}-signup-mode">{{$L.events_signup_mode}}</label>
+        <select id="{{$p}}-signup-mode" class="select w-full" name="signup_mode" aria-describedby="{{$p}}-signup-mode-error">
+          {{range .SignupOptions}}<option value="{{.Value}}"{{if .Selected}} selected{{end}}>{{.Label}}</option>{{end}}
+        </select>
+        {{with .SignupModeError}}<p id="{{$p}}-signup-mode-error" class="text-sm text-error" role="alert">{{.}}</p>{{end}}
+      </div>
+      <div class="grid gap-1">
+        <label class="label" for="{{$p}}-max-participants">{{$L.events_max_participants}}</label>
+        <input id="{{$p}}-max-participants" class="input w-full" type="number" min="1" max="999" name="max_participants" value="{{.MaxParticipants}}" aria-describedby="{{$p}}-max-participants-error">
+        {{with .MaxParticipantsError}}<p id="{{$p}}-max-participants-error" class="text-sm text-error" role="alert">{{.}}</p>{{end}}
+      </div>
+      <div class="grid gap-1">
+        <label class="label" for="{{$p}}-signup-deadline">{{$L.events_signup_deadline}}</label>
+        <input id="{{$p}}-signup-deadline" class="input w-full" type="datetime-local" name="signup_deadline" value="{{.SignupDeadline}}" aria-describedby="{{$p}}-signup-deadline-error">
+        {{with .SignupDeadlineError}}<p id="{{$p}}-signup-deadline-error" class="text-sm text-error" role="alert">{{.}}</p>{{end}}
+      </div>
+    </div>
+    <p class="label">{{$L.events_signup_help}}</p>
+  </fieldset>
+  {{if .Coaches}}
+    <fieldset class="fieldset rounded-box border border-base-300 p-4" data-testid="{{$p}}-coaches">
+      <legend class="fieldset-legend">{{$L.events_extra_coaches}}</legend>
+      <p class="label">{{$L.events_extra_coaches_help}}</p>
+      <div class="grid gap-2 sm:grid-cols-2">
+        {{range .Coaches}}
+          <label class="label cursor-pointer justify-start gap-3" for="{{$p}}-coach-{{.Value}}">
+            <input id="{{$p}}-coach-{{.Value}}" class="checkbox" type="checkbox" name="coach_user_id" value="{{.Value}}"{{if .Checked}} checked{{end}}>
+            <span>{{.Label}}</span>
+          </label>
+        {{end}}
+      </div>
+      {{with .CoachesError}}<p id="{{$p}}-coaches-error" class="text-sm text-error" role="alert">{{.}}</p>{{end}}
+    </fieldset>
+  {{end}}
+{{end}}
+
+{{define "group-events"}}
+  {{with .Group}}{{$L := .L}}{{with .Events}}
+    <section class="card card-border bg-base-100 shadow-sm" aria-labelledby="group-events-heading">
+      <div class="card-body">
+        <h2 id="group-events-heading" class="card-title">{{if .Past}}{{$L.events_past_heading}}{{else}}{{$L.events_heading}}{{end}}</h2>
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div role="tablist" class="tabs tabs-box tabs-sm">
+            <a role="tab" class="tab{{if not .Past}} tab-active{{end}}" href="{{.UpcomingURL}}"{{if not .Past}} aria-selected="true"{{end}} data-testid="events-upcoming-tab">{{$L.events_upcoming}}</a>
+            <a role="tab" class="tab{{if .Past}} tab-active{{end}}" href="{{.PastURL}}"{{if .Past}} aria-selected="true"{{end}} data-testid="events-past-tab">{{$L.events_past}}</a>
+          </div>
+          {{if .TeamOptions}}
+            <form class="flex flex-wrap items-end gap-2" method="get" action="{{.FilterURL}}">
+              {{if .Past}}<input type="hidden" name="when" value="past">{{end}}
+              <fieldset class="fieldset">
+                <label class="fieldset-legend" for="events-filter-team">{{$L.events_filter_team}}</label>
+                <select id="events-filter-team" class="select select-sm" name="team">
+                  <option value="">{{$L.events_filter_all}}</option>
+                  {{range .TeamOptions}}<option value="{{.Value}}"{{if .Selected}} selected{{end}}>{{.Label}}</option>{{end}}
+                </select>
+              </fieldset>
+              <button class="btn btn-sm" type="submit">{{$L.events_filter}}</button>
+            </form>
+          {{end}}
+        </div>
+        <p class="text-sm opacity-70">{{$L.events_times_in}} {{.TimeZone}}</p>
+        {{if .Rows}}
+          <div class="overflow-x-auto">
+            <table class="table" data-testid="events">
+              <thead><tr><th scope="col">{{$L.events_when}}</th><th scope="col">{{$L.events_title}}</th><th scope="col">{{$L.events_teams}}</th><th scope="col">{{$L.events_place}}</th></tr></thead>
+              <tbody>
+                {{range .Rows}}
+                  <tr data-event-id="{{.ID}}"{{if .Cancelled}} data-event-cancelled="true"{{end}}>
+                    <td class="whitespace-nowrap" data-testid="event-when">{{.When}}</td>
+                    <td><a class="link{{if .Cancelled}} line-through{{end}}" href="{{.URL}}">{{.Title}}</a> {{template "event-kind-badge" .}}{{if .Cancelled}} <span class="badge badge-error badge-soft badge-sm">{{$L.events_cancelled}}</span>{{end}}</td>
+                    <td>{{.Teams}}</td>
+                    <td>{{.Place}}</td>
+                  </tr>
+                {{end}}
+              </tbody>
+            </table>
+          </div>
+        {{else}}
+          <p class="text-sm opacity-70" data-testid="events-empty">{{$L.events_empty}}</p>
+        {{end}}
+      </div>
+    </section>
+
+    {{with .CreateForm}}
+      <section class="card card-border bg-base-100 shadow-sm" aria-labelledby="event-create-heading">
+        <div class="card-body">
+          <h2 id="event-create-heading" class="card-title">{{$L.events_create}}</h2>
+          <form class="grid gap-4" method="post" action="{{.ActionURL}}" hx-post="{{.ActionURL}}" hx-target="#page-content" hx-swap="outerHTML" hx-disabled-elt="this">
+            <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
+            {{template "event-fields" .}}
+            <div><button class="btn btn-primary" type="submit">{{$L.events_create}}</button></div>
+          </form>
+        </div>
+      </section>
+    {{end}}
+  {{end}}{{end}}
+{{end}}
+
+{{define "group-event"}}
+  {{with .Group}}{{$L := .L}}{{with .Event}}
+    <p><a class="link" href="{{.ListURL}}">{{$L.events_back}}</a></p>
+    <section class="card card-border bg-base-100 shadow-sm" aria-labelledby="event-heading" data-event-id="{{.ID}}">
+      <div class="card-body">
+        <h2 id="event-heading" class="card-title flex-wrap">{{.Title}} {{template "event-kind-badge" .}}{{if .Cancelled}} <span class="badge badge-error badge-soft" data-testid="event-cancelled-badge">{{$L.events_cancelled}}</span>{{end}}</h2>
+        {{if .Cancelled}}<div role="status" class="alert alert-error alert-soft"><span>{{$L.events_cancelled_notice}}</span></div>{{end}}
+        <dl class="grid grid-cols-1 gap-2 text-sm sm:grid-cols-[auto_1fr]">
+          <dt class="opacity-70">{{$L.events_when}}</dt><dd data-testid="event-when">{{.When}} <span class="opacity-70">({{.TimeZone}})</span></dd>
+          <dt class="opacity-70">{{$L.events_teams}}</dt><dd data-testid="event-teams">{{.Teams}}</dd>
+          <dt class="opacity-70">{{$L.events_place}}</dt><dd data-testid="event-place">{{.Place}}</dd>
+          <dt class="opacity-70">{{$L.events_signup_mode}}</dt><dd data-testid="event-signup">{{.SignupLabel}}</dd>
+          {{with .MaxParticipants}}<dt class="opacity-70">{{$L.events_max_participants}}</dt><dd data-testid="event-max-participants">{{.}}</dd>{{end}}
+          {{with .SignupDeadline}}<dt class="opacity-70">{{$L.events_signup_deadline}}</dt><dd data-testid="event-signup-deadline">{{.}}</dd>{{end}}
+          <dt class="opacity-70">{{$L.events_coaches}}</dt>
+          <dd data-testid="event-coaches">
+            {{if .Coaches}}
+              <ul class="flex flex-wrap gap-2">
+                {{range .Coaches}}<li data-coach-id="{{.UserID}}">{{.Label}}{{if .Extra}} <span class="badge badge-ghost badge-xs">{{$L.events_extra_coach}}</span>{{end}}</li>{{end}}
+              </ul>
+            {{else}}<span class="opacity-70">{{$L.events_no_coaches}}</span>{{end}}
+          </dd>
+        </dl>
+        {{if .Generated}}<p class="text-sm opacity-70" data-testid="event-generated">{{if .Edited}}{{$L.events_generated_edited}}{{else}}{{$L.events_generated}}{{end}}</p>{{end}}
+        {{if .Warnings}}
+          <div role="alert" class="alert alert-warning alert-soft alert-vertical sm:alert-horizontal items-start" data-testid="event-warnings">
+            <div>
+              <h3 class="font-semibold">{{$L.events_warnings}}</h3>
+              <ul class="list-disc ps-5">{{range .Warnings}}<li>{{.}}</li>{{end}}</ul>
+            </div>
+          </div>
+        {{end}}
+      </div>
+    </section>
+
+    {{if .CanEdit}}
+      <section class="card card-border bg-base-100 shadow-sm" aria-labelledby="event-edit-heading">
+        <div class="card-body">
+          <h2 id="event-edit-heading" class="card-title">{{$L.events_edit}}</h2>
+          <form class="grid gap-4" method="post" action="{{.EditForm.ActionURL}}" hx-post="{{.EditForm.ActionURL}}" hx-target="#page-content" hx-swap="outerHTML" hx-disabled-elt="this">
+            <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
+            <input type="hidden" name="version" value="{{.Version}}">
+            {{template "event-fields" .EditForm}}
+            <div><button class="btn btn-primary" type="submit">{{$L.events_save}}</button></div>
+          </form>
+          <div class="divider"></div>
+          <div class="flex flex-wrap gap-2">
+            <form method="post" action="{{.CancelURL}}" hx-post="{{.CancelURL}}" hx-target="#page-content" hx-swap="outerHTML" hx-disabled-elt="this">
+              <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
+              <input type="hidden" name="version" value="{{.Version}}">
+              {{if .Cancelled}}
+                <input type="hidden" name="cancelled" value="false">
+                <button class="btn btn-outline" type="submit">{{$L.events_restore}}</button>
+              {{else}}
+                <input type="hidden" name="cancelled" value="true">
+                <button class="btn btn-outline btn-warning" type="submit">{{$L.events_cancel}}</button>
+              {{end}}
+            </form>
+            <form method="post" action="{{.DeleteURL}}" hx-post="{{.DeleteURL}}" hx-target="#page-content" hx-swap="outerHTML" hx-disabled-elt="this" hx-confirm="{{$L.events_delete_confirm}}">
+              <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
+              <input type="hidden" name="version" value="{{.Version}}">
+              <button class="btn btn-outline btn-error" type="submit">{{$L.events_delete}}</button>
+            </form>
+          </div>
+        </div>
+      </section>
+    {{end}}
+  {{end}}{{end}}
+{{end}}

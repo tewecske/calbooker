@@ -281,6 +281,57 @@ func (a *GroupAccess) CanViewSeasons() bool {
 	return a.CanManageSeasons() || a.HasRole(GroupRoleCoach)
 }
 
+// CanCreateEvents reports whether the account may create events at all:
+// admins, managers, site administrators, and coaches of a team in the
+// current season.
+func (a *GroupAccess) CanCreateEvents() bool {
+	return a.CanManageGroup() || (a.HasRole(GroupRoleCoach) && len(a.coached) > 0)
+}
+
+// CanCreateEvent reports whether the account may put an event on teamIDs:
+// admins, managers, and site administrators for any teams; coaches only when
+// they coach every one of the teams in the current season.
+func (a *GroupAccess) CanCreateEvent(teamIDs []int64) bool {
+	if a.CanManageGroup() {
+		return true
+	}
+	if len(teamIDs) == 0 {
+		return false
+	}
+	for _, teamID := range teamIDs {
+		if !a.CoachesTeam(teamID) {
+			return false
+		}
+	}
+	return true
+}
+
+// CanEditEvent reports whether the account may edit, cancel, or delete the
+// event: the same rule as CanCreateEvent for the event's teams.
+func (a *GroupAccess) CanEditEvent(event Event) bool {
+	return event.GroupID == a.GroupID() && a.CanCreateEvent(event.TeamIDs())
+}
+
+// CanViewEvent reports whether the event is visible (the Visibility rule):
+// admins, managers, and site administrators see every event; others see the
+// events of their own teams, the teams they coach, their children's teams,
+// and the events they are an extra coach of.
+func (a *GroupAccess) CanViewEvent(event Event) bool {
+	if !a.CanView() || event.GroupID != a.groupID {
+		return false
+	}
+	if a.SeesAllTeams() {
+		return true
+	}
+	visible := a.VisibleTeamIDs()
+	for _, teamID := range event.TeamIDs() {
+		if slices.Contains(visible, teamID) {
+			return true
+		}
+	}
+	return a.IsMember() && slices.Contains(event.CoachUserIDs(), a.userID)
+}
+
 // CanManageRoster reports whether the account may add and remove players
 // and parents on a team: admins, managers, and the team's coaches.
 func (a *GroupAccess) CanManageRoster(teamID int64) bool {

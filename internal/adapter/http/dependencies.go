@@ -36,6 +36,7 @@ type Dependencies struct {
 	Teams       TeamUseCases
 	Invites     InviteUseCases
 	Profiles    ProfileUseCases
+	Resources   ResourceUseCases
 	JoinGroup   JoinRateLimitedGroupJoiner
 
 	AdminAccounts       AdminAccountLister

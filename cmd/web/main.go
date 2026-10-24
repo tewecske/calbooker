@@ -83,6 +83,7 @@ func main() {
 		Teams:               applicationGraph.Team,
 		Invites:             applicationGraph.Invite,
 		Profiles:            applicationGraph.Profile,
+		Resources:           applicationGraph.Resource,
 		JoinGroup:           applicationGraph.GroupJoin,
 		AdminAccounts:       applicationGraph.AdminAccounts,
 		AdminAccountEditor:  applicationGraph.AdminAccounts,

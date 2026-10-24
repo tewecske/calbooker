@@ -105,8 +105,10 @@ get `service.ErrGroupNotFound`, which handlers render as 404.
   `CanCreateInvite(role, teamID)` (also decides which invites an account sees
   and revokes), `ChildUserIDs()`, `IsGuardianOf(id)`, `CanCreateProfile`
   (staff and parents), `CanEditProfile(id)` (staff and the child's
-  guardians), `CanManageGuardians` (staff), `CanViewChildren`. Add a question
-  here rather than checking roles in a handler.
+  guardians), `CanManageGuardians` (staff), `CanViewChildren`,
+  `CanManageResources` (admins, managers, site administrators),
+  `CanViewResources` (those plus coaches). Add a question here rather than
+  checking roles in a handler.
 - Extension points: `GroupAccessService.SetCoachedTeams(source)` for season
   coaches (#5), a `TeamRelationSource.TeamIDs(ctx, groupID, userID)`; coached
   teams count only for members with the coach role. `SetChildTeams(source)`
@@ -147,3 +149,32 @@ get `service.ErrGroupNotFound`, which handlers render as 404.
   foreign key removes it when the role goes.
 - Every admin and manager action in a group is audited by the group and team
   services with the group as target (`group.*` action codes).
+
+## Resources
+
+- `ResourceService` (`internal/service/resource.go`, store
+  `internal/store/postgres/resources.go`, migration 000005) owns `resources`:
+  name, kind (a stable code from `service.ResourceKinds()`: `field`, `court`,
+  `hall`, `pool`, `room`, `other`, labelled per language as
+  `resources.kind.<code>`), optional description, optional
+  `max_concurrent_teams` (1 to 99, empty is no limit), `archived_at`, and
+  `version` for revision-checked edits.
+- Use cases: `List(access)` (all, active first) and `ActiveResources(access)`
+  (not archived, for pickers) need `CanViewResources`; `Find(access, id)`
+  loads any resource of the group, archived included, for every account that
+  sees the group, so plans and events can show what they reference;
+  `Usable(access, id)` is `Find` plus `ErrResourceArchived` for archived
+  resources, for validating new plan slots and events; `Create`, `Update`, and
+  `SetArchived` (archive and restore) need `CanManageResources` and are
+  audited as `group.resource.created`, `.updated`, `.archived`, `.restored`.
+- A name is unique per group among non-archived resources, ignoring case
+  (partial unique index `resources_active_name_unique`,
+  `ErrResourceNameTaken`); restoring fails while an active resource holds the
+  name.
+- Later tables reference a resource as `(group_id, resource_id)` with a
+  composite foreign key to `resources (group_id, id)`
+  (`resources_group_id_unique`), so a reference never crosses groups.
+- Pages: `/{language}/groups/{id}/resources` and
+  `/{language}/groups/{id}/resources/{resourceID}` (`resource.go`,
+  `resources.html`, catalogs `resources.json`). Coaches see them read only;
+  players and parents get access denied and no navigation entry.

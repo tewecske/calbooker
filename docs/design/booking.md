@@ -68,6 +68,26 @@ Refinements made in #3 (open for the owner to confirm):
   such entries are removed by unlinking.
 - Audit entries name profiles by ID, never by the child's name or birth year.
 
+Refinements made in #4 (open for the owner to confirm):
+
+- A resource's kind is one of a fixed list stored as a stable code: field,
+  court, sports hall, pool, room, other (labelled in en and hu). Free text
+  would make filtering and later rules harder; "other" plus the description
+  covers the rest.
+- The optional concurrent-team limit is a whole number from 1 to 99; empty
+  means no limit.
+- Admins, managers, and site administrators create, edit, archive, and
+  restore resources; coaches see the resource list and pages read only.
+  Players and parents do not see the resource pages (no navigation entry,
+  access denied); events and plans will show them the resource's name.
+- Names are unique per group among resources in use, ignoring case; an
+  archived resource frees its name, and restoring it fails while another
+  resource holds the name.
+- Archived resources stay loadable for the plans and events that reference
+  them, are left out of pickers, can still be edited, and can be restored.
+  Nothing deletes a resource except deleting its group.
+- Audit entries name a resource by ID and name (`group.resource.*`).
+
 ## Data model
 
 All tables carry `group_id` (directly or through their parent) so every query
@@ -86,7 +106,7 @@ teams (group_id, name, birth_year_from, birth_year_to, description?, archived_at
 team_members (team_id, user_id, role: player | parent)
 child_profiles (user_id, group_id, birth_year, created_by, version)   the users row has kind 'profile'
 guardians (group_id, parent_user_id, child_user_id)  parent needs the parent role; linked parents are derived onto rosters
-resources (group_id, name, kind, description?, max_concurrent_teams?, archived_at?)
+resources (group_id, name, kind, description?, max_concurrent_teams?, archived_at?, version)   kind: field | court | hall | pool | room | other
 seasons (group_id, name, starts_on, ends_on)
 season_parts (season_id, name, starts_on, ends_on, alternating_weeks bool)
 season_team_coaches (season_id, team_id, coach_user_id, is_head)

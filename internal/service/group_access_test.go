@@ -120,6 +120,35 @@ func TestGroupAccessOutsiderSeesNothing(t *testing.T) {
 	}
 }
 
+func TestGroupAccessResources(t *testing.T) {
+	tests := []struct {
+		name         string
+		grants       GroupAccessGrants
+		manage, view bool
+	}{
+		{name: "admin", grants: memberWith(GroupRoleAdmin), manage: true, view: true},
+		{name: "manager", grants: memberWith(GroupRoleManager), manage: true, view: true},
+		{name: "site administrator", grants: GroupAccessGrants{SiteAdmin: true}, manage: true, view: true},
+		{name: "coach reads only", grants: memberWith(GroupRoleCoach), view: true},
+		{name: "player", grants: memberWith(GroupRolePlayer)},
+		{name: "parent", grants: memberWith(GroupRoleParent)},
+		{name: "member without roles", grants: memberWith()},
+		{name: "outsider", grants: GroupAccessGrants{Roles: []string{GroupRoleAdmin}}},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			access := accessFor(test.grants)
+			if access.CanManageResources() != test.manage || access.CanViewResources() != test.view {
+				t.Fatalf("manage/view = %v/%v, want %v/%v", access.CanManageResources(), access.CanViewResources(), test.manage, test.view)
+			}
+		})
+	}
+	var missing *GroupAccess
+	if missing.CanManageResources() || missing.CanViewResources() {
+		t.Fatal("nil access grants resources")
+	}
+}
+
 func TestGroupAccessRolesAndVisibleTeams(t *testing.T) {
 	access := accessFor(GroupAccessGrants{
 		Member:         true,

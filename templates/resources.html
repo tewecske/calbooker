@@ -1,0 +1,131 @@
+{{define "resource-fields"}}
+  <fieldset class="fieldset">
+    <label class="fieldset-legend" for="{{.Prefix}}-name">{{.L.resources_name}}</label>
+    <input id="{{.Prefix}}-name" class="input w-full" name="name" required maxlength="64" value="{{.Name}}" aria-describedby="{{.Prefix}}-name-error">
+    {{with .NameError}}<p id="{{$.Prefix}}-name-error" class="text-sm text-error" role="alert">{{.}}</p>{{end}}
+  </fieldset>
+  <div class="grid gap-4 sm:grid-cols-2">
+    <fieldset class="fieldset">
+      <label class="fieldset-legend" for="{{.Prefix}}-kind">{{.L.resources_kind}}</label>
+      <select id="{{.Prefix}}-kind" class="select w-full" name="kind" required aria-describedby="{{.Prefix}}-kind-error">
+        {{range .Kinds}}<option value="{{.Value}}"{{if .Selected}} selected{{end}}>{{.Label}}</option>{{end}}
+      </select>
+      {{with .KindError}}<p id="{{$.Prefix}}-kind-error" class="text-sm text-error" role="alert">{{.}}</p>{{end}}
+    </fieldset>
+    <fieldset class="fieldset">
+      <label class="fieldset-legend" for="{{.Prefix}}-max-teams">{{.L.resources_capacity}}</label>
+      <input id="{{.Prefix}}-max-teams" class="input w-full" type="number" name="max_concurrent_teams" min="1" max="99" value="{{.MaxTeams}}" aria-describedby="{{.Prefix}}-max-teams-help {{.Prefix}}-max-teams-error">
+      <p id="{{.Prefix}}-max-teams-help" class="label">{{.L.resources_capacity_help}}</p>
+      {{with .MaxTeamsError}}<p id="{{$.Prefix}}-max-teams-error" class="text-sm text-error" role="alert">{{.}}</p>{{end}}
+    </fieldset>
+  </div>
+  <fieldset class="fieldset">
+    <label class="fieldset-legend" for="{{.Prefix}}-description">{{.L.resources_description}}</label>
+    <input id="{{.Prefix}}-description" class="input w-full" name="description" maxlength="255" value="{{.Description}}" aria-describedby="{{.Prefix}}-description-help {{.Prefix}}-description-error">
+    <p id="{{.Prefix}}-description-help" class="label">{{.L.resources_description_help}}</p>
+    {{with .DescriptionError}}<p id="{{$.Prefix}}-description-error" class="text-sm text-error" role="alert">{{.}}</p>{{end}}
+  </fieldset>
+{{end}}
+
+{{define "resource-table"}}
+  <div class="overflow-x-auto">
+    <table class="table" data-testid="{{.TestID}}">
+      <thead><tr><th scope="col">{{.L.resources_name}}</th><th scope="col">{{.L.resources_kind}}</th><th scope="col">{{.L.resources_capacity}}</th></tr></thead>
+      <tbody>
+        {{range .Rows}}
+          <tr data-resource-id="{{.ID}}" data-resource-kind="{{.Kind}}">
+            <td><a class="link" href="{{.URL}}">{{.Name}}</a>{{with .Description}}<div class="text-sm opacity-70">{{.}}</div>{{end}}</td>
+            <td>{{.KindLabel}}</td>
+            <td data-testid="resource-capacity">{{.Capacity}}</td>
+          </tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+{{end}}
+
+{{define "group-resources"}}
+  {{with .Group}}{{$L := .L}}{{with .Resources}}
+    <section class="card card-border bg-base-100 shadow-sm" aria-labelledby="group-resources-heading">
+      <div class="card-body">
+        <h2 id="group-resources-heading" class="card-title">{{$L.resources_heading}}</h2>
+        <p class="text-sm opacity-70">{{$L.resources_intro}}</p>
+        {{if .Active.Rows}}
+          {{template "resource-table" .Active}}
+        {{else}}
+          <p class="text-sm opacity-70" data-testid="resources-empty">{{$L.resources_empty}}</p>
+        {{end}}
+        {{if not .CreateForm}}
+          <div role="status" class="alert alert-info alert-soft" data-testid="resources-read-only"><span>{{$L.resources_read_only}}</span></div>
+        {{end}}
+      </div>
+    </section>
+
+    {{with .CreateForm}}
+      <section class="card card-border bg-base-100 shadow-sm" aria-labelledby="resource-create-heading">
+        <div class="card-body">
+          <h2 id="resource-create-heading" class="card-title">{{$L.resources_create}}</h2>
+          <form class="grid gap-4" method="post" action="{{.ActionURL}}" hx-post="{{.ActionURL}}" hx-target="#page-content" hx-swap="outerHTML" hx-disabled-elt="this">
+            <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
+            {{template "resource-fields" .}}
+            <div><button class="btn btn-primary" type="submit">{{$L.resources_create}}</button></div>
+          </form>
+        </div>
+      </section>
+    {{end}}
+
+    {{if .Archived.Rows}}
+      <section class="card card-border bg-base-100 shadow-sm" aria-labelledby="resources-archived-heading">
+        <div class="card-body">
+          <h2 id="resources-archived-heading" class="card-title">{{$L.resources_archived}}</h2>
+          <p class="text-sm opacity-70">{{$L.resources_archived_help}}</p>
+          {{template "resource-table" .Archived}}
+        </div>
+      </section>
+    {{end}}
+  {{end}}{{end}}
+{{end}}
+
+{{define "group-resource"}}
+  {{with .Group}}{{$L := .L}}{{with .Resource}}
+    <p><a class="link" href="{{.ListURL}}">{{$L.resources_back}}</a></p>
+    <section class="card card-border bg-base-100 shadow-sm" aria-labelledby="resource-heading">
+      <div class="card-body">
+        <h2 id="resource-heading" class="card-title">{{.Name}}{{if .Archived}} <span class="badge badge-warning badge-soft" data-testid="resource-archived-badge">{{$L.resources_archived_badge}}</span>{{end}}</h2>
+        <dl class="grid grid-cols-1 gap-2 text-sm sm:grid-cols-[auto_1fr]">
+          <dt class="opacity-70">{{$L.resources_kind}}</dt><dd data-testid="resource-kind">{{.KindLabel}}</dd>
+          <dt class="opacity-70">{{$L.resources_capacity}}</dt><dd data-testid="resource-capacity">{{.Capacity}}</dd>
+          {{with .Description}}<dt class="opacity-70">{{$L.resources_description}}</dt><dd data-testid="resource-description">{{.}}</dd>{{end}}
+        </dl>
+        {{if .Archived}}<p class="text-sm opacity-70">{{$L.resources_archived_help}}</p>{{end}}
+      </div>
+    </section>
+
+    {{if .CanEdit}}
+      <section class="card card-border bg-base-100 shadow-sm" aria-labelledby="resource-edit-heading">
+        <div class="card-body">
+          <h2 id="resource-edit-heading" class="card-title">{{$L.resources_edit}}</h2>
+          <form class="grid gap-4" method="post" action="{{.EditForm.ActionURL}}" hx-post="{{.EditForm.ActionURL}}" hx-target="#page-content" hx-swap="outerHTML" hx-disabled-elt="this">
+            <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
+            <input type="hidden" name="version" value="{{.Version}}">
+            {{template "resource-fields" .EditForm}}
+            <div><button class="btn btn-primary" type="submit">{{$L.resources_save}}</button></div>
+          </form>
+          <div class="divider"></div>
+          <form method="post" action="{{.ArchiveURL}}" hx-post="{{.ArchiveURL}}" hx-target="#page-content" hx-swap="outerHTML" hx-disabled-elt="this"
+                {{if not .Archived}}hx-confirm="{{$L.resources_archive_confirm}}"{{end}}>
+            <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
+            <input type="hidden" name="version" value="{{.Version}}">
+            {{if .Archived}}
+              <input type="hidden" name="archived" value="false">
+              <button class="btn btn-outline" type="submit">{{$L.resources_restore}}</button>
+            {{else}}
+              <input type="hidden" name="archived" value="true">
+              <button class="btn btn-outline btn-warning" type="submit">{{$L.resources_archive}}</button>
+            {{end}}
+          </form>
+        </div>
+      </section>
+    {{end}}
+  {{end}}{{end}}
+{{end}}

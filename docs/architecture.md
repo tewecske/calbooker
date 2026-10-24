@@ -112,8 +112,12 @@ get `service.ErrGroupNotFound`, which handlers render as 404.
   `CanCreateEvents` (staff, and coaches with a team this season),
   `CanCreateEvent(teamIDs)` (staff; coaches only for teams they all coach),
   `CanEditEvent(event)` (the same for the event's teams), `CanViewEvent(event)`
-  (the Visibility rule plus the event's extra coaches). Add a question here
-  rather than checking roles in a handler.
+  (the Visibility rule plus the event's extra coaches),
+  `CanViewCoaches` (staff and coaches), `CanManageQualifications` (staff),
+  `CanViewQualification(id)`, `CanViewAvailability(id)`, and
+  `CanEditAvailability(id)` (staff, and the coach themself),
+  `CanViewAllAvailability` (staff). Add
+  a question here rather than checking roles in a handler.
 - Extension points: `GroupAccessService.SetCoachedTeams(source)` takes a
   `TeamRelationSource.TeamIDs(ctx, groupID, userID)`; `service.SeasonService`
   implements it from `season_team_coaches` of the group's current season and
@@ -288,3 +292,39 @@ get `service.ErrGroupNotFound`, which handlers render as 404.
   `/{language}/groups/{id}/events/{eventID}` with `POST .../cancel` and
   `.../delete` (`event.go`, `events.html`, catalogs `events.json`). Every
   member has the Events tab and sees the events visible to them.
+## Coaches
+
+- `CoachService` (`internal/service/coach.go`, `availability.go`, store
+  `internal/store/postgres/coaches.go`, migration 000008) owns
+  `coach_qualifications` (one age range per coach and group) and
+  `coach_availability` (weekly windows per season part: week `A`, `B`, or
+  `all`, weekday, minutes). Both reference the member's coach role by
+  foreign key (removing the role removes them); windows reference the part
+  as `(group_id, season_part_id)` and go with it.
+- Pure helpers for the planning boards: `TeamAgeRange(team, season)`
+  (season start year minus birth years), `CoachQualification.Covers(ages)`
+  (the whole range inside), `NormalizeAvailability` (merge overlapping or
+  touching windows of the same week and weekday), `DefaultSeasonPart`,
+  `PreviousSeasonPart`, and `PartAvailability.Covers(coach, week, weekday,
+  start, end)` (an A/B slot needs the week's plus every-week windows; an
+  every-week slot in an alternating part needs both weeks; A/B windows
+  count only while the part alternates).
+- Use cases: `Coaches(access)` (staff: every coach; coaches: themselves),
+  `Qualifications(access)` and `Availability(access, partID)` (every coach,
+  staff only; for #12 and #14), `CoachAvailability(access, partID, coachID)`,
+  `Parts(access)`, `PreviousPart`, `SetQualification`/`ClearQualification`
+  (staff, audited), and `AddAvailability`, `MoveAvailability`,
+  `DeleteAvailability`, `CopyPreviousAvailability` (staff and the coach
+  themself; staff edits of another coach audited as `group.coach.*`).
+- Edits go through `CoachRepository.EditAvailability`, which locks the
+  coach's role row (`FOR NO KEY UPDATE`), reads the coach's windows of the
+  part, applies the change, merges, and replaces them in one transaction, so
+  concurrent edits never lose each other. Window IDs change on every edit;
+  the grid re-renders after each change.
+- Pages: `/{language}/groups/{id}/coaches` (qualifications and team ages),
+  `/{language}/groups/{id}/coaches/{coachID}/availability?part=&week=` (the
+  week grid with `move`, `create`, `delete`, `copy` posts), and
+  `/{language}/groups/{id}/coaches/availability` (staff, side by side)
+  (`coach.go`, `coaches.html`, catalogs `coaches.json`). The week grid is
+  used unchanged: alternating parts get A / B / every-week tabs of their own,
+  the grid's `Week` is `A` or `B` on those tabs and empty otherwise.

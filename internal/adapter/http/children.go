@@ -112,7 +112,7 @@ func (h *groupHandler) createProfile(writer http.ResponseWriter, request *http.R
 		h.renderWriteError(writer, request, current, groupSectionChildren, 0, err, h.profileFormErrors(current, form, err))
 		return
 	}
-	h.renderSection(writer, request, current, groupSectionChildren, 0, FormData{}, []Alert{{Level: "success", Message: h.t(current.language, "children.created")}}, http.StatusOK)
+	h.renderChildrenAfterWrite(writer, request, current, []Alert{{Level: "success", Message: h.t(current.language, "children.created")}})
 }
 
 func (h *groupHandler) updateProfile(writer http.ResponseWriter, request *http.Request) {
@@ -131,7 +131,7 @@ func (h *groupHandler) updateProfile(writer http.ResponseWriter, request *http.R
 		h.renderWriteError(writer, request, current, groupSectionChildren, 0, err, FormData{})
 		return
 	}
-	h.renderSection(writer, request, current, groupSectionChildren, 0, FormData{}, []Alert{{Level: "success", Message: h.t(current.language, "children.saved")}}, http.StatusOK)
+	h.renderChildrenAfterWrite(writer, request, current, []Alert{{Level: "success", Message: h.t(current.language, "children.saved")}})
 }
 
 func (h *groupHandler) deleteProfile(writer http.ResponseWriter, request *http.Request) {
@@ -149,7 +149,7 @@ func (h *groupHandler) deleteProfile(writer http.ResponseWriter, request *http.R
 		h.renderWriteError(writer, request, current, groupSectionChildren, 0, err, FormData{})
 		return
 	}
-	h.renderSection(writer, request, current, groupSectionChildren, 0, FormData{}, []Alert{{Level: "success", Message: h.t(current.language, "children.deleted")}}, http.StatusOK)
+	h.renderChildrenAfterWrite(writer, request, current, []Alert{{Level: "success", Message: h.t(current.language, "children.deleted")}})
 }
 
 func (h *groupHandler) addGuardian(writer http.ResponseWriter, request *http.Request) {
@@ -184,7 +184,7 @@ func (h *groupHandler) changeGuardian(writer http.ResponseWriter, request *http.
 		h.renderWriteError(writer, request, current, groupSectionChildren, 0, err, FormData{})
 		return
 	}
-	h.renderSection(writer, request, current, groupSectionChildren, 0, FormData{}, []Alert{{Level: "success", Message: h.t(current.language, message)}}, http.StatusOK)
+	h.renderChildrenAfterWrite(writer, request, current, []Alert{{Level: "success", Message: h.t(current.language, message)}})
 }
 
 func (h *groupHandler) childRequest(writer http.ResponseWriter, request *http.Request) (groupRequest, bool) {
@@ -287,6 +287,19 @@ func (h *groupHandler) loadChildren(writer http.ResponseWriter, request *http.Re
 	}
 	view.Children = children
 	return true
+}
+
+// renderChildrenAfterWrite rebuilds the caller's access before rendering:
+// a write here can change the account's own children (a parent's new
+// profile is linked to them), which the request's access was built without.
+func (h *groupHandler) renderChildrenAfterWrite(writer http.ResponseWriter, request *http.Request, current groupRequest, alerts []Alert) {
+	access, err := h.dependencies.GroupAccess.For(request.Context(), current.user.ID, current.access.GroupID())
+	if err != nil {
+		h.renderLoadError(writer, request, current.language, err)
+		return
+	}
+	current.access = access
+	h.renderSection(writer, request, current, groupSectionChildren, 0, FormData{}, alerts, http.StatusOK)
 }
 
 // profileForm reads the profile name and birth year. An unparseable year

@@ -3,6 +3,7 @@ import { expect, test } from "@playwright/test";
 import {
   appURL,
   becomeGuest,
+  createInvite,
   providerAdmin,
   providerURL,
   signInAtProvider,
@@ -97,9 +98,9 @@ test.describe("single sign-on", () => {
     await owner.page.locator("#group-new-name").fill(uniqueName("SSO"));
     await owner.page.locator("#group-new-name").locator("xpath=ancestor::form").getByRole("button").click();
     await owner.page.waitForURL(/\/en\/groups\/\d+$/);
-    const inviteCode = (await owner.page.getByTestId("group-invite-code").innerText()).trim();
-    expect(inviteCode).toMatch(invitePattern);
     const groupName = await owner.page.locator("#group-summary-heading").innerText();
+    const inviteCode = await createInvite(owner.page, owner.page.url(), { role: "player" });
+    expect(inviteCode).toMatch(invitePattern);
 
     const { context: guestContext, page: guest } = await becomeGuest(browser);
     await guest.goto(`${appURL}/en/groups/join`);

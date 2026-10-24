@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { appURL, becomeGuest, signUpUser, ssoEnabled, uniqueName } from "./support";
+import { appURL, becomeGuest, createInvite, signUpUser, ssoEnabled, uniqueName } from "./support";
 
 // Clubs with roles, a time zone, and teams (#2). Opt-in like the single
 // sign-on specs: CALBOOKER_SSO_E2E=1 (make e2e) with goweb's Hydra and
@@ -32,7 +32,6 @@ test.describe("groups", () => {
     await expect(page.locator("#alerts")).toContainText("Group settings saved.");
     await page.goto(groupURL);
     await expect(page.getByTestId("group-time-zone")).toHaveText("Europe/Budapest");
-    const inviteCode = (await page.getByTestId("group-invite-code").innerText()).trim();
 
     // Create a team.
     await page.locator("nav a[data-section=teams]").click();
@@ -45,6 +44,9 @@ test.describe("groups", () => {
     await expect(page.locator("#team-heading")).toContainText("Lions");
     await expect(page.getByTestId("team-birth-years")).toHaveText("2015–2016");
     const teamURL = page.url();
+
+    // A group invite without a team makes the new member a player.
+    const inviteCode = await createInvite(page, groupURL, { role: "player" });
 
     // A guest joins with the invite code and becomes a player.
     const guest = await becomeGuest(browser);

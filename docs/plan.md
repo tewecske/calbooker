@@ -172,7 +172,7 @@ Progress is in the Status table below. The original first steps were:
 | 11 | merged | #31 |
 | 30 | merged | #32 |
 | 14 | merged | #33 |
-| 15 | in progress (lane C) | |
+| 15 | merged | #34 |
 
 ## Owner answers (2026-10-23)
 

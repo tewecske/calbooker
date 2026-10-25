@@ -3,7 +3,36 @@
 {{end}}
 
 {{define "home-content"}}
-  <p class="mt-4 max-w-2xl text-base-content/70">A server-rendered Go and HTMX application foundation.</p>
+  {{with .Home}}
+    <p class="mt-4 max-w-2xl text-base-content/70">{{.Intro}}</p>
+    <div class="mt-6 grid w-full max-w-3xl gap-6">
+      <section class="card card-border bg-base-100 shadow-sm" aria-labelledby="home-groups-heading">
+        <div class="card-body">
+          <h2 id="home-groups-heading" class="card-title">{{.GroupsLabel}}</h2>
+          {{with .GroupsFailed}}<p class="text-sm text-error" role="alert">{{.}}</p>{{end}}
+          {{if .Groups}}
+            <ul class="menu w-full p-0" id="home-groups">
+              {{range .Groups}}
+                <li><a href="{{.URL}}">{{.Name}}</a></li>
+              {{end}}
+            </ul>
+          {{else}}
+            <p class="text-sm opacity-70">{{.GroupsEmpty}}</p>
+          {{end}}
+          <div class="card-actions mt-2">
+            {{if .CreateURL}}<a class="btn btn-primary" href="{{.CreateURL}}">{{.CreateLabel}}</a>{{end}}
+            <a class="btn" href="{{.JoinURL}}">{{.JoinLabel}}</a>
+            {{if .AdminURL}}<a class="btn btn-ghost" href="{{.AdminURL}}">{{.AdminLabel}}</a>{{end}}
+          </div>
+        </div>
+      </section>
+    </div>
+  {{else}}
+    <p class="mt-4 max-w-2xl text-base-content/70">{{.Description}}</p>
+    <div class="mt-6">
+      <a class="btn btn-primary" href="{{.SignInURL}}">{{.Labels.sign_in}}</a>
+    </div>
+  {{end}}
 {{end}}
 
 {{define "home-fragment"}}

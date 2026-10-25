@@ -8,6 +8,7 @@ import (
 
 	"github.com/tewecske/calbooker/internal/adapter/http/middleware"
 	"github.com/tewecske/calbooker/internal/locale"
+	"github.com/tewecske/calbooker/internal/service"
 	staticassets "github.com/tewecske/calbooker/static"
 )
 
@@ -184,9 +185,13 @@ func home(renderer *PageRenderer, auth *authHandler) http.HandlerFunc {
 			Template:         "home",
 			FragmentTemplate: "home-fragment",
 			SignInURL:        mustLocalePath(language, "/sign-in"),
+			Labels:           auth.formLabels(language),
+			Description:      translateOrEmpty(renderer, language, "home.description"),
 		}
 		page.CSRFToken, _ = middleware.CSRFTokenFromContext(request.Context())
-		applySessionState(renderer, auth, request, language, &page)
+		if user, ok := applySessionState(renderer, auth, request, language, &page); ok {
+			page.Home = homeView(renderer, auth.dependencies, request, language, user)
+		}
 		if err := renderer.RenderRequest(writer, request, page); err != nil {
 			http.Error(writer, "internal server error", http.StatusInternalServerError)
 		}
@@ -195,13 +200,14 @@ func home(renderer *PageRenderer, auth *authHandler) http.HandlerFunc {
 
 // applySessionState fills the shared header state so public pages reflect the
 // visitor's session instead of always advertising anonymous navigation.
-func applySessionState(renderer *PageRenderer, auth *authHandler, request *http.Request, language locale.Code, page *PageData) {
+func applySessionState(renderer *PageRenderer, auth *authHandler, request *http.Request, language locale.Code, page *PageData) (service.User, bool) {
 	if user, ok := auth.currentUser(request); ok {
 		page.Account = settingsAccountMenu(language, user)
 		page.Navigation = primaryNavigation(renderer, language, true)
-		return
+		return user, true
 	}
 	page.Navigation = primaryNavigation(renderer, language, false)
+	return service.User{}, false
 }
 
 // primaryNavigation builds the localized primary navigation. Authenticated

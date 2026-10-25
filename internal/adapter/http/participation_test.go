@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/tewecske/calbooker/internal/service"
 )
@@ -41,6 +42,11 @@ func (s *participationUseCaseStub) RecordAttendance(_ context.Context, _ service
 	s.calls++
 	s.lastEvent, s.lastMarks = eventID, marks
 	return s.writeErr
+}
+
+func (s *participationUseCaseStub) CalendarAnswers(context.Context, *service.GroupAccess, time.Time, time.Time) ([]service.CalendarAnswer, error) {
+	s.calls++
+	return nil, nil
 }
 
 func participationDependencies(t *testing.T, access *service.GroupAccess) (Dependencies, *eventsUseCaseStub, *participationUseCaseStub) {

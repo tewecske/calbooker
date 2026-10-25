@@ -366,8 +366,17 @@ get `service.ErrGroupNotFound`, which handlers render as 404.
   target `#page-content`, URL pushed); without JavaScript they are plain
   links and a GET form. The group switcher lists the account's groups when
   there are several, keeping the week and the kind filter.
-- `CalendarItemView.Status`/`StatusCode` are the hook for the viewer's own
-  sign-up status: when set, the day list and the grid item show a badge.
+- Answer badges (#30): the handler asks
+  `ParticipationService.CalendarAnswers(access, week.From, week.To)` once per
+  page. It returns the viewer's own `event_participants` answers (`signed_up`,
+  `declined`, `nominated`; rows without an answer are skipped) and those of
+  `GroupAccess.ChildUserIDs()`, scoped to the group and to events overlapping
+  the range (`ParticipantRepository.ListAnswers`, one query). The handler
+  attaches them only to events `EventService.List` returned and the filter
+  kept, so nobody sees an answer on an event they cannot see, and nobody's
+  answer but their own and their children's. A child's badge reads
+  "Anna: Coming" (`calendar.child_status`); `CalendarItemView.Answers`
+  holds the badges, shown in the day list and as grid item badges.
   They are not filled yet; that needs a week-wide query of the viewer's
   `event_participants` rows (follow-up to #9).
 

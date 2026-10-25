@@ -138,6 +138,18 @@ func (r *participantRepositoryStub) ListConfirmedAttendance(_ context.Context, _
 	return kept, nil
 }
 
+func (r *participantRepositoryStub) ListAnswers(_ context.Context, _ int64, userIDs []int64, _, _ time.Time) ([]CalendarAnswer, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	var answers []CalendarAnswer
+	for _, row := range r.rows {
+		if slices.Contains(userIDs, row.UserID) {
+			answers = append(answers, CalendarAnswer{EventID: row.EventID, UserID: row.UserID, Status: row.Status})
+		}
+	}
+	return answers, nil
+}
+
 type participationSetup struct {
 	service *ParticipationService
 	events  *participationEventsStub

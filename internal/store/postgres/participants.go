@@ -264,6 +264,47 @@ func (r *ParticipantRepository) ListConfirmedAttendance(ctx context.Context, gro
 	return records, nil
 }
 
+// ListAnswers returns the answers of userIDs for the group's events that
+// overlap [from, to), with the members' names, ordered by event and member.
+func (r *ParticipantRepository) ListAnswers(ctx context.Context, groupID int64, userIDs []int64, from, to time.Time) ([]service.CalendarAnswer, error) {
+	db, err := r.database(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if len(userIDs) == 0 {
+		return []service.CalendarAnswer{}, nil
+	}
+	rows, err := db.QueryContext(ctx, `
+		SELECT p.event_id, p.user_id, p.status, u.display_name, u.username
+		FROM event_participants p
+		JOIN events e ON e.group_id = p.group_id AND e.id = p.event_id
+		JOIN users u ON u.id = p.user_id
+		WHERE p.group_id = $1 AND p.user_id = ANY($2::bigint[]) AND p.status IS NOT NULL
+			AND e.ends_at > $3 AND e.starts_at < $4
+		ORDER BY p.event_id, p.user_id
+	`, groupID, userIDs, from, to)
+	if err != nil {
+		return nil, mapParticipantError(err)
+	}
+	defer func() { _ = rows.Close() }()
+	answers := make([]service.CalendarAnswer, 0)
+	for rows.Next() {
+		var (
+			answer            service.CalendarAnswer
+			display, username sql.NullString
+		)
+		if err := rows.Scan(&answer.EventID, &answer.UserID, &answer.Status, &display, &username); err != nil {
+			return nil, mapParticipantError(err)
+		}
+		answer.DisplayName, answer.Username = nullableString(display), nullableString(username)
+		answers = append(answers, answer)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, mapParticipantError(err)
+	}
+	return answers, nil
+}
+
 func (r *ParticipantRepository) database(ctx context.Context) (*sql.DB, error) {
 	if err := ValidateContext(ctx); err != nil {
 		return nil, err

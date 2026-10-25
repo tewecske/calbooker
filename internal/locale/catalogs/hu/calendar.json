@@ -21,6 +21,7 @@
     "calendar.day_empty": {"text": "Nincs esemény"},
     "calendar.today_marker": {"text": "Ma"},
     "calendar.multi_day": {"text": "Több napos:"},
+    "calendar.child_status": {"text": "{name}: {status}"},
     "calendar.your_status": {"text": "A válaszod:"}
   }
 }

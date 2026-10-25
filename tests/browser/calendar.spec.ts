@@ -129,6 +129,19 @@ test.describe("calendar", () => {
     await expect(player.page.getByText(training)).toHaveCount(0);
     await expect(player.page.locator("#calendar-filter-team option")).toHaveText(["All teams", tigers]);
 
+    // No answer, no badge; after signing up the player sees "Coming" on the
+    // match, in the grid and in the day list, and nobody else's answer.
+    await expect(player.page.locator("[data-calendar-status]")).toHaveCount(0);
+    await player.page.locator("#calendar-grid").getByRole("link", { name: match }).click();
+    await player.page.waitForURL(/\/events\/\d+$/);
+    await player.page.getByTestId("participation").getByRole("button", { name: "I'll be there" }).click();
+    await expect(player.page.locator("#alerts")).toContainText("Answer saved.");
+    await player.page.goto(`${groupURL}/calendar?week=${nextWeek}`);
+    await expect(player.page.locator("#calendar-grid").getByText("Coming")).toBeVisible();
+    await expect(player.page.locator("[data-calendar-status=signed_up]")).toHaveCount(1);
+    await owner.page.goto(`${groupURL}/calendar?week=${nextWeek}`);
+    await expect(owner.page.locator("[data-calendar-status]")).toHaveCount(0);
+
     await player.context.close();
     await owner.context.close();
   });

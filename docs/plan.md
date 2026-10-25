@@ -39,6 +39,7 @@ Issue numbers are the GitHub ones. "After" lists what must be merged first.
 | 13 | Resource slot plan | M4 Season planning | 5, 6 | C |
 | 14 | Training plan board | M4 Season planning | 12, 13 | C |
 | 15 | Generate events from the plan | M4 Season planning | 8, 14 | C |
+| 30 | Own answer on calendar entries | M3 Events | 10, 11 | A |
 
 - M1 is one subagent at a time: everything else builds on it.
 - Then at most three lanes run in parallel (A: data and events, B: grid and
@@ -169,7 +170,8 @@ Progress is in the Status table below. The original first steps were:
 | 21 | merged (browser account pool, rate-limit backoff) | #22 |
 | 6 | merged | #17 |
 | 11 | in progress (lane A) | |
-| 14, 15 | open | |
+| 14 | in progress (lane C) | |
+| 15, 30 | open | |
 
 ## Owner answers (2026-10-23)
 

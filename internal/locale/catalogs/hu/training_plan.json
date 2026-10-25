@@ -1,0 +1,196 @@
+{
+  "messages": {
+    "training_plan.nav": {
+      "text": "Edzésterv"
+    },
+    "training_plan.heading": {
+      "text": "Edzésterv"
+    },
+    "training_plan.intro": {
+      "text": "Csapatok a szezonrészek helyszín-idősávjaiban, hétről hétre. Húzz egy csapatot a listából a rácsra, húzz egy edzést az áthelyezéshez, vagy használd a Javaslatot. Mentésig semmi nem tárolódik. A szabályszegések figyelmeztetésként jelennek meg, és nem akadályozzák a mentést."
+    },
+    "training_plan.previous": {
+      "text": "A javaslat kiindulása"
+    },
+    "training_plan.no_previous": {
+      "text": "Nincs előző szezon, amiből másolni lehetne"
+    },
+    "training_plan.read_only": {
+      "text": "A mentett edzéstervet csak olvasásra látod. A rendelkezésre állás változása nem módosítja magától a tervet; adminisztrátor vagy menedzser futtatja újra a javaslatot."
+    },
+    "training_plan.save": {
+      "text": "Mentés"
+    },
+    "training_plan.suggest": {
+      "text": "Javaslat"
+    },
+    "training_plan.start_over": {
+      "text": "Újrakezdés a javaslatból"
+    },
+    "training_plan.start_over_confirm": {
+      "text": "Lecseréled a táblát egy új javaslatra? A nem mentett módosítások elvesznek."
+    },
+    "training_plan.unsaved": {
+      "text": "Nem mentett módosítások"
+    },
+    "training_plan.discard": {
+      "text": "Módosítások elvetése"
+    },
+    "training_plan.suggest_help": {
+      "text": "A Javaslat megtartja a táblán lévőket, és kitölti az edzés nélküli csapatokat: előbb a tavalyi edzéseket, majd a csapat korosztályához, minden edzőjéhez és a kapacitáshoz illő szabad idősávokat."
+    },
+    "training_plan.warnings_heading": {
+      "text": "Figyelmeztetések"
+    },
+    "training_plan.pool": {
+      "text": "Csapatok"
+    },
+    "training_plan.pool_help": {
+      "text": "Húzz egy csapatot a rácsra edzés felvételéhez."
+    },
+    "training_plan.no_coach": {
+      "text": "Nincs edző"
+    },
+    "training_plan.no_teams": {
+      "text": "A csoportnak még nincs csapata."
+    },
+    "training_plan.add_heading": {
+      "text": "Edzés felvétele húzás nélkül"
+    },
+    "training_plan.add_team": {
+      "text": "Csapat"
+    },
+    "training_plan.add_choose": {
+      "text": "Válassz csapatot"
+    },
+    "training_plan.add_day": {
+      "text": "Nap"
+    },
+    "training_plan.add_resource": {
+      "text": "Helyszín"
+    },
+    "training_plan.add_start": {
+      "text": "Kezdés"
+    },
+    "training_plan.add_end": {
+      "text": "Vége"
+    },
+    "training_plan.add_submit": {
+      "text": "Edzés felvétele"
+    },
+    "training_plan.list_heading": {
+      "text": "Edzések"
+    },
+    "training_plan.col_team": {
+      "text": "Csapat"
+    },
+    "training_plan.col_coaches": {
+      "text": "Edzők"
+    },
+    "training_plan.col_state": {
+      "text": "Állapot"
+    },
+    "training_plan.slot": {
+      "text": "Idősáv"
+    },
+    "training_plan.new": {
+      "text": "Új"
+    },
+    "training_plan.remove": {
+      "text": "Törlés"
+    },
+    "training_plan.remove_label": {
+      "text": "{team} edzésének törlése"
+    },
+    "training_plan.empty": {
+      "text": "Ezen a héten még nincs edzés."
+    },
+    "training_plan.drag_hint": {
+      "text": "Húzz egy edzést az áthelyezéshez, vagy az alsó szélét a vége módosításához. Húzz egy csapatot a listából edzés felvételéhez. Érintőképernyőn húzás előtt tartsd nyomva."
+    },
+    "training_plan.team_trainings": {
+      "one": "{count} edzés",
+      "other": "{count} edzés"
+    },
+    "training_plan.suggested": {
+      "one": "{count} edzés javasolva.",
+      "other": "{count} edzés javasolva."
+    },
+    "training_plan.suggested_none": {
+      "text": "Nincs mit javasolni: minden aktív csapatnak van edzése."
+    },
+    "training_plan.unplaced": {
+      "one": "{count} csapat nem talált szabad idősávot.",
+      "other": "{count} csapat nem talált szabad idősávot."
+    },
+    "training_plan.stale": {
+      "text": "Az edzésterv megváltozott, mióta megnyitottad a táblát. Told el a módosításaidat, és próbáld újra."
+    },
+    "training_plan.saved": {
+      "text": "Edzésterv mentve: {added} új, {moved} áthelyezett, {removed} törölt."
+    },
+    "training_plan.no_changes": {
+      "text": "Nem változott semmi."
+    },
+    "training_plan.reason.previous_season": {
+      "text": "A tavalyi szezonból"
+    },
+    "training_plan.reason.slot": {
+      "text": "Illik egy helyszín-idősávba"
+    },
+    "training_plan.warning_line": {
+      "text": "{team}, {day} {time}, {resource}: {warning}"
+    },
+    "training_plan.warning.team_archived": {
+      "text": "A csapat archivált."
+    },
+    "training_plan.warning.resource_archived": {
+      "text": "A helyszín archivált."
+    },
+    "training_plan.warning.no_coach": {
+      "text": "A csapatnak nincs edzője ebben a szezonban."
+    },
+    "training_plan.warning.no_slot": {
+      "text": "Egyetlen helyszín-idősáv sem fedi le ezt az edzést."
+    },
+    "training_plan.warning.outside_slot": {
+      "text": "Az edzés túlnyúlik a helyszín-idősávján."
+    },
+    "training_plan.warning.slot_ages": {
+      "text": "Az idősáv ide szól: {slot_ages}, a csapat: {team_ages}."
+    },
+    "training_plan.warning.slot_full": {
+      "text": "{teams} csapat edz egyszerre az idősávban, de legfeljebb {limit} fér el."
+    },
+    "training_plan.warning.resource_full": {
+      "text": "{teams} csapat használja egyszerre a helyszínt, de legfeljebb {limit} fér el."
+    },
+    "training_plan.warning.team_overlap": {
+      "text": "A csapatnak ugyanekkor másik edzése is van ({other})."
+    },
+    "training_plan.warning.coach_unavailable": {
+      "text": "{coach} ekkor nem ér rá."
+    },
+    "training_plan.warning.coach_busy": {
+      "text": "{coach} ekkor a(z) {other_team} csapatot is edzi ({other})."
+    },
+    "training_plan.error.invalid_change": {
+      "text": "Ez a pozíció nincs a rácson."
+    },
+    "training_plan.error.invalid_time": {
+      "text": "Az edzéshez nap kell, és a kezdésnek a vége előtt kell lennie, egy napon belül."
+    },
+    "training_plan.error.invalid_week": {
+      "text": "Ez a hét nincs ebben a szezonrészben."
+    },
+    "training_plan.error.too_large": {
+      "text": "A terv túl sok edzést tartalmaz."
+    },
+    "training_plan.error.team_not_found": {
+      "text": "A táblán lévő egyik csapat már nem létezik. Told el a módosításaidat, és próbáld újra."
+    },
+    "training_plan.error.resource_not_found": {
+      "text": "A táblán lévő egyik helyszín már nem létezik. Told el a módosításaidat, és próbáld újra."
+    }
+  }
+}

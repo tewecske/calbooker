@@ -110,6 +110,7 @@ type GroupDetailView struct {
 	PlanSlot     *PlanSlotDetailView
 	CoachBoard   *CoachBoardView
 	Statistics   *StatisticsView
+	TrainingPlan *TrainingPlanView
 }
 
 // GroupNavItem is one group section link.
@@ -223,6 +224,7 @@ func registerGroupRoutes(mux *http.ServeMux, groups *groupHandler) {
 	registerParticipationRoutes(mux, groups)
 	registerCoachBoardRoutes(mux, groups)
 	registerStatisticsRoutes(mux, groups)
+	registerTrainingPlanRoutes(mux, groups)
 }
 
 func newGroupHandler(renderer *PageRenderer, dependencies Dependencies) *groupHandler {
@@ -248,7 +250,7 @@ func groupLabels(renderer *PageRenderer) map[locale.Code]map[string]string {
 	for _, language := range locale.Codes() {
 		values := make(map[string]string)
 		for _, id := range renderer.catalogs.Keys(language) {
-			if !strings.HasPrefix(id, "groups.") && !strings.HasPrefix(id, "teams.") && !strings.HasPrefix(id, "invites.") && !strings.HasPrefix(id, "children.") && !strings.HasPrefix(id, "resources.") && !strings.HasPrefix(id, "seasons.") && !strings.HasPrefix(id, "events.") && !strings.HasPrefix(id, "coaches.") && !strings.HasPrefix(id, "plan.") && !strings.HasPrefix(id, "participation.") && !strings.HasPrefix(id, "calendar.") && !strings.HasPrefix(id, "coach_board.") && !strings.HasPrefix(id, "statistics.") {
+			if !strings.HasPrefix(id, "groups.") && !strings.HasPrefix(id, "teams.") && !strings.HasPrefix(id, "invites.") && !strings.HasPrefix(id, "children.") && !strings.HasPrefix(id, "resources.") && !strings.HasPrefix(id, "seasons.") && !strings.HasPrefix(id, "events.") && !strings.HasPrefix(id, "coaches.") && !strings.HasPrefix(id, "plan.") && !strings.HasPrefix(id, "participation.") && !strings.HasPrefix(id, "calendar.") && !strings.HasPrefix(id, "coach_board.") && !strings.HasPrefix(id, "statistics.") && !strings.HasPrefix(id, "training_plan.") {
 				continue
 			}
 			if text, err := renderer.catalogs.Translate(language, id, nil); err == nil {
@@ -733,6 +735,7 @@ func (h *groupHandler) groupShell(current groupRequest, group service.Group, sec
 	}
 	if current.access.CanViewPlan() {
 		items = append(items, struct{ id, label, route string }{groupSectionPlan, "plan.nav", "/plan"})
+		items = append(items, struct{ id, label, route string }{groupSectionTrainingPlan, "training_plan.nav", "/training-plan"})
 	}
 	if current.access.CanViewResources() {
 		items = append(items, struct{ id, label, route string }{groupSectionResources, "resources.nav", "/resources"})

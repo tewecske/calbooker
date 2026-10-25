@@ -311,6 +311,35 @@ Refinements made in #11 (open for the owner to confirm):
   for staff only. Non-members get 404.
 - No charts and no migration.
 
+Refinements made in #14 (open for the owner to confirm):
+
+- Admins, managers, and site administrators edit the training plan; coaches
+  see the saved plan read only, all teams, without warnings (they rest on
+  other coaches' availability); players and parents do not see it.
+- The board edits a draft; nothing is saved until Save, which replaces the
+  part's whole training set. A save based on an older set is refused as a
+  conflict. A moved training keeps its identity, so events generated from it
+  (#15) keep their link; deleting a training keeps its events, unlinked.
+- Trainings of a team may repeat (several per week); a team has a week of
+  `A`, `B`, or `all` like slots. A training sits in the slot that contains it
+  (the shortest), else the slot it overlaps most; it may reach beyond its
+  slot, which is a warning.
+- Warnings, never blocking: archived team or resource, team without a season
+  coach, no slot, partly outside the slot, team ages outside the slot's ages,
+  more teams in a slot or on a resource than allowed (slots without a limit
+  count as one), the team twice at once, a coach not available for the whole
+  training (every week of an every-week training), a coach with another team
+  at the same time.
+- Suggest fills only active teams without a training, one training per team
+  from slots, and never removes anything; "Start over from suggestion"
+  replaces the board. Order: last season's matching part's trainings (same
+  resource, day, and time; archived resources skipped; even if they now
+  warn), then slots (age-specific first) where ages, all coaches, capacity,
+  and coach double booking fit. Teams no slot fits stay empty and the count
+  is shown.
+- A part that does not alternate stores every training as `all`.
+
+
 ## Data model
 
 All tables carry `group_id` (directly or through their parent) so every query
@@ -336,7 +365,7 @@ season_team_coaches (group_id, season_id, team_id, coach_user_id, is_head)   coa
 coach_qualifications (group_id, coach_user_id, min_age, max_age)   ages 0..99; coach needs the coach role
 coach_availability (group_id, season_part_id, coach_user_id, week, weekday, start_minute, end_minute)   merged per week and weekday
 plan_slots (group_id, season_part_id, resource_id, week, weekday, start_minute, end_minute, min_age?, max_age?, max_teams?, version)   A/B only in alternating parts; slots may overlap
-plan_trainings (season_part_id, team_id, resource_id, plan_slot_id?, week, weekday, start_minute, end_minute)
+plan_trainings (group_id, season_part_id, team_id, resource_id, plan_slot_id?, week, weekday, start_minute, end_minute)   several per team; slot optional, own times
 events (group_id, kind, title, starts_at, ends_at, resource_id?, location?, signup_mode,
         max_participants?, signup_deadline?,
         cancelled_at?, plan_training_id?, generated_for_week?, edited_at?, version)

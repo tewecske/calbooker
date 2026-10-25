@@ -537,3 +537,58 @@ get `service.ErrGroupNotFound`, which handlers render as 404.
   after a drop it rewrites the card's values and posts the draft, and the
   server re-renders the board (`#coach-board`, outer swap, alerts out of
   band). The same pattern fits the training plan board (#14).
+
+## Training plan board
+
+- `TrainingPlanService` (`internal/service/training_plan.go`, store
+  `PlanTrainingRepository` in `internal/store/postgres/plan_trainings.go`,
+  migration `000011_create_plan_trainings.up.sql`) owns `plan_trainings`: a
+  team on a resource, optionally in a resource slot, with its own week, day,
+  start, and end. Access: `CanManagePlan` edits, `CanViewPlan` (coaches)
+  reads; players and parents get access denied, non-members 404.
+- `Trainings(access, partID)` is the read API for event generation (#15):
+  every training of the part with `TeamID`, `ResourceID`, `PlanSlotID` (0 for
+  none), `Week`, `Weekday`, `StartMinute`, `EndMinute`, and its `ID`.
+- `Board(access, TrainingBoardRequest{PartID, Draft, Suggest})`: staff get the
+  posted draft (or the saved set), the slots, resources, team columns with
+  their season coaches, warnings, and optionally a suggestion (`fill` keeps
+  the draft and adds trainings for active teams without one; `replace`
+  starts empty). Coaches get the saved trainings only, without warnings
+  (they depend on other coaches' availability). Unknown teams and resources in
+  a draft are dropped.
+- A training's slot is derived, never sent by the browser:
+  `bestSlot` picks a slot of the same resource, day, and weeks that contains
+  the training (the shortest), else the one with the largest overlap.
+- Pure helpers: `SuggestTrainings` (previous season's trainings of the
+  matching part first, on active resources, even if they now warn; then per
+  team the first slot, slots with an age range first, where the team's ages
+  fit, every coach of the team is available (`PartAvailability.Covers`), the
+  slot and the resource have room, no coach trains another team then, and the
+  team is not training then; an every-week slot is tried as every week,
+  then A, then B), `TrainingWarnings` (`team_archived`, `resource_archived`,
+  `no_coach`, `no_slot`, `outside_slot`, `slot_ages`, `slot_full`,
+  `resource_full`, `team_overlap`, `coach_unavailable`, `coach_busy`),
+  `TrainingRevision`, and `DiffPlanTrainings`.
+- `Save(actor, partID, revision, trainings)` validates times and weeks,
+  checks teams and resources against the group, recomputes slots, then
+  `ReplacePlanTrainings` locks the part row, compares the revision (SHA-256
+  prefix of the sorted `(id, team, resource, week, day, start, end)` set), and
+  applies the diff: deletes, in-place updates (a moved training keeps its ID,
+  and with it the events generated from it), inserts. The unique key is
+  deferred so a save can swap two trainings. Audited as
+  `group.plan.trainings_saved` (part ID and counts).
+- `events (group_id, plan_training_id)` now has a composite foreign key with
+  `ON DELETE SET NULL (plan_training_id)`; `plan_trainings.plan_slot_id` uses
+  the same column-list form against `plan_slots`.
+- Page: `/{language}/groups/{id}/training-plan?part=&week=` (GET, POST saves)
+  and `.../training-plan/draft` (`training_plan.go`, `training_plan.html`,
+  catalogs `training_plan.json`). Hidden `t=<id>:<team>:<resource>:<week>:
+  <day>:<start>:<end>:<reason>` values hold the draft; the week grid beside
+  the form (slots as `Background` items, trainings as draggable items,
+  `hx-include` of the form) posts moves to the draft endpoint, which answers
+  with the board and `HX-Retarget: #training-plan-board`. Teams are dragged
+  from a sticky list (the training plan block of `static/app.js`) or added
+  with a form; switching the A/B week with unsaved changes posts the draft.
+- `WeekGridItem.Background` draws an item behind the others at full column
+  width with no lane and no pointer events; `WeekGridConfig.DragHint`
+  replaces the hint text.

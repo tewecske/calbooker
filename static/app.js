@@ -340,3 +340,98 @@
   document.addEventListener("DOMContentLoaded", () => init(document.documentElement));
   document.addEventListener("htmx:load", (event) => init(event.detail.elt));
 })();
+
+// Training plan board (templates/training_plan.html). Team cards from the
+// pool are dragged onto the week grid (the grid moves existing trainings
+// itself, see above); this code turns the drop point into a weekday,
+// resource, and start minute and asks the server to re-render the board from
+// the draft held in the board's form. Switching the A/B week keeps unsaved
+// changes the same way. Nothing is saved until the user presses Save.
+(() => {
+  let pointer = null;
+  const remember = (event) => {
+    const point = (event.touches && event.touches[0]) || (event.changedTouches && event.changedTouches[0]) || event;
+    if (typeof point.clientX === "number") pointer = {x: point.clientX, y: point.clientY};
+  };
+  for (const type of ["pointerdown", "pointermove", "mousemove", "touchstart", "touchmove", "touchend"]) {
+    document.addEventListener(type, remember, {capture: true, passive: true});
+  }
+
+  const send = (board, url, values) => {
+    const form = board.querySelector("#training-plan-form");
+    if (!form) return;
+    htmx.ajax("POST", url, {source: form, target: board, swap: "outerHTML", values});
+  };
+
+  const dropOnGrid = (board, item) => {
+    const grid = board.querySelector("[data-week-grid]");
+    if (!grid || !pointer) return;
+    const step = Number(grid.dataset.step);
+    const first = Number(grid.dataset.start);
+    const rows = Number(grid.dataset.rows);
+    for (const column of grid.querySelectorAll("[data-wg-column]")) {
+      const r = column.getBoundingClientRect();
+      if (pointer.x < r.left || pointer.x >= r.right || pointer.y < r.top || pointer.y >= r.bottom) continue;
+      const duration = Number(grid.dataset.defaultDuration || 60);
+      const spanRows = Math.min(rows, Math.max(1, Math.ceil(duration / step)));
+      const row = Math.floor((pointer.y - r.top) / (r.height / rows));
+      const start = first + Math.max(0, Math.min(row, rows - spanRows)) * step;
+      send(board, board.dataset.draftUrl, {
+        add_team: item.dataset.tpTeam,
+        weekday: column.dataset.weekday,
+        resource: column.dataset.resource || "",
+        start,
+        end: start + spanRows * step,
+        week: grid.dataset.week || "",
+      });
+      return;
+    }
+  };
+
+  const enable = (board) => {
+    const pool = board.querySelector("[data-tp-pool]");
+    if (pool) {
+      Sortable.create(pool, {
+        group: {name: `training-plan-${Math.random().toString(36).slice(2)}`, pull: "clone", put: false},
+        sort: false,
+        draggable: "[data-tp-team]",
+        filter: "button, input, select, label, a",
+        preventOnFilter: false,
+        forceFallback: true,
+        fallbackOnBody: true,
+        fallbackTolerance: 3,
+        delay: 200,
+        delayOnTouchOnly: true,
+        ghostClass: "tp-ghost",
+        fallbackClass: "tp-drag",
+        onEnd: (event) => {
+          event.clone?.remove();
+          dropOnGrid(board, event.item);
+        },
+      });
+    }
+    // Switching the A/B week with unsaved changes posts the draft instead of
+    // leaving the page.
+    board.addEventListener("click", (event) => {
+      const tab = event.target.closest("[data-wg-week-tab]");
+      if (!tab || board.dataset.changed !== "true") return;
+      event.preventDefault();
+      const url = new URL(tab.href, window.location.href);
+      url.pathname = `${url.pathname.replace(/\/$/, "")}/draft`;
+      send(board, url.pathname + url.search, {});
+    });
+  };
+
+  const init = (root) => {
+    if (typeof Sortable === "undefined" || !root || !root.querySelectorAll) return;
+    const boards = root.matches("[data-training-plan]") ? [root] : root.querySelectorAll("[data-training-plan]");
+    for (const board of boards) {
+      if (board.dataset.tpReady) continue;
+      board.dataset.tpReady = "true";
+      enable(board);
+    }
+  };
+
+  document.addEventListener("DOMContentLoaded", () => init(document.documentElement));
+  document.addEventListener("htmx:load", (event) => init(event.detail.elt));
+})();

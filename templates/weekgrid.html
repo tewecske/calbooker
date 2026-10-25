@@ -57,7 +57,7 @@
       {{range .Days}}{{range .Columns}}
       <ol class="wg-column grid {{$.RowsClass}}{{with $.HourClass}} {{.}}{{end}}" data-wg-column data-weekday="{{.Weekday}}" data-resource="{{.Resource}}" aria-label="{{.Label}}">
         {{range .Items}}
-        <li class="wg-item {{.VariantClass}} {{.PlacementClass}}{{if .Warning}} wg-item-warn{{end}}{{if .Movable}} wg-item-movable{{end}}{{if .Muted}} wg-item-muted{{end}}"
+        <li class="wg-item {{.VariantClass}} {{.PlacementClass}}{{if .Background}} wg-item-bg{{end}}{{if .Warning}} wg-item-warn{{end}}{{if .Movable}} wg-item-movable{{end}}{{if .Muted}} wg-item-muted{{end}}"
             data-wg-item="{{.ID}}" data-weekday="{{.Weekday}}" data-start="{{.StartMinute}}" data-end="{{.EndMinute}}" data-resource="{{.Resource}}"
             {{- if .Movable}} data-wg-draggable{{end}}>
           {{if .URL}}<a class="wg-item-label wg-item-link" href="{{.URL}}" data-wg-link>{{.Label}}</a>{{else}}<span class="wg-item-label">{{.Label}}</span>{{end}}
@@ -91,7 +91,7 @@
   {{end}}
 
   {{if .Editable}}
-  <p class="text-sm text-base-content/70">{{.Labels.DragHint}}</p>
+  <p class="text-sm text-base-content/70">{{.DragHint}}</p>
   <details class="collapse collapse-arrow border border-base-300 bg-base-100">
     <summary class="collapse-title font-medium">{{.Labels.Keyboard}}</summary>
     <div class="collapse-content grid gap-6 md:grid-cols-2">

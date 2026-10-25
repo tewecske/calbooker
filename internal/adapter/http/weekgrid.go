@@ -138,6 +138,9 @@ type WeekGridConfig struct {
 	DefaultDuration int
 	// CSRFToken goes into the keyboard forms for requests without HTMX.
 	CSRFToken string
+	// DragHint replaces the standard hint under an editable grid, for grids
+	// that do not support every gesture.
+	DragHint string
 }
 
 // WeekGridItem is one thing on the grid. Features fill it from their own
@@ -168,6 +171,10 @@ type WeekGridItem struct {
 	// Badges are short texts shown as small badges on the item, for example
 	// "Cancelled" or the viewer's sign-up status.
 	Badges []string
+	// Background items are drawn behind the other items of their column at
+	// the full column width, take no lane, and cannot be moved or clicked
+	// through, for example the resource slots a training plan fills.
+	Background bool
 }
 
 // WeekGridView is the render-ready grid for the "weekgrid" template.
@@ -208,6 +215,8 @@ type WeekGridView struct {
 	MoveFields   WeekGridFieldSet
 	CreateFields WeekGridFieldSet
 	Labels       WeekGridLabels
+	// DragHint is the hint under an editable grid.
+	DragHint string
 }
 
 // WeekGridFieldSet is the dot of the weekgrid-target-fields template.
@@ -511,6 +520,7 @@ func BuildWeekGrid(config WeekGridConfig, items []WeekGridItem, translate WeekGr
 		PreviousURL:     config.PreviousURL,
 		NextURL:         config.NextURL,
 		Labels:          text.labels,
+		DragHint:        cmp.Or(config.DragHint, text.labels.DragHint),
 	}
 	if config.WeekAURL != "" || config.WeekBURL != "" {
 		view.WeekTabs = []WeekGridTab{
@@ -584,7 +594,7 @@ func BuildWeekGrid(config WeekGridConfig, items []WeekGridItem, translate WeekGr
 			TimeLabel:     formatWeekGridMinute(item.StartMinute) + "–" + formatWeekGridMinute(item.EndMinute),
 			ResourceLabel: resourceLabels[item.Resource],
 			VariantClass:  item.Variant.class(),
-			Movable:       item.Draggable && config.MoveURL != "",
+			Movable:       item.Draggable && !item.Background && config.MoveURL != "",
 		}
 		if !hasResources {
 			placed.Resource = ""
@@ -631,9 +641,16 @@ func compareWeekGridItems(a, b WeekGridItemView) int {
 // first lane that is free at its start row. Items that only touch (one ends
 // on the row the next starts) share a lane.
 func layoutWeekGridColumn(items []WeekGridItemView, config WeekGridConfig) []WeekGridItemView {
-	laid := slices.Clone(items)
-	for index := range laid {
-		item := &laid[index]
+	var background []WeekGridItemView
+	laid := make([]WeekGridItemView, 0, len(items))
+	for _, item := range items {
+		if item.Background {
+			background = append(background, item)
+		} else {
+			laid = append(laid, item)
+		}
+	}
+	rowsOf := func(item *WeekGridItemView) {
 		start := max(item.StartMinute, config.StartMinute)
 		end := min(item.EndMinute, config.EndMinute)
 		item.ClippedStart = item.StartMinute < config.StartMinute
@@ -641,6 +658,9 @@ func layoutWeekGridColumn(items []WeekGridItemView, config WeekGridConfig) []Wee
 		item.Row = (start - config.StartMinute) / config.Step
 		endRow := (end - config.StartMinute + config.Step - 1) / config.Step
 		item.RowSpan = max(endRow-item.Row, 1)
+	}
+	for index := range laid {
+		rowsOf(&laid[index])
 	}
 	slices.SortStableFunc(laid, func(a, b WeekGridItemView) int {
 		return cmp.Or(
@@ -681,7 +701,15 @@ func layoutWeekGridColumn(items []WeekGridItemView, config WeekGridConfig) []Wee
 		item.PlacementClass = fmt.Sprintf("wg-row-%d wg-rspan-%d wg-col-%d wg-cspan-%d",
 			item.Row+1, item.RowSpan, firstColumn, nextColumn-firstColumn)
 	}
-	return laid
+	// Background items come first, so the others paint over them.
+	slices.SortStableFunc(background, compareWeekGridItems)
+	for index := range background {
+		item := &background[index]
+		rowsOf(item)
+		item.Lane, item.Lanes = 0, 1
+		item.PlacementClass = fmt.Sprintf("wg-row-%d wg-rspan-%d wg-col-1 wg-cspan-%d", item.Row+1, item.RowSpan, weekGridLaneColumns)
+	}
+	return append(background, laid...)
 }
 
 func weekGridOptions(config WeekGridConfig, days []WeekGridDayView) WeekGridOptions {

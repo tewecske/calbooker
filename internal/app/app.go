@@ -40,6 +40,7 @@ type Graph struct {
 	Events                *postgresstore.EventRepository
 	Coaches               *postgresstore.CoachRepository
 	PlanSlots             *postgresstore.PlanSlotRepository
+	PlanTrainings         *postgresstore.PlanTrainingRepository
 	Participants          *postgresstore.ParticipantRepository
 	AdminUsers            *postgresstore.AdminUserRepository
 	AuditLogs             *postgresstore.AuditLogRepository
@@ -67,6 +68,7 @@ type Graph struct {
 	Event                 *service.EventService
 	Coach                 *service.CoachService
 	PlanSlot              *service.PlanSlotService
+	TrainingPlan          *service.TrainingPlanService
 	Participation         *service.ParticipationService
 	CoachBoard            *service.CoachBoardService
 	Statistics            *service.StatisticsService
@@ -192,6 +194,10 @@ func New(database *sql.DB, appConfig config.Config) (*Graph, error) {
 	planSlotsRepository, err := postgresstore.NewPlanSlotRepository(database)
 	if err != nil {
 		return nil, fmt.Errorf("construct plan slot repository: %w", err)
+	}
+	planTrainingsRepository, err := postgresstore.NewPlanTrainingRepository(database)
+	if err != nil {
+		return nil, fmt.Errorf("construct plan training repository: %w", err)
 	}
 	participantsRepository, err := postgresstore.NewParticipantRepository(database)
 	if err != nil {
@@ -331,6 +337,10 @@ func New(database *sql.DB, appConfig config.Config) (*Graph, error) {
 	if err != nil {
 		return nil, fmt.Errorf("construct plan slot service: %w", err)
 	}
+	trainingPlanService, err := service.NewTrainingPlanService(planTrainingsRepository, seasonService, planSlotService, resourceService, teamsRepository, coachService, users)
+	if err != nil {
+		return nil, fmt.Errorf("construct training plan service: %w", err)
+	}
 	participationService, err := service.NewParticipationService(eventService, participantsRepository, users)
 	if err != nil {
 		return nil, fmt.Errorf("construct participation service: %w", err)
@@ -364,6 +374,7 @@ func New(database *sql.DB, appConfig config.Config) (*Graph, error) {
 	eventService.SetAuditor(auditService)
 	coachService.SetAuditor(auditService)
 	planSlotService.SetAuditor(auditService)
+	trainingPlanService.SetAuditor(auditService)
 	participationService.SetAuditor(auditService)
 	coachBoardService.SetAuditor(auditService)
 	adminAccounts, err := service.NewAdminAccountService(users, adminUsersRepository, auditService, sessionService)
@@ -441,6 +452,7 @@ func New(database *sql.DB, appConfig config.Config) (*Graph, error) {
 		Events:                eventsRepository,
 		Coaches:               coachesRepository,
 		PlanSlots:             planSlotsRepository,
+		PlanTrainings:         planTrainingsRepository,
 		Participants:          participantsRepository,
 		AdminUsers:            adminUsersRepository,
 		AuditLogs:             auditLogRepository,
@@ -468,6 +480,7 @@ func New(database *sql.DB, appConfig config.Config) (*Graph, error) {
 		Event:                 eventService,
 		Coach:                 coachService,
 		PlanSlot:              planSlotService,
+		TrainingPlan:          trainingPlanService,
 		Participation:         participationService,
 		CoachBoard:            coachBoardService,
 		Statistics:            statisticsService,

@@ -1,0 +1,175 @@
+{{/* Training plan board of a season part (internal/adapter/http/training_plan.go). */}}
+{{define "group-training-plan"}}
+  {{with .Group}}{{$L := .L}}{{with .TrainingPlan}}
+    <section class="card card-border bg-base-100 shadow-sm" aria-labelledby="training-plan-heading">
+      <div class="card-body gap-4">
+        <h2 id="training-plan-heading" class="card-title">{{$L.training_plan_heading}}</h2>
+        <p class="text-sm opacity-70">{{$L.training_plan_intro}}</p>
+        {{if .Empty}}
+          <p class="text-sm opacity-70" data-testid="training-plan-no-seasons">{{$L.plan_no_seasons}}{{if .CanEdit}} <a class="link" href="{{.SeasonsURL}}">{{$L.plan_add_season}}</a>{{end}}</p>
+        {{else}}
+          <form class="flex flex-wrap items-end gap-2" method="get" action="{{.PickerURL}}" data-testid="training-plan-part-picker">
+            <fieldset class="fieldset">
+              <label class="fieldset-legend" for="training-plan-part">{{$L.plan_part}}</label>
+              <select id="training-plan-part" class="select" name="part">
+                {{range .Parts}}<option value="{{.Value}}"{{if .Selected}} selected{{end}}>{{.Label}}</option>{{end}}
+              </select>
+            </fieldset>
+            <button class="btn" type="submit">{{$L.plan_show}}</button>
+          </form>
+          {{if .ResourceFilter}}
+            <form method="get" action="{{.PickerURL}}" data-testid="training-plan-resource-filter">
+              <input type="hidden" name="part" value="{{.PartID}}">
+              {{with .Week}}<input type="hidden" name="week" value="{{.}}">{{end}}
+              <fieldset class="fieldset">
+                <legend class="fieldset-legend">{{$L.plan_columns}}</legend>
+                <div class="flex flex-wrap gap-3">
+                  {{range .ResourceFilter}}
+                    <label class="label cursor-pointer gap-2"><input class="checkbox checkbox-sm" type="checkbox" name="r" value="{{.Value}}"{{if .Checked}} checked{{end}}><span>{{.Label}}</span></label>
+                  {{end}}
+                </div>
+              </fieldset>
+              <button class="btn btn-sm" type="submit">{{$L.plan_show}}</button>
+            </form>
+          {{end}}
+          {{template "training-plan-board" .}}
+        {{end}}
+      </div>
+    </section>
+  {{end}}{{end}}
+{{end}}
+
+{{/* The board. The dot is a *TrainingPlanView; HTMX swaps #training-plan-board. */}}
+{{define "training-plan-board"}}{{$L := .L}}{{$board := .}}
+  <div id="training-plan-board" class="grid gap-4" data-training-plan data-testid="training-plan-board" data-part-id="{{.PartID}}"{{if .Changed}} data-changed="true"{{end}} data-draft-url="{{.DraftURL}}">
+    <p class="flex flex-wrap items-center gap-2" data-testid="training-plan-part-info">
+      <span class="font-medium">{{.SeasonName}}: {{.PartName}}</span>
+      <span class="text-sm opacity-70">{{.PartDates}}</span>
+      {{if .Alternating}}<span class="badge badge-info badge-soft badge-sm">{{$L.plan_alternating}}</span>{{end}}
+      {{if .CanEdit}}<span class="text-sm opacity-70">{{with .PreviousSeason}}{{$L.training_plan_previous}}: {{.}}{{else}}{{$L.training_plan_no_previous}}{{end}}</span>{{end}}
+    </p>
+    {{if not .CanEdit}}
+      <div role="status" class="alert alert-info alert-soft" data-testid="training-plan-read-only"><span>{{$L.training_plan_read_only}}</span></div>
+    {{else if .NoResources}}
+      <div role="status" class="alert alert-warning alert-soft" data-testid="training-plan-no-resources"><span>{{$L.plan_no_resources}} <a class="link" href="{{.ResourcesURL}}">{{$L.plan_add_resource}}</a></span></div>
+    {{end}}
+
+    {{if .CanEdit}}
+      <form id="training-plan-form" class="grid gap-4" method="post" action="{{.ActionURL}}" hx-post="{{.ActionURL}}" hx-target="#training-plan-board" hx-swap="outerHTML" data-testid="training-plan-form">
+        <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
+        <input type="hidden" name="revision" value="{{.Revision}}">
+        {{range .Values}}<input type="hidden" name="t" value="{{.}}" data-tp-value>{{end}}
+        <div class="flex flex-wrap items-center gap-2" data-testid="training-plan-actions">
+          <button class="btn btn-primary" type="submit" data-testid="training-plan-save">{{$L.training_plan_save}}</button>
+          <button class="btn" type="submit" name="suggest" value="fill" formaction="{{.DraftURL}}" hx-post="{{.DraftURL}}" hx-target="#training-plan-board" hx-swap="outerHTML" data-testid="training-plan-suggest">{{$L.training_plan_suggest}}</button>
+          <button class="btn btn-ghost" type="submit" name="suggest" value="replace" formaction="{{.DraftURL}}" hx-post="{{.DraftURL}}" hx-target="#training-plan-board" hx-swap="outerHTML" hx-confirm="{{.StartOverText}}" data-testid="training-plan-start-over">{{$L.training_plan_start_over}}</button>
+          {{if .Changed}}
+            <span class="badge badge-warning badge-soft" data-testid="training-plan-unsaved">{{$L.training_plan_unsaved}}</span>
+            <a class="link text-sm" href="{{.ActionURL}}" data-testid="training-plan-discard">{{$L.training_plan_discard}}</a>
+          {{end}}
+        </div>
+        <p class="text-sm opacity-70">{{$L.training_plan_suggest_help}}</p>
+        {{if .Warnings}}
+          <div role="alert" class="alert alert-warning alert-soft items-start" data-testid="training-plan-warnings">
+            <div>
+              <h3 class="font-semibold">{{$L.training_plan_warnings_heading}}</h3>
+              <ul class="mt-1 list-disc pl-5 text-sm">
+                {{range .Warnings}}<li data-testid="training-plan-warning">{{.}}</li>{{end}}
+              </ul>
+            </div>
+          </div>
+        {{end}}
+        <div class="grid gap-4">
+          {{with .Add}}
+            <fieldset class="fieldset rounded-box border border-base-300 p-4" data-testid="training-plan-add">
+              <legend class="fieldset-legend">{{$L.training_plan_add_heading}}</legend>
+              <div class="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
+                <label class="grid gap-1 text-sm"><span>{{$L.training_plan_add_team}}</span>
+                  <select class="select select-sm" name="add_team" data-testid="training-plan-add-team">
+                    <option value="">{{$L.training_plan_add_choose}}</option>
+                    {{range .Teams}}<option value="{{.Value}}">{{.Label}}</option>{{end}}
+                  </select></label>
+                <label class="grid gap-1 text-sm"><span>{{$L.training_plan_add_day}}</span>
+                  <select class="select select-sm" name="add_weekday" data-testid="training-plan-add-day">{{range .Days}}<option value="{{.Value}}">{{.Label}}</option>{{end}}</select></label>
+                <label class="grid gap-1 text-sm"><span>{{$L.training_plan_add_resource}}</span>
+                  <select class="select select-sm" name="add_resource" data-testid="training-plan-add-resource">{{range .Resources}}<option value="{{.Value}}">{{.Label}}</option>{{end}}</select></label>
+                <label class="grid gap-1 text-sm"><span>{{$L.training_plan_add_start}}</span>
+                  <select class="select select-sm" name="add_start" data-testid="training-plan-add-start">{{range .Starts}}<option value="{{.Value}}"{{if .Selected}} selected{{end}}>{{.Label}}</option>{{end}}</select></label>
+                <label class="grid gap-1 text-sm"><span>{{$L.training_plan_add_end}}</span>
+                  <select class="select select-sm" name="add_end" data-testid="training-plan-add-end">{{range .Ends}}<option value="{{.Value}}"{{if .Selected}} selected{{end}}>{{.Label}}</option>{{end}}</select></label>
+              </div>
+              <div><button class="btn btn-sm mt-2" type="submit" name="add" value="1" formaction="{{$board.DraftURL}}" hx-post="{{$board.DraftURL}}" hx-target="#training-plan-board" hx-swap="outerHTML" data-testid="training-plan-add-submit">{{$L.training_plan_add_submit}}</button></div>
+            </fieldset>
+          {{end}}
+        </div>
+      </form>
+    {{end}}
+
+    <div class="grid items-start gap-4{{if .CanEdit}} lg:grid-cols-[14rem_minmax(0,1fr)]{{end}}">
+      {{if .CanEdit}}<section class="card card-border bg-base-200 lg:sticky lg:top-4" aria-labelledby="training-plan-pool-heading">
+        <div class="card-body gap-2 p-4">
+          <h3 id="training-plan-pool-heading" class="font-semibold">{{$L.training_plan_pool}}</h3>
+          <p class="text-sm opacity-70">{{$L.training_plan_pool_help}}</p>
+          {{if .Teams}}
+            <ul class="grid min-h-12 gap-2" data-tp-pool data-testid="training-plan-pool">
+              {{range .Teams}}
+                <li class="card card-border card-sm cursor-grab bg-base-100" data-tp-team="{{.ID}}" data-testid="training-plan-team">
+                  <div class="card-body gap-1 p-2">
+                    <span class="font-medium">{{.Name}}{{if .Archived}} <span class="badge badge-ghost badge-sm">{{$L.coach_board_archived}}</span>{{end}}</span>
+                    <span class="text-xs opacity-70">{{.Ages}}</span>
+                    <span class="text-xs" data-testid="training-plan-team-coaches">{{if .Coaches}}{{.Coaches}}{{else}}<span class="badge badge-warning badge-soft badge-sm">{{$L.training_plan_no_coach}}</span>{{end}}</span>
+                    <span class="badge badge-ghost badge-sm" data-testid="training-plan-team-count">{{.Count}}</span>
+                  </div>
+                </li>
+              {{end}}
+            </ul>
+          {{else}}
+            <p class="text-sm opacity-70" data-testid="training-plan-no-teams">{{$L.training_plan_no_teams}}</p>
+          {{end}}
+        </div>
+      </section>{{end}}
+      <div hx-include="#training-plan-form" data-testid="training-plan-grid">{{template "weekgrid" .Grid}}</div>
+    </div>
+
+    <h3 class="font-semibold" id="training-plan-list-heading">{{$L.training_plan_list_heading}}{{with .Week}} <span class="badge badge-soft badge-sm">{{if eq . "A"}}{{$L.plan_week_a}}{{else}}{{$L.plan_week_b}}{{end}}</span>{{end}}</h3>
+    {{if .Rows}}
+      <div class="overflow-x-auto">
+        <table class="table table-sm" data-testid="training-plan-rows" aria-labelledby="training-plan-list-heading">
+          <thead><tr>
+            <th scope="col">{{$L.training_plan_col_team}}</th><th scope="col">{{$L.plan_slot_day}}</th><th scope="col">{{$L.plan_slot_time}}</th><th scope="col">{{$L.plan_slot_resource}}</th>
+            {{if .Alternating}}<th scope="col">{{$L.plan_slot_week}}</th>{{end}}
+            <th scope="col">{{$L.training_plan_col_coaches}}</th><th scope="col"><span class="sr-only">{{$L.training_plan_col_state}}</span></th>
+          </tr></thead>
+          <tbody>
+            {{range .Rows}}
+              <tr data-training-index="{{.Index}}" data-testid="training-plan-row">
+                <td class="font-medium">{{.Team}}</td>
+                <td>{{.Day}}</td>
+                <td data-testid="training-plan-row-time">{{.Time}}{{with .Slot}}<div class="text-xs opacity-70">{{$L.training_plan_slot}}: {{.}}</div>{{end}}</td>
+                <td>{{.Resource}}</td>
+                {{if $board.Alternating}}<td>{{.Week}}</td>{{end}}
+                <td>{{.Coaches}}</td>
+                <td>
+                  <div class="flex flex-wrap items-center gap-1">
+                    {{if .New}}<span class="badge badge-info badge-soft badge-sm">{{$L.training_plan_new}}</span>{{end}}
+                    {{with .Explanation}}<span class="text-xs opacity-70" data-testid="training-plan-explanation">{{.}}</span>{{end}}
+                    {{range .Warnings}}<span class="badge badge-warning badge-soft badge-sm h-auto text-wrap" data-testid="training-plan-row-warning">{{.}}</span>{{end}}
+                    {{if $board.CanEdit}}<button class="btn btn-ghost btn-xs" type="submit" form="training-plan-form" name="remove" value="{{.Index}}" formaction="{{$board.DraftURL}}" hx-post="{{$board.DraftURL}}" hx-include="#training-plan-form" hx-target="#training-plan-board" hx-swap="outerHTML" aria-label="{{.RemoveLabel}}" data-testid="training-plan-remove">{{$L.training_plan_remove}}</button>{{end}}
+                  </div>
+                </td>
+              </tr>
+            {{end}}
+          </tbody>
+        </table>
+      </div>
+    {{else}}
+      <p class="text-sm opacity-70" data-testid="training-plan-empty">{{$L.training_plan_empty}}</p>
+    {{end}}
+  </div>
+{{end}}
+
+{{/* Answer to a board request from HTMX: alerts out of band and the board. */}}
+{{define "training-plan-swap"}}
+  {{template "alerts-oob" .}}
+  {{with .Group.TrainingPlan}}{{template "training-plan-board" .}}{{end}}
+{{end}}

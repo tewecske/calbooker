@@ -1,0 +1,196 @@
+{
+  "messages": {
+    "training_plan.nav": {
+      "text": "Training plan"
+    },
+    "training_plan.heading": {
+      "text": "Training plan"
+    },
+    "training_plan.intro": {
+      "text": "Teams in the resource slots of a season part, week by week. Drag a team from the list onto the grid, drag a training to move it, or use Suggest. Nothing is saved until you press Save. Rule breaks are shown as warnings and never block a save."
+    },
+    "training_plan.previous": {
+      "text": "Suggestions start from"
+    },
+    "training_plan.no_previous": {
+      "text": "No previous season to copy from"
+    },
+    "training_plan.read_only": {
+      "text": "You see the saved training plan read only. Availability changes do not change the plan by themselves; an administrator or manager re-runs the suggestion."
+    },
+    "training_plan.save": {
+      "text": "Save"
+    },
+    "training_plan.suggest": {
+      "text": "Suggest"
+    },
+    "training_plan.start_over": {
+      "text": "Start over from suggestion"
+    },
+    "training_plan.start_over_confirm": {
+      "text": "Replace the board with a new suggestion? Unsaved changes are lost."
+    },
+    "training_plan.unsaved": {
+      "text": "Unsaved changes"
+    },
+    "training_plan.discard": {
+      "text": "Discard changes"
+    },
+    "training_plan.suggest_help": {
+      "text": "Suggest keeps what is on the board and fills teams without a training: last season's trainings first, then free resource slots that fit the team's ages, all of its coaches, and the capacity."
+    },
+    "training_plan.warnings_heading": {
+      "text": "Warnings"
+    },
+    "training_plan.pool": {
+      "text": "Teams"
+    },
+    "training_plan.pool_help": {
+      "text": "Drag a team onto the grid to add a training."
+    },
+    "training_plan.no_coach": {
+      "text": "No coach"
+    },
+    "training_plan.no_teams": {
+      "text": "The group has no teams yet."
+    },
+    "training_plan.add_heading": {
+      "text": "Add a training without dragging"
+    },
+    "training_plan.add_team": {
+      "text": "Team"
+    },
+    "training_plan.add_choose": {
+      "text": "Choose a team"
+    },
+    "training_plan.add_day": {
+      "text": "Day"
+    },
+    "training_plan.add_resource": {
+      "text": "Resource"
+    },
+    "training_plan.add_start": {
+      "text": "Start"
+    },
+    "training_plan.add_end": {
+      "text": "End"
+    },
+    "training_plan.add_submit": {
+      "text": "Add training"
+    },
+    "training_plan.list_heading": {
+      "text": "Trainings"
+    },
+    "training_plan.col_team": {
+      "text": "Team"
+    },
+    "training_plan.col_coaches": {
+      "text": "Coaches"
+    },
+    "training_plan.col_state": {
+      "text": "State"
+    },
+    "training_plan.slot": {
+      "text": "Slot"
+    },
+    "training_plan.new": {
+      "text": "New"
+    },
+    "training_plan.remove": {
+      "text": "Remove"
+    },
+    "training_plan.remove_label": {
+      "text": "Remove the training of {team}"
+    },
+    "training_plan.empty": {
+      "text": "No trainings in this week yet."
+    },
+    "training_plan.drag_hint": {
+      "text": "Drag a training to move it or its bottom edge to change its end. Drag a team from the list to add one. On touch screens, press and hold before dragging."
+    },
+    "training_plan.team_trainings": {
+      "one": "{count} training",
+      "other": "{count} trainings"
+    },
+    "training_plan.suggested": {
+      "one": "{count} training suggested.",
+      "other": "{count} trainings suggested."
+    },
+    "training_plan.suggested_none": {
+      "text": "Nothing to suggest: every active team has a training."
+    },
+    "training_plan.unplaced": {
+      "one": "{count} team found no free slot.",
+      "other": "{count} teams found no free slot."
+    },
+    "training_plan.stale": {
+      "text": "The training plan changed since you opened the board. Discard your changes and try again."
+    },
+    "training_plan.saved": {
+      "text": "Training plan saved: {added} added, {moved} moved, {removed} removed."
+    },
+    "training_plan.no_changes": {
+      "text": "Nothing changed."
+    },
+    "training_plan.reason.previous_season": {
+      "text": "From last season"
+    },
+    "training_plan.reason.slot": {
+      "text": "Fits a resource slot"
+    },
+    "training_plan.warning_line": {
+      "text": "{team}, {day} {time}, {resource}: {warning}"
+    },
+    "training_plan.warning.team_archived": {
+      "text": "The team is archived."
+    },
+    "training_plan.warning.resource_archived": {
+      "text": "The resource is archived."
+    },
+    "training_plan.warning.no_coach": {
+      "text": "The team has no coach this season."
+    },
+    "training_plan.warning.no_slot": {
+      "text": "No resource slot covers this training."
+    },
+    "training_plan.warning.outside_slot": {
+      "text": "The training reaches beyond its resource slot."
+    },
+    "training_plan.warning.slot_ages": {
+      "text": "The slot is for {slot_ages}, the team is {team_ages}."
+    },
+    "training_plan.warning.slot_full": {
+      "text": "{teams} teams train in the slot at once, it allows {limit}."
+    },
+    "training_plan.warning.resource_full": {
+      "text": "{teams} teams use the resource at once, it takes {limit}."
+    },
+    "training_plan.warning.team_overlap": {
+      "text": "The team has another training at the same time ({other})."
+    },
+    "training_plan.warning.coach_unavailable": {
+      "text": "{coach} is not available at this time."
+    },
+    "training_plan.warning.coach_busy": {
+      "text": "{coach} also coaches {other_team} at this time ({other})."
+    },
+    "training_plan.error.invalid_change": {
+      "text": "That position is not on the grid."
+    },
+    "training_plan.error.invalid_time": {
+      "text": "A training needs a day and a start before its end, inside one day."
+    },
+    "training_plan.error.invalid_week": {
+      "text": "That week does not exist in this part."
+    },
+    "training_plan.error.too_large": {
+      "text": "The plan holds too many trainings."
+    },
+    "training_plan.error.team_not_found": {
+      "text": "A team on the board no longer exists. Discard your changes and try again."
+    },
+    "training_plan.error.resource_not_found": {
+      "text": "A resource on the board no longer exists. Discard your changes and try again."
+    }
+  }
+}

@@ -88,6 +88,7 @@ func main() {
 		Events:              applicationGraph.Event,
 		Coaches:             applicationGraph.Coach,
 		Plan:                applicationGraph.PlanSlot,
+		TrainingPlan:        applicationGraph.TrainingPlan,
 		Participation:       applicationGraph.Participation,
 		CoachBoard:          applicationGraph.CoachBoard,
 		Statistics:          applicationGraph.Statistics,

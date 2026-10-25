@@ -170,11 +170,22 @@ func TestEventRepositoryLifecycle(t *testing.T) {
 
 	// A generated event keeps its plan columns.
 	generated := integrationEvent(group.ID, "Practice", "2026-11-02T16:00:00Z", "2026-11-02T17:30:00Z", lions.ID)
-	plan := int64(77)
+	planSeason, err := seasons.CreateSeason(ctx, service.Season{GroupID: group.ID, Name: "2024/25", StartsOn: seasonDate("2024-08-01"), EndsOn: seasonDate("2025-06-30"), CreatedAt: 100,
+		Parts: []service.SeasonPart{{Position: 1, Name: "Whole", StartsOn: seasonDate("2024-08-01"), EndsOn: seasonDate("2025-06-30")}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var plan int64
+	if err := harness.DB.QueryRowContext(ctx, `
+		INSERT INTO plan_trainings (group_id, season_part_id, team_id, resource_id, week, weekday, start_minute, end_minute, created_at)
+		VALUES ($1, $2, $3, $4, 'all', 1, 960, 1050, 100) RETURNING id
+	`, group.ID, planSeason.Parts[0].ID, lions.ID, court.ID).Scan(&plan); err != nil {
+		t.Fatal(err)
+	}
 	monday := service.ParseSeasonDate("2026-11-02")
 	generated.PlanTrainingID, generated.GeneratedForWeek = &plan, &monday
 	practice, err := events.CreateEvent(ctx, generated)
-	if err != nil || practice.PlanTrainingID == nil || *practice.PlanTrainingID != 77 || practice.GeneratedForWeek == nil || service.FormatSeasonDate(*practice.GeneratedForWeek) != "2026-11-02" {
+	if err != nil || practice.PlanTrainingID == nil || *practice.PlanTrainingID != plan || practice.GeneratedForWeek == nil || service.FormatSeasonDate(*practice.GeneratedForWeek) != "2026-11-02" {
 		t.Fatalf("generated = %+v, %v", practice, err)
 	}
 	tigersOnly, err := events.CreateEvent(ctx, integrationEvent(group.ID, "Tigers practice", "2026-11-02T16:30:00Z", "2026-11-02T18:00:00Z", tigers.ID))

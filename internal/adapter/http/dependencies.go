@@ -41,6 +41,8 @@ type Dependencies struct {
 	Events      EventUseCases
 	Coaches     CoachUseCases
 	Plan        PlanUseCases
+	// TrainingPlan is the training plan board (#14).
+	TrainingPlan TrainingPlanUseCases
 	// Participation is sign-up and attendance on event pages (#9).
 	Participation ParticipationUseCases
 	CoachBoard    CoachBoardUseCases

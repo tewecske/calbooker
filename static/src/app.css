@@ -139,6 +139,10 @@
 .wg-resize:hover {
   @apply bg-base-content/20;
 }
+/* A background item (a resource slot) sits behind the others and ignores the pointer. */
+.wg-item.wg-item-bg {
+  @apply pointer-events-none border-dashed border-base-content/30 bg-base-200/70 text-base-content/70 shadow-none;
+}
 .wg-item-neutral { @apply bg-neutral text-neutral-content; }
 .wg-item-primary { @apply bg-primary text-primary-content; }
 .wg-item-secondary { @apply bg-secondary text-secondary-content; }
@@ -160,5 +164,13 @@
   @apply opacity-40;
 }
 .cb-drag {
+  @apply opacity-90 shadow-lg;
+}
+
+/* ---- Training plan board (templates/training_plan.html) ---- */
+.tp-ghost {
+  @apply opacity-40;
+}
+.tp-drag {
   @apply opacity-90 shadow-lg;
 }

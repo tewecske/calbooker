@@ -84,11 +84,17 @@ type CalendarItemView struct {
 	Teams     string
 	Place     string
 	Cancelled bool
-	// Status is the viewer's own sign-up status label and StatusCode its
-	// stable code. Both stay empty until sign-up (#9) provides them; the
-	// templates show a badge when Status is set.
-	Status     string
-	StatusCode string
+	// Answers are the viewer's own sign-up answer and their children's
+	// (#30), one badge each.
+	Answers []CalendarAnswerView
+}
+
+// CalendarAnswerView is one answer badge. Label is the status, prefixed
+// with the child's name for a child's answer; Code is the stable status.
+type CalendarAnswerView struct {
+	Code  string
+	Label string
+	Self  bool
 }
 
 // calendarSelection is the validated query of a calendar request.
@@ -180,7 +186,11 @@ func (h *groupHandler) loadCalendar(writer http.ResponseWriter, request *http.Re
 
 	shown := service.FilterCalendarEvents(events, selection.filter)
 	page.Empty = len(shown) == 0
-	items, days := h.calendarItems(language, group, week, shown)
+	answers, ok := h.calendarAnswers(writer, request, current, week, shown)
+	if !ok {
+		return false
+	}
+	items, days := h.calendarItems(language, group, week, shown, answers)
 	grid, err := BuildWeekGrid(calendarGridConfig(week, items, page.PreviousURL, page.NextURL), items, h.renderer.WeekGridTranslator(language))
 	if err != nil {
 		h.renderError(writer, request, http.StatusInternalServerError)
@@ -280,9 +290,42 @@ func (h *groupHandler) calendarGroups(writer http.ResponseWriter, request *http.
 	return groups, true
 }
 
+// calendarAnswers loads the viewer's own and their children's answers for
+// the week with one query and labels them per event. Only events in shown
+// (what the viewer sees) get badges. Without participation, no badges.
+func (h *groupHandler) calendarAnswers(writer http.ResponseWriter, request *http.Request, current groupRequest, week service.CalendarWeek, shown []service.Event) (map[int64][]CalendarAnswerView, bool) {
+	if h.dependencies.Participation == nil || len(shown) == 0 {
+		return nil, true
+	}
+	answers, err := h.dependencies.Participation.CalendarAnswers(request.Context(), current.access, week.From, week.To)
+	if err != nil {
+		h.renderEventLoadError(writer, request, current.language, err)
+		return nil, false
+	}
+	visible := make(map[int64]bool, len(shown))
+	for _, event := range shown {
+		visible[event.ID] = true
+	}
+	byEvent := make(map[int64][]CalendarAnswerView)
+	for _, answer := range answers {
+		if !visible[answer.EventID] {
+			continue
+		}
+		label := h.t(current.language, "participation.status."+answer.Status)
+		if !answer.Self {
+			label = h.translate(current.language, "calendar.child_status", map[string]string{
+				"name":   h.memberLabel(current.language, answer.UserID, answer.DisplayName, answer.Username, nil),
+				"status": label,
+			})
+		}
+		byEvent[answer.EventID] = append(byEvent[answer.EventID], CalendarAnswerView{Code: answer.Status, Label: label, Self: answer.Self})
+	}
+	return byEvent, true
+}
+
 // calendarItems turns the week's events into grid items (one per event and
 // day) and the day list's entries.
-func (h *groupHandler) calendarItems(language locale.Code, group service.Group, week service.CalendarWeek, events []service.Event) ([]WeekGridItem, [7][]CalendarItemView) {
+func (h *groupHandler) calendarItems(language locale.Code, group service.Group, week service.CalendarWeek, events []service.Event, answers map[int64][]CalendarAnswerView) ([]WeekGridItem, [7][]CalendarItemView) {
 	var (
 		items []WeekGridItem
 		days  [7][]CalendarItemView
@@ -304,6 +347,7 @@ func (h *groupHandler) calendarItems(language locale.Code, group service.Group, 
 				Teams:     row.Teams,
 				Place:     row.Place,
 				Cancelled: row.Cancelled,
+				Answers:   answers[event.ID],
 			}
 			days[segment.Weekday-1] = append(days[segment.Weekday-1], entry)
 			item := WeekGridItem{
@@ -320,8 +364,8 @@ func (h *groupHandler) calendarItems(language locale.Code, group service.Group, 
 			if row.Cancelled {
 				item.Badges = append(item.Badges, cancelled)
 			}
-			if entry.Status != "" {
-				item.Badges = append(item.Badges, entry.Status)
+			for _, answer := range entry.Answers {
+				item.Badges = append(item.Badges, answer.Label)
 			}
 			items = append(items, item)
 		}

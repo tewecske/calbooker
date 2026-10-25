@@ -255,9 +255,20 @@ Refinements made in #10 (open for the owner to confirm):
 - Switching groups keeps the week and the kind filter and drops team and
   resource filters. The switcher shows only for members of several groups.
 - Narrow screens (below `md`) get a list of days instead of the grid.
-- The viewer's own sign-up status has a hook (a badge on each calendar
-  entry) but is not filled yet: #9 answers per event (`Roster`), and the
-  calendar needs a week-wide "my answers" query; that is a follow-up.
+- The viewer's own sign-up status is shown as a badge on each calendar
+  entry (filled in #30).
+Refinements made in #30 (open for the owner to confirm):
+
+- Calendar entries show the viewer's own answer as a badge ("Coming", "Not
+  coming", "Nominated", the same words as the event page); events without an
+  answer show none. A parent also sees each linked child's answer, prefixed
+  with the child's name ("Anna: Coming"). A viewer who is both a player and a
+  parent can see several badges on one entry.
+- Nobody else's answer appears on the calendar, coaches and staff included;
+  they open the event for the roster. Badges appear only on events the
+  calendar already lists, so filters and visibility are unchanged.
+- One query per week page; no migration.
+
 Refinements made in #12 (open for the owner to confirm):
 
 - The coach board edits a draft in the page; nothing is saved until Save,

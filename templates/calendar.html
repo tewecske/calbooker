@@ -95,7 +95,7 @@
                             <a class="link font-semibold{{if .Cancelled}} line-through{{end}}" href="{{.URL}}">{{.Title}}</a>
                             {{template "event-kind-badge" .}}
                             {{if .Cancelled}}<span class="badge badge-error badge-soft badge-sm">{{$L.events_cancelled}}</span>{{end}}
-                            {{if .Status}}<span class="badge badge-outline badge-sm" data-calendar-status="{{.StatusCode}}"><span class="sr-only">{{$L.calendar_your_status}} </span>{{.Status}}</span>{{end}}
+                            {{range .Answers}}<span class="badge badge-outline badge-sm" data-calendar-status="{{.Code}}"{{if not .Self}} data-calendar-child="true"{{end}}>{{if .Self}}<span class="sr-only">{{$L.calendar_your_status}} </span>{{end}}{{.Label}}</span>{{end}}
                           </p>
                           {{if or .Teams .Place}}<p class="text-sm opacity-70">{{.Teams}}{{if and .Teams .Place}} · {{end}}{{.Place}}</p>{{end}}
                           {{if .MultiDay}}<p class="text-xs opacity-70">{{$L.calendar_multi_day}} {{.When}}</p>{{end}}

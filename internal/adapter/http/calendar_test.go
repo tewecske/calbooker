@@ -2,6 +2,7 @@ package httpadapter
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"regexp"
@@ -411,4 +412,105 @@ func TestCalendarGridConfigCoversEveryEvent(t *testing.T) {
 	if calendarVariant(service.EventKindMatch) != WeekGridInfo || calendarVariant("x") != WeekGridSecondary {
 		t.Fatal("variants")
 	}
+}
+
+// calendarAnswersStub answers CalendarAnswers like ParticipationService:
+// only the account's own rows and its children's, whatever is stored.
+type calendarAnswersStub struct {
+	*participationUseCaseStub
+	stored []service.CalendarAnswer
+	err    error
+	ranges [][2]time.Time
+}
+
+func (s *calendarAnswersStub) CalendarAnswers(_ context.Context, access *service.GroupAccess, from, to time.Time) ([]service.CalendarAnswer, error) {
+	s.calls++
+	s.ranges = append(s.ranges, [2]time.Time{from, to})
+	if s.err != nil {
+		return nil, s.err
+	}
+	var own []service.CalendarAnswer
+	for _, answer := range s.stored {
+		if answer.UserID == access.UserID() || slices.Contains(access.ChildUserIDs(), answer.UserID) {
+			answer.Self = answer.UserID == access.UserID()
+			own = append(own, answer)
+		}
+	}
+	return own, nil
+}
+
+func calendarAnswerFixture() []service.CalendarAnswer {
+	anna := "Anna"
+	return []service.CalendarAnswer{
+		{EventID: 2, UserID: 7, Status: service.ParticipantSignedUp},
+		{EventID: 6, UserID: 7, Status: service.ParticipantDeclined},
+		{EventID: 3, UserID: 20, Status: service.ParticipantNominated, DisplayName: &anna},
+		{EventID: 2, UserID: 99, Status: service.ParticipantDeclined},
+		// Event 1 is not visible to the player.
+		{EventID: 1, UserID: 7, Status: service.ParticipantSignedUp},
+	}
+}
+
+func TestCalendarShowsOwnAndChildAnswers(t *testing.T) {
+	statuses := regexp.MustCompile(`data-calendar-status="(\w+)"`)
+	t.Run("player sees own answers only", func(t *testing.T) {
+		dependencies, _ := calendarDependencies(t, playerOfTeam(2))
+		answers := &calendarAnswersStub{participationUseCaseStub: &participationUseCaseStub{}, stored: calendarAnswerFixture()}
+		dependencies.Participation = answers
+		body := serveGroups(t, dependencies, http.MethodGet, "/en/groups/3/calendar?week=2026-10-19", "", false).Body.String()
+		if answers.calls != 1 {
+			t.Errorf("answer queries = %d, want 1", answers.calls)
+		}
+		var got []string
+		for _, match := range statuses.FindAllStringSubmatch(body, -1) {
+			got = append(got, match[1])
+		}
+		got = slices.Compact(slices.Sorted(slices.Values(got)))
+		if !slices.Equal(got, []string{"declined", "signed_up"}) {
+			t.Errorf("badges = %v, want the player's two answers", got)
+		}
+		for _, want := range []string{">Coming</span>", ">Not coming</span>", "Your answer:"} {
+			if !strings.Contains(body, want) {
+				t.Errorf("calendar missing %q", want)
+			}
+		}
+		if strings.Contains(body, "Anna") || strings.Contains(body, "data-calendar-child") {
+			t.Error("another member's answer is shown")
+		}
+	})
+	t.Run("parent sees the child's answer with the name", func(t *testing.T) {
+		dependencies, _ := calendarDependencies(t, calendarParent())
+		answers := &calendarAnswersStub{participationUseCaseStub: &participationUseCaseStub{}, stored: calendarAnswerFixture()}
+		dependencies.Participation = answers
+		body := serveGroups(t, dependencies, http.MethodGet, "/en/groups/3/calendar?week=2026-10-19", "", false).Body.String()
+		if !strings.Contains(body, `data-calendar-status="nominated" data-calendar-child="true">Anna: Nominated</span>`) {
+			t.Errorf("child badge missing in %d bytes", len(body))
+		}
+		if len(statuses.FindAllString(body, -1)) != 1 {
+			t.Errorf("badges = %d, want the child answer once", len(statuses.FindAllString(body, -1)))
+		}
+	})
+	t.Run("hungarian labels", func(t *testing.T) {
+		dependencies, _ := calendarDependencies(t, calendarParent())
+		dependencies.Participation = &calendarAnswersStub{participationUseCaseStub: &participationUseCaseStub{}, stored: calendarAnswerFixture()}
+		body := serveGroups(t, dependencies, http.MethodGet, "/hu/groups/3/calendar?week=2026-10-19", "", false).Body.String()
+		if !strings.Contains(body, "Anna: ") || strings.Contains(body, "Anna: Nominated") {
+			t.Error("child badge is not localized")
+		}
+	})
+	t.Run("a failing query is an error page", func(t *testing.T) {
+		dependencies, _ := calendarDependencies(t, playerOfTeam(2))
+		dependencies.Participation = &calendarAnswersStub{participationUseCaseStub: &participationUseCaseStub{}, err: errors.New("down")}
+		if response := serveGroups(t, dependencies, http.MethodGet, "/en/groups/3/calendar?week=2026-10-19", "", false); response.Code != http.StatusInternalServerError {
+			t.Errorf("status = %d", response.Code)
+		}
+	})
+	t.Run("a non-member still gets 404 without a query", func(t *testing.T) {
+		dependencies, _ := calendarDependencies(t, groupAccessAs(service.GroupAccessGrants{}))
+		answers := &calendarAnswersStub{participationUseCaseStub: &participationUseCaseStub{}, stored: calendarAnswerFixture()}
+		dependencies.Participation = answers
+		if response := serveGroups(t, dependencies, http.MethodGet, "/en/groups/3/calendar", "", false); response.Code != http.StatusNotFound || answers.calls != 0 {
+			t.Errorf("status = %d, queries = %d", response.Code, answers.calls)
+		}
+	})
 }

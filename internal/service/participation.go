@@ -172,6 +172,10 @@ type ParticipantRepository interface {
 	// ListConfirmedAttendance returns attended rows of events of the group
 	// that are not cancelled and start in [from, to), earliest first.
 	ListConfirmedAttendance(ctx context.Context, groupID int64, from, to time.Time) ([]AttendanceRecord, error)
+	// ListAnswers returns the answers (rows with a status) of userIDs for
+	// events of the group that overlap [from, to), with the members' names,
+	// ordered by event and member.
+	ListAnswers(ctx context.Context, groupID int64, userIDs []int64, from, to time.Time) ([]CalendarAnswer, error)
 }
 
 // ParticipationEvents is the part of EventService participation uses.
@@ -529,6 +533,54 @@ func (s *ParticipationService) ConfirmedAttendance(ctx context.Context, access *
 		if slices.ContainsFunc(record.TeamIDs, func(id int64) bool { return slices.Contains(visible, id) }) {
 			kept = append(kept, record)
 		}
+	}
+	return kept, nil
+}
+
+// CalendarAnswer is one answer shown on the calendar: the viewer's own, or
+// a linked child's. Names are the member's, for labelling a child's answer.
+type CalendarAnswer struct {
+	EventID     int64
+	UserID      int64
+	Status      string
+	Self        bool
+	DisplayName *string
+	Username    *string
+}
+
+// CalendarAnswers returns the viewer's own answers and, for a parent, the
+// answers of the linked children, for the group's events that overlap
+// [from, to), in one query. Nobody else's answers are returned. The caller
+// shows them only on events it already listed for the same access, so
+// visibility stays with EventService.
+func (s *ParticipationService) CalendarAnswers(ctx context.Context, access *GroupAccess, from, to time.Time) ([]CalendarAnswer, error) {
+	if err := s.validate(ctx); err != nil {
+		return nil, err
+	}
+	if !access.CanView() {
+		return nil, ErrGroupNotFound
+	}
+	if from.IsZero() || to.IsZero() || !from.Before(to) {
+		return nil, ErrInvalidAttendance
+	}
+	own := access.UserID()
+	ids := []int64{own}
+	for _, id := range access.ChildUserIDs() {
+		if id != own && !slices.Contains(ids, id) {
+			ids = append(ids, id)
+		}
+	}
+	answers, err := s.participants.ListAnswers(ctx, access.GroupID(), ids, from, to)
+	if err != nil {
+		return nil, fmt.Errorf("list calendar answers: %w", err)
+	}
+	kept := make([]CalendarAnswer, 0, len(answers))
+	for _, answer := range answers {
+		if answer.Status == "" || !slices.Contains(ids, answer.UserID) {
+			continue
+		}
+		answer.Self = answer.UserID == own
+		kept = append(kept, answer)
 	}
 	return kept, nil
 }

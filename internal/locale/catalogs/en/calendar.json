@@ -21,6 +21,7 @@
     "calendar.day_empty": {"text": "No events"},
     "calendar.today_marker": {"text": "Today"},
     "calendar.multi_day": {"text": "Spans several days:"},
+    "calendar.child_status": {"text": "{name}: {status}"},
     "calendar.your_status": {"text": "Your answer:"}
   }
 }

@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/tewecske/calbooker/internal/locale"
 	"github.com/tewecske/calbooker/internal/service"
@@ -17,6 +18,9 @@ type ParticipationUseCases interface {
 	Roster(ctx context.Context, access *service.GroupAccess, detail service.EventDetail) (service.ParticipationRoster, error)
 	Respond(ctx context.Context, actor service.GroupActor, eventID, userID int64, status string) (*service.Participant, error)
 	RecordAttendance(ctx context.Context, actor service.GroupActor, eventID int64, marks []service.AttendanceMark) error
+	// CalendarAnswers returns the viewer's own answers and their children's
+	// for the events overlapping [from, to) (#30).
+	CalendarAnswers(ctx context.Context, access *service.GroupAccess, from, to time.Time) ([]service.CalendarAnswer, error)
 }
 
 // ParticipationView is the participants card of an event page.

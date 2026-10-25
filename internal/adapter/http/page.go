@@ -50,6 +50,7 @@ type PageData struct {
 	Template         string
 	FragmentTemplate string
 	Navigation       []NavigationItem
+	MenuLabel        string // names the small-screen menu; the renderer fills it
 	Languages        []LanguageOption
 	Account          *AccountMenu
 	SignInURL        string
@@ -62,6 +63,7 @@ type PageData struct {
 	Alerts            []Alert
 	Settings          *SettingsView
 	Groups            *GroupsView
+	Home              *HomeView
 	Group             *GroupDetailView
 	Admin             *AdminView
 	WeekGridDemo      *WeekGridDemoView
@@ -574,6 +576,9 @@ func (r *PageRenderer) RenderRequestStatus(writer http.ResponseWriter, request *
 	}
 	if page.Languages == nil {
 		page.Languages = navbarLanguageOptions(locale.Code(page.Language), request)
+	}
+	if page.MenuLabel == "" {
+		page.MenuLabel, _ = r.Translate(locale.Code(page.Language), "nav.menu")
 	}
 	name := page.Template
 	if IsHTMX(request) {

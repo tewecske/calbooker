@@ -18,6 +18,20 @@
   <body class="min-h-screen bg-base-100 text-base-content">
     <header class="navbar border-b border-base-300 px-4" aria-label="Site header">
       <div class="navbar-start">
+        {{if .Navigation}}
+          <details class="dropdown md:hidden" id="mobile-menu">
+            <summary class="btn btn-ghost btn-circle" aria-label="{{.MenuLabel}}" title="{{.MenuLabel}}">
+              <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5M3.75 17.25h16.5"/>
+              </svg>
+            </summary>
+            <ul class="menu dropdown-content z-10 mt-2 w-52 rounded-box bg-base-200 p-2 shadow" aria-label="{{.MenuLabel}}">
+              {{range .Navigation}}
+                <li><a href="{{.URL}}">{{.Label}}</a></li>
+              {{end}}
+            </ul>
+          </details>
+        {{end}}
         <a class="btn btn-ghost text-xl" href="/">Calbooker</a>
       </div>
       <nav class="navbar-center hidden gap-2 md:flex" aria-label="Primary navigation">

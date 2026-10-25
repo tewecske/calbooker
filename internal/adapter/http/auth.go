@@ -68,6 +68,7 @@ func (h *authHandler) home(writer http.ResponseWriter, request *http.Request) {
 		},
 	}
 	page.Navigation = primaryNavigation(h.renderer, language, true)
+	page.Home = homeView(h.renderer, h.dependencies, request, language, user)
 	h.renderPage(writer, request, page)
 }
 

@@ -47,16 +47,18 @@ type TrainingPlanView struct {
 	ActionURL    string
 	DraftURL     string
 	DiscardURL   string
-	PartID       int64
-	Parts        []SelectOptionView
-	SeasonName   string
-	PartName     string
-	PartDates    string
-	Alternating  bool
-	Week         string
-	Revision     string
-	Changed      bool
-	Stale        bool
+	// GenerateURL opens the page that generates events from the saved plan.
+	GenerateURL string
+	PartID      int64
+	Parts       []SelectOptionView
+	SeasonName  string
+	PartName    string
+	PartDates   string
+	Alternating bool
+	Week        string
+	Revision    string
+	Changed     bool
+	Stale       bool
 	// PreviousSeason names the season the suggestion copies from.
 	PreviousSeason string
 	StartOverText  string
@@ -545,6 +547,7 @@ func (h *groupHandler) trainingLayout(current groupRequest, board service.Traini
 	view.ActionURL = h.trainingPlanURL(language, groupID, "", query)
 	view.DraftURL = h.trainingPlanURL(language, groupID, "/draft", query)
 	view.DiscardURL = h.trainingPlanURL(language, groupID, "", query)
+	view.GenerateURL = h.eventGenerationURL(language, groupID) + "?part=" + strconv.FormatInt(part.ID, 10)
 
 	resources := make(map[int64]service.Resource, len(board.Resources))
 	for _, resource := range board.Resources {

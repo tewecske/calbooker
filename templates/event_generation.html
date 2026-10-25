@@ -1,0 +1,92 @@
+{{/* Generate events from the training plan (internal/adapter/http/event_generation.go). */}}
+{{define "group-event-generation"}}
+  {{with .Group}}{{$L := .L}}{{with .EventGeneration}}
+    <section class="card card-border bg-base-100 shadow-sm" aria-labelledby="event-generation-heading">
+      <div class="card-body gap-4">
+        <h2 id="event-generation-heading" class="card-title">{{$L.event_generation_heading}}</h2>
+        <p class="text-sm opacity-70">{{$L.event_generation_intro}}</p>
+        {{if .Empty}}
+          <p class="text-sm opacity-70" data-testid="event-generation-no-seasons">{{$L.plan_no_seasons}} <a class="link" href="{{.SeasonsURL}}">{{$L.plan_add_season}}</a></p>
+        {{else}}
+          <p class="flex flex-wrap items-center gap-2" data-testid="event-generation-part-info">
+            <span class="font-medium">{{.SeasonName}}: {{.PartName}}</span>
+            <span class="text-sm opacity-70">{{.PartDates}}</span>
+            <a class="link text-sm" href="{{.PlanURL}}">{{$L.event_generation_back}}</a>
+          </p>
+          <form class="flex flex-wrap items-end gap-2" method="get" action="{{.PickerURL}}" data-testid="event-generation-form">
+            <fieldset class="fieldset">
+              <label class="fieldset-legend" for="event-generation-part">{{$L.plan_part}}</label>
+              <select id="event-generation-part" class="select" name="part">
+                {{range .Parts}}<option value="{{.Value}}"{{if .Selected}} selected{{end}}>{{.Label}}</option>{{end}}
+              </select>
+            </fieldset>
+            <fieldset class="fieldset">
+              <label class="fieldset-legend" for="event-generation-week">{{$L.event_generation_week}}</label>
+              <select id="event-generation-week" class="select" name="week">
+                {{range .Weeks}}<option value="{{.Value}}"{{if .Selected}} selected{{end}}>{{.Label}}</option>{{end}}
+              </select>
+            </fieldset>
+            <fieldset class="fieldset">
+              <label class="fieldset-legend" for="event-generation-weeks">{{$L.event_generation_weeks}}</label>
+              <select id="event-generation-weeks" class="select" name="weeks">
+                {{range .WeekCounts}}<option value="{{.Value}}"{{if .Selected}} selected{{end}}>{{.Label}}</option>{{end}}
+              </select>
+            </fieldset>
+            <button class="btn" type="submit" data-testid="event-generation-preview">{{$L.event_generation_preview}}</button>
+          </form>
+          {{if .Previewed}}{{template "event-generation-result" $.Group}}{{end}}
+        {{end}}
+      </div>
+    </section>
+  {{end}}{{end}}
+{{end}}
+
+{{define "event-generation-result"}}
+  {{$L := .L}}{{with .EventGeneration}}
+    <div class="grid gap-4" data-testid="event-generation-result"{{if .Done}} data-done="true"{{end}}>
+      <p class="text-sm opacity-70">{{$L.event_generation_times_in}} {{.TimeZone}}</p>
+      <ul class="flex flex-wrap gap-2" data-testid="event-generation-counts">
+        {{range .Counts}}<li class="badge badge-soft{{if eq .Action "create"}} badge-success{{else if eq .Action "keep"}} badge-warning{{else if eq .Action "remove"}} badge-error{{end}}" data-action="{{.Action}}">{{.Label}}: <span data-testid="event-generation-count-{{.Action}}">{{.Count}}</span></li>{{end}}
+      </ul>
+      {{if .Items}}
+        <div class="overflow-x-auto">
+          <table class="table table-sm" data-testid="event-generation-items">
+            <thead><tr><th scope="col">{{$L.event_generation_col_action}}</th><th scope="col">{{$L.event_generation_col_when}}</th><th scope="col">{{$L.event_generation_col_team}}</th><th scope="col">{{$L.event_generation_col_resource}}</th></tr></thead>
+            <tbody>
+              {{range .Items}}
+                <tr data-testid="event-generation-item" data-action="{{.Action}}">
+                  <td>{{.ActionLabel}}{{with .Reason}} <span class="text-xs opacity-70">({{.}})</span>{{end}}</td>
+                  <td>{{.When}}</td><td>{{.Team}}</td><td>{{.Resource}}</td>
+                </tr>
+              {{end}}
+            </tbody>
+          </table>
+        </div>
+      {{else if not .Kept}}
+        <p class="text-sm opacity-70" data-testid="event-generation-empty">{{$L.event_generation_empty}}</p>
+      {{end}}
+      {{if .Kept}}
+        <div role="status" class="alert alert-warning alert-soft grid gap-2" data-testid="event-generation-kept">
+          <h3 class="font-medium">{{$L.event_generation_kept_heading}}</h3>
+          <p class="text-sm">{{$L.event_generation_kept_intro}}</p>
+          <ul class="list-disc pl-5">
+            {{range .Kept}}
+              <li data-testid="event-generation-kept-item"><a class="link" href="{{.URL}}">{{.Team}}, {{.When}}</a> <span class="text-sm">({{.Reason}})</span></li>
+            {{end}}
+          </ul>
+        </div>
+      {{end}}
+      {{if .CanConfirm}}
+        <form method="post" action="{{.ActionURL}}" data-testid="event-generation-confirm-form">
+          <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
+          <input type="hidden" name="part" value="{{.PartID}}">
+          <input type="hidden" name="week" value="{{.Week}}">
+          <input type="hidden" name="weeks" value="{{.WeekCount}}">
+          <button class="btn btn-primary" type="submit" data-testid="event-generation-confirm">{{$L.event_generation_confirm}}</button>
+        </form>
+      {{else if not .Done}}
+        <p class="text-sm opacity-70" data-testid="event-generation-nothing">{{$L.event_generation_nothing}}</p>
+      {{end}}
+    </div>
+  {{end}}
+{{end}}

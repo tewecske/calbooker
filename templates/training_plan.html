@@ -46,6 +46,7 @@
       <span class="font-medium">{{.SeasonName}}: {{.PartName}}</span>
       <span class="text-sm opacity-70">{{.PartDates}}</span>
       {{if .Alternating}}<span class="badge badge-info badge-soft badge-sm">{{$L.plan_alternating}}</span>{{end}}
+      {{if .CanEdit}}<a class="btn btn-sm btn-primary btn-soft" href="{{.GenerateURL}}" data-testid="training-plan-generate-link">{{$L.event_generation_link}}</a>{{end}}
       {{if .CanEdit}}<span class="text-sm opacity-70">{{with .PreviousSeason}}{{$L.training_plan_previous}}: {{.}}{{else}}{{$L.training_plan_no_previous}}{{end}}</span>{{end}}
     </p>
     {{if not .CanEdit}}

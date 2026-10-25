@@ -371,6 +371,22 @@ get `service.ErrGroupNotFound`, which handlers render as 404.
   They are not filled yet; that needs a week-wide query of the viewer's
   `event_participants` rows (follow-up to #9).
 
+## Participation statistics
+
+- `StatisticsService` (`internal/service/statistics.go`, store
+  `internal/store/postgres/statistics.go`, no migration) builds the period
+  (week, month, season part, season) as instants `[From, To)` from calendar
+  days in the group's time zone, and the store aggregates in SQL
+  (`TeamStatistics`, `PlayerStatistics`); only events that are not
+  cancelled and have ended count.
+- Access stays in `GroupAccess`: `CanViewStatistics` (every member; others
+  get 404), `StatisticsTeamIDs` (all teams for staff, coached teams for
+  coaches, none for players and parents) and `StatisticsPlayerScope`
+  (everyone, the players of the coached teams, plus the account and its
+  linked children). Emails show for staff only.
+- Page: `GET /{language}/groups/{id}/statistics?period=&date=&season=&part=`
+  in `internal/adapter/http/statistics.go`, template `statistics.html`,
+  catalogs `statistics.json`. Read-only, server-rendered tables.
 ## Coaches
 
 - `CoachService` (`internal/service/coach.go`, `availability.go`, store

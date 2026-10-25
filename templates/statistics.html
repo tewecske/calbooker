@@ -1,0 +1,113 @@
+{{/* Participation statistics (#11): events, sign-ups, confirmed attendance,
+     and attendance rate per team and per player for a week, month, season
+     part, or season (internal/adapter/http/statistics.go). */}}
+{{define "group-statistics"}}
+  {{with .Group}}{{$L := .L}}{{with .Statistics}}
+    <section class="card card-border bg-base-100 shadow-sm" aria-labelledby="group-statistics-heading">
+      <div class="card-body">
+        <h2 id="group-statistics-heading" class="card-title">{{$L.statistics_heading}}</h2>
+        <p class="text-sm opacity-70" data-testid="statistics-intro">{{.Intro}}</p>
+        <div role="tablist" class="tabs tabs-box tabs-sm" aria-label="{{$L.statistics_periods}}">
+          {{range .Tabs}}
+            <a role="tab" class="tab{{if .Current}} tab-active{{end}}" href="{{.URL}}"{{if .Current}} aria-selected="true"{{end}} data-testid="statistics-tab-{{.Kind}}">{{.Label}}</a>
+          {{end}}
+        </div>
+        {{if .Picker}}
+          <form class="flex flex-wrap items-end gap-2" method="get" action="{{.ActionURL}}" data-testid="statistics-picker">
+            <input type="hidden" name="period" value="{{.Period}}">
+            <fieldset class="fieldset">
+              <label class="fieldset-legend" for="statistics-pick">{{if eq .PickerName "season"}}{{$L.statistics_pick_season}}{{else}}{{$L.statistics_pick_part}}{{end}}</label>
+              <select id="statistics-pick" class="select" name="{{.PickerName}}">
+                {{range .Picker}}<option value="{{.Value}}"{{if .Selected}} selected{{end}}>{{.Label}}</option>{{end}}
+              </select>
+            </fieldset>
+            <button class="btn" type="submit">{{$L.statistics_show}}</button>
+          </form>
+        {{end}}
+        {{if .HasPeriod}}
+          <div class="flex flex-wrap items-center gap-3">
+            {{if .PreviousURL}}<a class="btn btn-sm" href="{{.PreviousURL}}" data-testid="statistics-previous">{{$L.statistics_previous}}</a>{{end}}
+            <p class="font-medium" data-testid="statistics-period">{{.Heading}}</p>
+            {{if .NextURL}}<a class="btn btn-sm" href="{{.NextURL}}" data-testid="statistics-next">{{$L.statistics_next}}</a>{{end}}
+          </div>
+          <p class="text-sm opacity-70" data-testid="statistics-dates">{{.Dates}} · {{$L.statistics_times_in}} {{.TimeZone}}</p>
+        {{else}}
+          <p class="text-sm opacity-70" data-testid="statistics-no-seasons">{{$L.statistics_no_seasons}}</p>
+        {{end}}
+      </div>
+    </section>
+
+    {{if .HasPeriod}}
+      {{if .ShowTeams}}
+        <section class="card card-border bg-base-100 shadow-sm" aria-labelledby="statistics-teams-heading">
+          <div class="card-body">
+            <h2 id="statistics-teams-heading" class="card-title">{{$L.statistics_teams_heading}}</h2>
+            {{if .Teams}}
+              <div class="overflow-x-auto">
+                <table class="table" data-testid="statistics-teams">
+                  <thead><tr>
+                    <th scope="col">{{$L.statistics_team}}</th>
+                    <th scope="col" class="text-end">{{$L.statistics_players}}</th>
+                    <th scope="col" class="text-end">{{$L.statistics_events}}</th>
+                    <th scope="col" class="text-end">{{$L.statistics_signed_up}}</th>
+                    <th scope="col" class="text-end">{{$L.statistics_attended}}</th>
+                    <th scope="col" class="text-end">{{$L.statistics_rate}}</th>
+                  </tr></thead>
+                  <tbody>
+                    {{range .Teams}}
+                      <tr data-team-id="{{.ID}}">
+                        <td><a class="link" href="{{.URL}}">{{.Name}}</a></td>
+                        <td class="text-end" data-testid="stat-players">{{.Players}}</td>
+                        <td class="text-end" data-testid="stat-events">{{.Events}}</td>
+                        <td class="text-end" data-testid="stat-signed-up">{{.SignedUp}}</td>
+                        <td class="text-end" data-testid="stat-attended">{{.Attended}}</td>
+                        <td class="text-end" data-testid="stat-rate">{{.Rate}}</td>
+                      </tr>
+                    {{end}}
+                  </tbody>
+                </table>
+              </div>
+            {{else}}
+              <p class="text-sm opacity-70" data-testid="statistics-teams-empty">{{$L.statistics_teams_empty}}</p>
+            {{end}}
+          </div>
+        </section>
+      {{end}}
+
+      <section class="card card-border bg-base-100 shadow-sm" aria-labelledby="statistics-players-heading">
+        <div class="card-body">
+          <h2 id="statistics-players-heading" class="card-title">{{$L.statistics_players_heading}}</h2>
+          {{if .Players}}
+            <div class="overflow-x-auto">
+              <table class="table" data-testid="statistics-players">
+                <thead><tr>
+                  <th scope="col">{{$L.statistics_player}}</th>
+                  <th scope="col">{{$L.statistics_teams}}</th>
+                  <th scope="col" class="text-end">{{$L.statistics_events}}</th>
+                  <th scope="col" class="text-end">{{$L.statistics_signed_up}}</th>
+                  <th scope="col" class="text-end">{{$L.statistics_attended}}</th>
+                  <th scope="col" class="text-end">{{$L.statistics_rate}}</th>
+                </tr></thead>
+                <tbody>
+                  {{range .Players}}
+                    <tr data-user-id="{{.UserID}}">
+                      <td>{{.Label}}{{if .Self}} <span class="badge badge-soft badge-sm">{{$L.statistics_you}}</span>{{else if .Child}} <span class="badge badge-soft badge-sm">{{$L.statistics_child}}</span>{{end}}{{with .Email}}<div class="text-sm opacity-70">{{.}}</div>{{end}}</td>
+                      <td>{{.Teams}}</td>
+                      <td class="text-end" data-testid="stat-events">{{.Events}}</td>
+                      <td class="text-end" data-testid="stat-signed-up">{{.SignedUp}}</td>
+                      <td class="text-end" data-testid="stat-attended">{{.Attended}}</td>
+                      <td class="text-end" data-testid="stat-rate">{{.Rate}}</td>
+                    </tr>
+                  {{end}}
+                </tbody>
+              </table>
+            </div>
+          {{else}}
+            <p class="text-sm opacity-70" data-testid="statistics-players-empty">{{$L.statistics_players_empty}}</p>
+          {{end}}
+          <p class="text-sm opacity-70">{{$L.statistics_note}}</p>
+        </div>
+      </section>
+    {{end}}
+  {{end}}{{end}}
+{{end}}

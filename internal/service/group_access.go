@@ -601,3 +601,51 @@ func (s *GroupAccessService) For(ctx context.Context, userID, groupID int64) (*G
 	}
 	return NewGroupAccess(groupID, userID, grants), nil
 }
+
+// CanViewStatistics reports whether the account opens the participation
+// statistics (#11): every member sees at least their own numbers, and site
+// administrators see everything. Non-members get a not-found answer from
+// GroupAccessService.
+func (a *GroupAccess) CanViewStatistics() bool {
+	return a.CanView()
+}
+
+// StatisticsTeamIDs returns the teams whose statistics the account sees as
+// a team: every team (all) for admins, managers, and site administrators;
+// the teams they coach this season for coaches; none for players and
+// parents, who see only their own (or their children's) numbers.
+func (a *GroupAccess) StatisticsTeamIDs() (ids []int64, all bool) {
+	switch {
+	case !a.CanView():
+		return nil, false
+	case a.SeesAllTeams():
+		return nil, true
+	case a.HasRole(GroupRoleCoach):
+		return slices.Clone(a.coached), false
+	}
+	return nil, false
+}
+
+// CanViewTeamStatistics reports whether the account sees the team's
+// statistics.
+func (a *GroupAccess) CanViewTeamStatistics(teamID int64) bool {
+	ids, all := a.StatisticsTeamIDs()
+	return all || slices.Contains(ids, teamID)
+}
+
+// StatisticsPlayerScope returns whose per-player numbers the account sees:
+// every player (all); the players of the listed teams (the teams a coach
+// coaches); and the listed users (the account itself and its children).
+func (a *GroupAccess) StatisticsPlayerScope() (all bool, teamIDs, userIDs []int64) {
+	if !a.CanView() {
+		return false, nil, nil
+	}
+	teamIDs, all = a.StatisticsTeamIDs()
+	if all {
+		return true, nil, nil
+	}
+	if a.IsMember() {
+		userIDs = append([]int64{a.userID}, a.childIDs...)
+	}
+	return false, teamIDs, userIDs
+}

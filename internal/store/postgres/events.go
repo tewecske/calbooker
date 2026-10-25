@@ -60,18 +60,8 @@ func (r *EventRepository) CreateEvent(ctx context.Context, event service.Event) 
 		return service.Event{}, mapEventError(err)
 	}
 	defer func() { _ = tx.Rollback() }()
-	var eventID int64
-	if err := tx.QueryRowContext(ctx, `
-		INSERT INTO events (group_id, kind, title, starts_at, ends_at, resource_id, location, signup_mode, max_participants,
-			signup_deadline, cancelled_at, plan_training_id, generated_for_week, edited_at, created_at, version)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13::date, $14, $15, 0)
-		RETURNING id
-	`, event.GroupID, event.Kind, event.Title, event.StartsAt, event.EndsAt, event.ResourceID, event.Location, event.SignupMode,
-		nullableLimit(event.MaxParticipants), nullableTime(event.SignupDeadline), event.CancelledAt, event.PlanTrainingID,
-		nullableDate(event.GeneratedForWeek), event.EditedAt, event.CreatedAt).Scan(&eventID); err != nil {
-		return service.Event{}, mapEventError(err)
-	}
-	if err := writeEventMembers(ctx, tx, event.GroupID, eventID, event); err != nil {
+	eventID, err := insertEvent(ctx, tx, event)
+	if err != nil {
 		return service.Event{}, err
 	}
 	created, err := findEvent(ctx, tx, event.GroupID, eventID)
@@ -485,4 +475,24 @@ func mapEventError(err error) error {
 		}
 	}
 	return ClassifyError(err)
+}
+
+// insertEvent inserts the event with its teams and extra coaches and returns
+// its ID.
+func insertEvent(ctx context.Context, tx queryer, event service.Event) (int64, error) {
+	var eventID int64
+	if err := tx.QueryRowContext(ctx, `
+		INSERT INTO events (group_id, kind, title, starts_at, ends_at, resource_id, location, signup_mode, max_participants,
+			signup_deadline, cancelled_at, plan_training_id, generated_for_week, edited_at, created_at, version)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13::date, $14, $15, 0)
+		RETURNING id
+	`, event.GroupID, event.Kind, event.Title, event.StartsAt, event.EndsAt, event.ResourceID, event.Location, event.SignupMode,
+		nullableLimit(event.MaxParticipants), nullableTime(event.SignupDeadline), event.CancelledAt, event.PlanTrainingID,
+		nullableDate(event.GeneratedForWeek), event.EditedAt, event.CreatedAt).Scan(&eventID); err != nil {
+		return 0, mapEventError(err)
+	}
+	if err := writeEventMembers(ctx, tx, event.GroupID, eventID, event); err != nil {
+		return 0, err
+	}
+	return eventID, nil
 }

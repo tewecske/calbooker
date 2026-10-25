@@ -592,3 +592,50 @@ get `service.ErrGroupNotFound`, which handlers render as 404.
 - `WeekGridItem.Background` draws an item behind the others at full column
   width with no lane and no pointer events; `WeekGridConfig.DragHint`
   replaces the hint text.
+
+## Event generation
+
+- `EventGenerationService` (`internal/service/event_generation.go`, store
+  `EventGenerationRepository` in `internal/store/postgres/event_generation.go`,
+  migration `000012_events_generated_unique.up.sql`) turns the saved training
+  plan of a season part into `training` events with open sign-up, linked by
+  `plan_training_id` and `generated_for_week` (the week's Monday). Staff only
+  (`CanManagePlan`: admins, managers, site administrators); other members get
+  access denied, non-members 404.
+- `Options`, `Preview`, and `Generate` take a part, the Monday of the first
+  week, and one or two consecutive weeks; each week needs a day inside the
+  part (a part that starts mid-week generates only its own days). `Preview`
+  runs the same decision as `Generate` without locking or writing.
+- `PlanGeneration` is the pure decision. A training makes one event in a week
+  when its week (`A`, `B`, or `all`, resolved with `SeasonPart.WeekOn` for
+  that day) matches and the day is inside the part. Local minutes become
+  instants through `EventInstant` as a wall time in the group's time zone, so
+  a 16:00 training stays at 16:00 across daylight-saving changes; a start or
+  end the clocks skip is reported as skipped (`time_skipped`). Title is the
+  team's name; archived teams and resources are skipped.
+- Per (training, week), against the generated events that exist:
+  none is created; one equal to the plan is `unchanged`; one that differs is
+  rebuilt (deleted and created) only when `edited_at` is empty and it has no
+  `event_participants` row; otherwise it is kept and listed with the reason
+  (`edited`, `participants`). Generated events of the part's weeks that no
+  training produces any more (the training was deleted, which clears
+  `plan_training_id`, or it no longer applies to that week) are removed
+  unless they are edited or have participants, in which case they are kept
+  and listed.
+- `EventGenerationRepository.Generate` runs the read, the decision, and the
+  writes in one transaction. With `apply` it locks the season part row
+  (`FOR UPDATE`, so board saves and other generations of the part wait) and
+  the generated events of the weeks (`FOR UPDATE OF e`; participant writes
+  lock their event row too), refuses to delete an event with participants,
+  and creates events through `insertEvent`, the same insert as
+  `EventRepository.CreateEvent`. The unique index `events_generated_unique`
+  on `(group_id, plan_training_id, generated_for_week)` makes a second event
+  for the same training and week impossible even in a race.
+- Audit `group.plan.events_generated` (part, weeks, counts; never names),
+  written only when something changed.
+- Page: `/{language}/groups/{id}/event-generation?part=&week=&weeks=` (GET
+  shows the choice and, with `week`, the preview; POST confirms and shows
+  the result). Linked from the training plan board (`event_generation.go`,
+  `event_generation.html`, catalogs `event_generation.json`). Plain forms,
+  no HTMX; the confirmation recomputes the decision rather than trusting the
+  preview.

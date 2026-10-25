@@ -43,6 +43,8 @@ type Dependencies struct {
 	Plan        PlanUseCases
 	// TrainingPlan is the training plan board (#14).
 	TrainingPlan TrainingPlanUseCases
+	// EventGeneration generates events from the training plan (#15).
+	EventGeneration EventGenerationUseCases
 	// Participation is sign-up and attendance on event pages (#9).
 	Participation ParticipationUseCases
 	CoachBoard    CoachBoardUseCases

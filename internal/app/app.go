@@ -69,6 +69,7 @@ type Graph struct {
 	Coach                 *service.CoachService
 	PlanSlot              *service.PlanSlotService
 	TrainingPlan          *service.TrainingPlanService
+	EventGeneration       *service.EventGenerationService
 	Participation         *service.ParticipationService
 	CoachBoard            *service.CoachBoardService
 	Statistics            *service.StatisticsService
@@ -194,6 +195,10 @@ func New(database *sql.DB, appConfig config.Config) (*Graph, error) {
 	planSlotsRepository, err := postgresstore.NewPlanSlotRepository(database)
 	if err != nil {
 		return nil, fmt.Errorf("construct plan slot repository: %w", err)
+	}
+	eventGenerationRepository, err := postgresstore.NewEventGenerationRepository(database)
+	if err != nil {
+		return nil, fmt.Errorf("construct event generation repository: %w", err)
 	}
 	planTrainingsRepository, err := postgresstore.NewPlanTrainingRepository(database)
 	if err != nil {
@@ -341,6 +346,10 @@ func New(database *sql.DB, appConfig config.Config) (*Graph, error) {
 	if err != nil {
 		return nil, fmt.Errorf("construct training plan service: %w", err)
 	}
+	eventGenerationService, err := service.NewEventGenerationService(eventGenerationRepository, seasonService, resourceService, teamsRepository, users)
+	if err != nil {
+		return nil, fmt.Errorf("construct event generation service: %w", err)
+	}
 	participationService, err := service.NewParticipationService(eventService, participantsRepository, users)
 	if err != nil {
 		return nil, fmt.Errorf("construct participation service: %w", err)
@@ -375,6 +384,7 @@ func New(database *sql.DB, appConfig config.Config) (*Graph, error) {
 	coachService.SetAuditor(auditService)
 	planSlotService.SetAuditor(auditService)
 	trainingPlanService.SetAuditor(auditService)
+	eventGenerationService.SetAuditor(auditService)
 	participationService.SetAuditor(auditService)
 	coachBoardService.SetAuditor(auditService)
 	adminAccounts, err := service.NewAdminAccountService(users, adminUsersRepository, auditService, sessionService)
@@ -481,6 +491,7 @@ func New(database *sql.DB, appConfig config.Config) (*Graph, error) {
 		Coach:                 coachService,
 		PlanSlot:              planSlotService,
 		TrainingPlan:          trainingPlanService,
+		EventGeneration:       eventGenerationService,
 		Participation:         participationService,
 		CoachBoard:            coachBoardService,
 		Statistics:            statisticsService,

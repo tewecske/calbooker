@@ -340,6 +340,42 @@ Refinements made in #14 (open for the owner to confirm):
 - A part that does not alternate stores every training as `all`.
 
 
+Refinements made in #15 (open for the owner to confirm):
+
+- Generation is staff only (admins, managers, site administrators) and lives
+  on its own page, linked from the training plan board. Pick a season part,
+  the first week (any week with a day inside the part, default next week)
+  and one or two weeks; the preview lists what will be created, rebuilt,
+  removed, kept, or skipped, with times in the group's time zone; confirming
+  recomputes it. A part that starts or ends mid-week generates only the days
+  inside it.
+- A generated event is a `training` with open sign-up, titled with the
+  team's name, with the training's team and resource, no coaches (the
+  team's season coaches apply as for any event), no limit and no deadline.
+  A training in an A/B part makes an event only in weeks of its letter.
+- Times keep their wall-clock time across daylight-saving changes (a Sunday
+  training at 08:00 is at 08:00 on the day clocks change; one that crosses
+  the change is an hour shorter or longer). A start or end that does not
+  exist that day (02:30 on the last Sunday of March in Budapest) is skipped
+  and listed rather than moved.
+- Regenerating compares by training and week. An event is rebuilt (deleted
+  and created again) only if it differs from the plan, `edited_at` is empty,
+  and it has no participant row; events that are edited by hand (including
+  cancelled ones) or have participants are kept and listed with the reason
+  and a link, even when the plan moved. Generating twice without a change
+  writes and audits nothing, and a unique index allows one generated event
+  per training and week.
+- Trainings deleted from the plan: the foreign key clears the event's
+  training link, so the next generation of those weeks removes their
+  unedited, participant-free events (they are recognised by
+  `generated_for_week` and by lying inside the part's dates) and lists the
+  others as kept. Weeks never regenerated keep their events until then.
+- A hand-deleted generated event is created again by the next generation.
+  Trainings of archived teams or resources are skipped and listed.
+- Audit: `group.plan.events_generated` with the part, the weeks, and counts
+  of created, rebuilt, removed, kept, and unchanged events.
+
+
 ## Data model
 
 All tables carry `group_id` (directly or through their parent) so every query

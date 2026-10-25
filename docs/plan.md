@@ -173,6 +173,7 @@ Progress is in the Status table below. The original first steps were:
 | 30 | merged | #32 |
 | 14 | merged | #33 |
 | 15 | merged | #34 |
+| 35 | merged (mobile menu, signed-in home) | #36 |
 
 ## Owner answers (2026-10-23)
 

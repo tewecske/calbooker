@@ -171,8 +171,8 @@ Progress is in the Status table below. The original first steps were:
 | 6 | merged | #17 |
 | 11 | merged | #31 |
 | 30 | merged | #32 |
-| 14 | in progress (lane C) | |
-| 15 | open | |
+| 14 | merged | #33 |
+| 15 | in progress (lane C) | |
 
 ## Owner answers (2026-10-23)
 

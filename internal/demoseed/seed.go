@@ -285,8 +285,7 @@ func (s *seeder) group(g GroupPlan) {
 			s.exec(`INSERT INTO team_members (group_id, team_id, user_id, role, created_at) VALUES ($1, $2, $3, 'player', $4)`,
 				groupID, teamID, s.users[player], unix)
 			parent := team.Parents[i]
-			s.exec(`INSERT INTO team_members (group_id, team_id, user_id, role, created_at) VALUES ($1, $2, $3, 'parent', $4)`,
-				groupID, teamID, s.users[parent], unix)
+			// Parents are on the roster only through guardians (derived at read time).
 			s.exec(`INSERT INTO guardians (group_id, parent_user_id, child_user_id, created_by, created_at) VALUES ($1, $2, $3, $4, $5)`,
 				groupID, s.users[parent], s.users[player], s.users[g.Admin()], unix)
 		}

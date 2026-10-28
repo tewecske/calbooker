@@ -70,6 +70,10 @@ func TestSeedFillsAndIsRepeatable(t *testing.T) {
 		t.Errorf("events = %d", first["events"])
 	}
 
+	var storedParents int
+	if err := harness.DB.QueryRowContext(ctx, `SELECT count(*) FROM team_members WHERE role = 'parent'`).Scan(&storedParents); err != nil || storedParents != 0 {
+		t.Errorf("stored parent team rows = %d, %v; parents belong to teams through guardians only", storedParents, err)
+	}
 	var admins int
 	if err := harness.DB.QueryRowContext(ctx, `SELECT count(*) FROM users WHERE is_admin AND email = $1`, SiteAdminEmail).Scan(&admins); err != nil || admins != 1 {
 		t.Errorf("site admins = %d, %v", admins, err)

@@ -174,8 +174,8 @@ Progress is in the Status table below. The original first steps were:
 | 14 | merged | #33 |
 | 15 | merged | #34 |
 | 35 | merged (mobile menu, signed-in home) | #36 |
-| 37 | in progress (lane A, demo seed) | |
-| 38 | in progress (lane B, parent links on Members, A/B switch on plan pages) | |
+| 37 | merged (demo seed) | #39 |
+| 38 | merged (parent links on Members, A/B switch on plan pages) | #40 |
 
 ## Owner answers (2026-10-23)
 

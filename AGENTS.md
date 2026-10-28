@@ -11,6 +11,7 @@ Use hexagonal boundaries and manual constructor wiring. Keep domain code indepen
 Package responsibilities:
 
 - `cmd/web` owns process startup and dependency wiring. Keep business logic out.
+- `cmd/demo-seed` and `internal/demoseed` are development tooling (`make demo-seed`): wipe the local database and fill it with demo accounts and data. Nothing in the web application imports them; they refuse production and non-local databases.
 - `internal/app` owns explicit application graph composition; it does not own resource lifecycle.
 - `internal/config` loads typed environment configuration (`CALBOOKER_*`) and redacts secrets.
 - `internal/locale` owns supported language codes (en, hu), canonical localized paths, and translation catalogs. Catalogs are split per area in `internal/locale/catalogs/<lang>/<area>.json` (`common`, `auth`, `guest`, `settings`, `groups`, `admin`, `about`, ...) and merged at load; a message ID defined in two files is a load error. Keep a message in the same area file for every language.

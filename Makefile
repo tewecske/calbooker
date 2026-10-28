@@ -3,7 +3,7 @@ GO := go
 # The goweb checkout that runs PostgreSQL, Hydra, and the provider locally.
 GOWEB_DIR ?= ../goweb
 
-.PHONY: build clean fmt-check test test-integration vet assets check run dev-setup e2e
+.PHONY: build clean fmt-check test test-integration vet assets check run dev-setup e2e demo-seed
 
 build:
 	mkdir -p bin
@@ -47,3 +47,8 @@ test-integration:
 e2e:
 	@set -a; if [ -f .env ]; then . ./.env; fi; if [ -f .env.local ]; then . ./.env.local; fi; set +a; \
 	CALBOOKER_SSO_E2E=1 npx playwright test
+
+# Wipes this checkout's database (from .env.local) and fills it with demo
+# data; creates the demo accounts at the provider on first use.
+demo-seed:
+	@set -a; if [ -f .env ]; then . ./.env; fi; if [ -f .env.local ]; then . ./.env.local; fi; set +a; $(GO) run ./cmd/demo-seed

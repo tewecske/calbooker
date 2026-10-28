@@ -199,6 +199,45 @@ Nothing sends mail yet. When booking notifications land, point
 `CALBOOKER_MAIL_RELAY=smtp://localhost:1025` at goweb's Mailpit (started by
 goweb's `make db-up`, inbox at `http://127.0.0.1:8025`).
 
+## Demo data
+
+`make demo-seed` (`cmd/demo-seed`, `internal/demoseed`) resets this checkout's
+database and fills it with demo data, so every feature can be tried by signing
+in as a role. It reads `.env` and `.env.local`, prints the database it wipes,
+and refuses `CALBOOKER_ENV=production` and any database host other than
+`localhost`/`127.0.0.1`. It empties every table except `schema_migrations`
+(`TRUNCATE ... RESTART IDENTITY CASCADE`), so run it only on a development
+database. Running it twice gives the same result.
+
+Accounts (all with password `test1234`, created at goweb's provider through
+its sign-up form; existing ones are skipped, and a new account's email is
+confirmed through Mailpit's API when the provider sent a message):
+
+| Account | Role |
+| --- | --- |
+| `bvsc@example.com`, `kise@example.com`, `fuzy@example.com` | group administrator |
+| `<group>-manager-<1..2>@example.com` | manager (BVSC, KISE) |
+| `<group>-coach-<1..4>@example.com` | coach; 1-2 coach team 1, 3-4 team 2, coaches 1 and 3 are head coaches |
+| `<group>-player-<1..10>@example.com` | player; 1-5 in team 1, 6-10 in team 2 |
+| `<group>-parent-<1..10>@example.com` | parent, guardian of the player with the same number |
+| `fuzy-manager-1@example.com` | manager and coach in one person; Fuzy has one team with players and parents 1-10 |
+| `admin@example.com` | calbooker site administrator (must already exist at the provider; its password is not touched) |
+
+`<group>` is `bvsc`, `kise`, or `fuzy` (lowercase, no accent). Every group has
+fields "Field 1" and "Field 2", a season covering today (1 September to 30
+June of the current sports year) with an autumn part (to 31 January,
+alternating A/B weeks) and a spring part, coach assignments, qualifications
+and availability, plan slots on both fields, four past events with confirmed
+attendance, and three upcoming events per team. The training plan and event
+generation are left empty for you to try.
+
+Provider user IDs (the SSO subject) are read from goweb's database by email
+(read-only); the URL is `CALBOOKER_DATABASE_URL` with database `goweb`, or
+`DEMO_SEED_GOWEB_DATABASE_URL`. `-provider` / `CALBOOKER_BROWSER_PROVIDER_URL`
+sets the provider origin and `DEMO_SEED_MAILPIT_URL` (default
+`http://localhost:8025`) Mailpit's. Stop the running calbooker first or sign
+out: its sessions disappear with the wipe.
+
 ## Week grid demo
 
 With `CALBOOKER_ENV=development` (the `.env.example` default), calbooker

@@ -17,11 +17,20 @@
       </div>
     </div>
     {{with .DatesError}}<p id="{{$id}}-dates-error" class="text-sm text-error" role="alert">{{.}}</p>{{end}}
-    <label class="label cursor-pointer justify-start gap-3 mt-2" for="{{$id}}-alternating">
-      <input id="{{$id}}-alternating" class="checkbox" type="checkbox" name="{{$key}}alternating" value="true"{{if .Alternating}} checked{{end}} aria-describedby="{{$id}}-alternating-help">
-      <span>{{.L.seasons_alternating}}</span>
-    </label>
-    <p id="{{$id}}-alternating-help" class="label">{{.L.seasons_alternating_help}}</p>
+    {{if .PlanURL}}
+      <input type="hidden" name="{{$key}}alternating" value="{{if .Alternating}}true{{else}}false{{end}}">
+      <p class="mt-2 flex flex-wrap items-center gap-2 text-sm" data-testid="{{$id}}-alternating-readonly">
+        <span>{{.L.seasons_alternating}}:</span>
+        <span class="badge badge-soft{{if .Alternating}} badge-info{{end}}">{{if .Alternating}}{{.L.seasons_alternating_on}}{{else}}{{.L.seasons_alternating_off}}{{end}}</span>
+        <a class="link" href="{{.PlanURL}}">{{.L.seasons_alternating_plan_link}}</a>
+      </p>
+    {{else}}
+      <label class="label cursor-pointer justify-start gap-3 mt-2" for="{{$id}}-alternating">
+        <input id="{{$id}}-alternating" class="checkbox" type="checkbox" name="{{$key}}alternating" value="true"{{if .Alternating}} checked{{end}} aria-describedby="{{$id}}-alternating-help">
+        <span>{{.L.seasons_alternating}}</span>
+      </label>
+      <p id="{{$id}}-alternating-help" class="label">{{.L.seasons_alternating_help}}</p>
+    {{end}}
   </fieldset>
 {{end}}
 

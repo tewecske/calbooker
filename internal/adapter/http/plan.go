@@ -51,8 +51,12 @@ type PlanView struct {
 	PartName     string
 	PartDates    string
 	Alternating  bool
-	Week         string
-	WeekLabel    string
+	// SwitchURL and SeasonVersion drive the A/B weeks switch, shown to
+	// those who manage seasons (CanEdit).
+	SwitchURL     string
+	SeasonVersion int64
+	Week          string
+	WeekLabel     string
 	// NoResources is true when the group has no active resource, so slots
 	// cannot be added.
 	NoResources bool
@@ -587,6 +591,8 @@ func (h *groupHandler) planLayout(current groupRequest, board service.PlanBoard,
 	view.SeasonName, view.PartName = board.Season.Name, part.Name
 	view.PartDates = service.FormatSeasonDate(part.StartsOn) + " – " + service.FormatSeasonDate(part.EndsOn)
 	view.Alternating = part.AlternatingWeeks
+	view.SwitchURL = h.groupPath(language, groupID, "/seasons/"+strconv.FormatInt(board.Season.ID, 10)+"/parts/"+strconv.FormatInt(part.ID, 10)+"/alternating")
+	view.SeasonVersion = board.Season.Version
 	for _, season := range board.Seasons {
 		for _, candidate := range season.Parts {
 			view.Parts = append(view.Parts, SelectOptionView{

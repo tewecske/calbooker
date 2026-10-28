@@ -1,5 +1,10 @@
 {
   "messages": {
+    "plan.alternating.on": {"text": "Turn on A/B weeks"},
+    "plan.alternating.off": {"text": "Turn off A/B weeks"},
+    "plan.alternating.help": {"text": "The first week of the part is an A week. Staff change this for the whole part."},
+    "plan.alternating.off_confirm": {"text": "Turn off A/B weeks? Items for week A or B then count as every week."},
+    "plan.alternating.saved": {"text": "A/B weeks saved."},
     "plan.nav": {
       "text": "Plan"
     },

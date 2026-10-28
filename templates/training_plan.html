@@ -49,6 +49,17 @@
       {{if .CanEdit}}<a class="btn btn-sm btn-primary btn-soft" href="{{.GenerateURL}}" data-testid="training-plan-generate-link">{{$L.event_generation_link}}</a>{{end}}
       {{if .CanEdit}}<span class="text-sm opacity-70">{{with .PreviousSeason}}{{$L.training_plan_previous}}: {{.}}{{else}}{{$L.training_plan_no_previous}}{{end}}</span>{{end}}
     </p>
+    {{if .CanEdit}}
+    <form class="flex flex-wrap items-center gap-2" method="post" action="{{.SwitchURL}}" hx-post="{{.SwitchURL}}" hx-target="#training-plan-board" hx-swap="outerHTML" hx-disabled-elt="this"{{if .Alternating}} hx-confirm="{{$L.plan_alternating_off_confirm}}"{{end}} data-testid="training-plan-alternating-form">
+      <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
+      <input type="hidden" name="version" value="{{.SeasonVersion}}">
+      <input type="hidden" name="return" value="training-plan">
+      {{with .Week}}<input type="hidden" name="week" value="{{.}}">{{end}}
+      <input type="hidden" name="alternating" value="{{if .Alternating}}false{{else}}true{{end}}">
+      <button class="btn btn-sm" type="submit" data-testid="part-alternating-toggle" aria-pressed="{{if .Alternating}}true{{else}}false{{end}}">{{if .Alternating}}{{$L.plan_alternating_off}}{{else}}{{$L.plan_alternating_on}}{{end}}</button>
+      <span class="text-sm opacity-70">{{$L.plan_alternating_help}}</span>
+    </form>
+    {{end}}
     {{if not .CanEdit}}
       <div role="status" class="alert alert-info alert-soft" data-testid="training-plan-read-only"><span>{{$L.training_plan_read_only}}</span></div>
     {{else if .NoResources}}

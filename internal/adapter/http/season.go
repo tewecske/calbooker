@@ -25,6 +25,7 @@ type SeasonUseCases interface {
 	Create(ctx context.Context, actor service.GroupActor, input service.SeasonInput) (service.Season, error)
 	Update(ctx context.Context, actor service.GroupActor, seasonID, expectedVersion int64, input service.SeasonInput) (service.Season, error)
 	Delete(ctx context.Context, actor service.GroupActor, seasonID, expectedVersion int64) error
+	SetPartAlternating(ctx context.Context, actor service.GroupActor, seasonID, partID, expectedVersion int64, alternating bool) (service.Season, error)
 	SeasonCoaches(ctx context.Context, access *service.GroupAccess, seasonID int64) ([]service.SeasonCoach, error)
 	TeamCoaching(ctx context.Context, access *service.GroupAccess, teamID int64) (service.TeamCoaching, error)
 	AssignCoach(ctx context.Context, actor service.GroupActor, assignment service.CoachAssignment) error
@@ -110,8 +111,11 @@ type SeasonPartFormView struct {
 	StartsOn    string
 	EndsOn      string
 	Alternating bool
-	NameError   string
-	DatesError  string
+	// PlanURL is set for a stored part: its A/B weeks are then shown read
+	// only, with a link to the plan page where staff switch them.
+	PlanURL    string
+	NameError  string
+	DatesError string
 }
 
 // TeamCoachesView is the coaches card of a team page.
@@ -148,6 +152,7 @@ func registerSeasonRoutes(mux *http.ServeMux, groups *groupHandler) {
 		mux.HandleFunc("GET "+prefix+"/groups/{id}/seasons/{seasonID}", groups.season)
 		mux.HandleFunc("POST "+prefix+"/groups/{id}/seasons/{seasonID}", groups.updateSeason)
 		mux.HandleFunc("POST "+prefix+"/groups/{id}/seasons/{seasonID}/delete", groups.deleteSeason)
+		mux.HandleFunc("POST "+prefix+"/groups/{id}/seasons/{seasonID}/parts/{partID}/alternating", groups.setPartAlternating)
 		mux.HandleFunc("POST "+prefix+"/groups/{id}/teams/{teamID}/coaches/add", groups.assignCoach)
 		mux.HandleFunc("POST "+prefix+"/groups/{id}/teams/{teamID}/coaches/head", groups.setHeadCoach)
 		mux.HandleFunc("POST "+prefix+"/groups/{id}/teams/{teamID}/coaches/remove", groups.removeCoach)
@@ -505,6 +510,7 @@ func (h *groupHandler) seasonFormView(language locale.Code, prefix, actionURL st
 		view.EndsOn = form.Value("ends_on")
 		view.NameError = form.Error("name")
 		view.DatesError = form.Error("starts_on")
+		view.setPlanURLs(h, language, season)
 		for index := range view.Parts {
 			key := "part" + strconv.Itoa(index+1) + "_"
 			view.Parts[index].Name = form.Value(key + "name")
@@ -518,6 +524,7 @@ func (h *groupHandler) seasonFormView(language locale.Code, prefix, actionURL st
 		view.Name = season.Name
 		view.StartsOn = service.FormatSeasonDate(season.StartsOn)
 		view.EndsOn = service.FormatSeasonDate(season.EndsOn)
+		view.setPlanURLs(h, language, season)
 		for _, part := range season.Parts {
 			if part.Position < 1 || part.Position > len(view.Parts) {
 				continue
@@ -530,6 +537,18 @@ func (h *groupHandler) seasonFormView(language locale.Code, prefix, actionURL st
 		}
 	}
 	return view
+}
+
+// setPlanURLs links the stored parts of a season to their plan page.
+func (view *SeasonFormView) setPlanURLs(h *groupHandler, language locale.Code, season *service.Season) {
+	if season == nil {
+		return
+	}
+	for _, part := range season.Parts {
+		if part.Position >= 1 && part.Position <= len(view.Parts) {
+			view.Parts[part.Position-1].PlanURL = h.groupPath(language, season.GroupID, "/plan") + planQuery{part: part.ID}.encode()
+		}
+	}
 }
 
 // seasonFormErrors attaches the field error for a season validation
@@ -617,4 +636,56 @@ func seasonForm(request *http.Request) (service.SeasonInput, FormData) {
 func seasonErrorMessage(err error) string {
 	_, message := seasonErrorField(err)
 	return message
+}
+
+// setPartAlternating switches the A/B weeks of one part from the slot plan
+// page or the training plan board (return=plan or training-plan). Only
+// staff who manage seasons change it, at the season's revision; the page
+// the request came from is rendered again.
+func (h *groupHandler) setPartAlternating(writer http.ResponseWriter, request *http.Request) {
+	current, seasonID, ok := h.seasonPathRequest(writer, request)
+	if !ok {
+		return
+	}
+	partID, err := pathPositiveID(request, "partID")
+	if err != nil {
+		h.renderGroupNotFound(writer, request, current.language)
+		return
+	}
+	_ = request.ParseForm()
+	query := planQuery{part: partID}
+	if week := request.PostFormValue("week"); week == service.SeasonWeekA || week == service.SeasonWeekB {
+		query.week = week
+	}
+	back := func(alerts []Alert, status int) {
+		if request.PostFormValue("return") == groupSectionTrainingPlan {
+			h.renderTrainingPlan(writer, request, current, query, service.TrainingBoardRequest{}, alerts, status)
+			return
+		}
+		h.renderPlan(writer, request, current, query, alerts, status)
+	}
+	version, err := parseVersion(request.PostFormValue("version"))
+	if err == nil {
+		_, err = h.dependencies.Seasons.SetPartAlternating(request.Context(), current.actor(), seasonID, partID, version, request.PostFormValue("alternating") == "true")
+	} else {
+		err = service.ErrOptimisticLockConflict
+	}
+	if err != nil {
+		message, status := "", http.StatusUnprocessableEntity
+		switch {
+		case errors.Is(err, service.ErrGroupNotFound), errors.Is(err, service.ErrSeasonNotFound), errors.Is(err, service.ErrRecordNotFound):
+			h.renderGroupNotFound(writer, request, current.language)
+			return
+		case errors.Is(err, service.ErrGroupForbidden):
+			message, status = "groups.error.forbidden", http.StatusForbidden
+		case errors.Is(err, service.ErrOptimisticLockConflict):
+			message, status = "groups.error.conflict", http.StatusConflict
+		default:
+			h.renderError(writer, request, http.StatusInternalServerError)
+			return
+		}
+		back([]Alert{{Level: "error", Message: h.t(current.language, message)}}, formFailureStatus(request, status))
+		return
+	}
+	back([]Alert{{Level: "success", Message: h.t(current.language, "plan.alternating.saved")}}, http.StatusOK)
 }

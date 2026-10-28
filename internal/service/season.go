@@ -441,6 +441,31 @@ func (s *SeasonService) Update(ctx context.Context, actor GroupActor, seasonID, 
 	return updated, nil
 }
 
+// SetPartAlternating switches the A/B weeks of one season part at the
+// season's expected revision, leaving everything else as stored. It is a
+// season edit: the same authorization, revision check, and audit entry as
+// Update. Plan items keep their week; for a part that stops alternating the
+// plans show A/B items as every-week.
+func (s *SeasonService) SetPartAlternating(ctx context.Context, actor GroupActor, seasonID, partID, expectedVersion int64, alternating bool) (Season, error) {
+	season, err := s.findEditable(ctx, actor, seasonID, expectedVersion)
+	if err != nil {
+		return Season{}, err
+	}
+	input := SeasonInput{Name: season.Name, StartsOn: season.StartsOn, EndsOn: season.EndsOn}
+	found := false
+	for _, part := range season.Parts {
+		raw := SeasonPartInput{Name: part.Name, StartsOn: part.StartsOn, EndsOn: part.EndsOn, AlternatingWeeks: part.AlternatingWeeks}
+		if part.ID == partID {
+			raw.AlternatingWeeks, found = alternating, true
+		}
+		input.Parts = append(input.Parts, raw)
+	}
+	if !found {
+		return Season{}, ErrSeasonNotFound
+	}
+	return s.Update(ctx, actor, seasonID, expectedVersion, input)
+}
+
 // Delete removes a season at the expected revision with its parts and
 // coach assignments.
 func (s *SeasonService) Delete(ctx context.Context, actor GroupActor, seasonID, expectedVersion int64) error {

@@ -55,10 +55,14 @@ type TrainingPlanView struct {
 	PartName    string
 	PartDates   string
 	Alternating bool
-	Week        string
-	Revision    string
-	Changed     bool
-	Stale       bool
+	// SwitchURL and SeasonVersion drive the A/B weeks switch, shown to
+	// those who edit the plan (CanEdit).
+	SwitchURL     string
+	SeasonVersion int64
+	Week          string
+	Revision      string
+	Changed       bool
+	Stale         bool
 	// PreviousSeason names the season the suggestion copies from.
 	PreviousSeason string
 	StartOverText  string
@@ -524,6 +528,8 @@ func (h *groupHandler) trainingLayout(current groupRequest, board service.Traini
 	view.SeasonName, view.PartName = board.Season.Name, part.Name
 	view.PartDates = service.FormatSeasonDate(part.StartsOn) + " – " + service.FormatSeasonDate(part.EndsOn)
 	view.Alternating = part.AlternatingWeeks
+	view.SwitchURL = h.groupPath(language, groupID, "/seasons/"+strconv.FormatInt(board.Season.ID, 10)+"/parts/"+strconv.FormatInt(part.ID, 10)+"/alternating")
+	view.SeasonVersion = board.Season.Version
 	view.Revision = board.Revision
 	view.Changed = board.Changed
 	view.Stale = board.Stale()

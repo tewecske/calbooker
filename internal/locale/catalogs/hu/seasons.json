@@ -1,5 +1,8 @@
 {
   "messages": {
+    "seasons.alternating.on": {"text": "Be"},
+    "seasons.alternating.off": {"text": "Ki"},
+    "seasons.alternating.plan_link": {"text": "Módosítás a tervoldalon"},
     "seasons.nav": {"text": "Szezonok"},
     "seasons.heading": {"text": "Szezonok"},
     "seasons.intro": {"text": "Egy szezon az első napjától az utolsó napjáig tart, és egy vagy két szakaszból áll, például augusztustól decemberig és januártól júniusig. A szezonok nem fedhetik egymást; az aktuális szezon az, amelyik a csoport időzónája szerint tartalmazza a mai napot."},

@@ -1,5 +1,8 @@
 {
   "messages": {
+    "seasons.alternating.on": {"text": "On"},
+    "seasons.alternating.off": {"text": "Off"},
+    "seasons.alternating.plan_link": {"text": "Change on the plan page"},
     "seasons.nav": {"text": "Seasons"},
     "seasons.heading": {"text": "Seasons"},
     "seasons.intro": {"text": "A season runs from its first to its last day and has one or two parts, for example August to December and January to June. Seasons do not overlap; the current season is the one that contains today in the group's time zone."},

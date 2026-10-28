@@ -1,5 +1,10 @@
 {
   "messages": {
+    "plan.alternating.on": {"text": "A/B hetek bekapcsolása"},
+    "plan.alternating.off": {"text": "A/B hetek kikapcsolása"},
+    "plan.alternating.help": {"text": "A szakasz első hete A hét. Az egész szakaszra a vezetők állíthatják."},
+    "plan.alternating.off_confirm": {"text": "Kikapcsolod az A/B heteket? Az A vagy B heti elemek ezután minden hétre érvényesek."},
+    "plan.alternating.saved": {"text": "Az A/B hetek mentve."},
     "plan.nav": {
       "text": "Terv"
     },

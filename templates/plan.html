@@ -22,6 +22,17 @@
             <span class="text-sm opacity-70">{{.PartDates}}</span>
             {{if .Alternating}}<span class="badge badge-info badge-soft badge-sm">{{$L.plan_alternating}}</span>{{end}}
           </p>
+          {{if .CanEdit}}
+          <form class="flex flex-wrap items-center gap-2" method="post" action="{{.SwitchURL}}" hx-post="{{.SwitchURL}}" hx-target="#page-content" hx-swap="outerHTML" hx-disabled-elt="this"{{if .Alternating}} hx-confirm="{{$L.plan_alternating_off_confirm}}"{{end}} data-testid="plan-alternating-form">
+            <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
+            <input type="hidden" name="version" value="{{.SeasonVersion}}">
+            <input type="hidden" name="return" value="plan">
+            {{with .Week}}<input type="hidden" name="week" value="{{.}}">{{end}}
+            <input type="hidden" name="alternating" value="{{if .Alternating}}false{{else}}true{{end}}">
+            <button class="btn btn-sm" type="submit" data-testid="part-alternating-toggle" aria-pressed="{{if .Alternating}}true{{else}}false{{end}}">{{if .Alternating}}{{$L.plan_alternating_off}}{{else}}{{$L.plan_alternating_on}}{{end}}</button>
+            <span class="text-sm opacity-70">{{$L.plan_alternating_help}}</span>
+          </form>
+          {{end}}
           {{if not .CanEdit}}
             <div role="status" class="alert alert-info alert-soft" data-testid="plan-read-only"><span>{{$L.plan_read_only}}</span></div>
           {{else if .NoResources}}

@@ -142,11 +142,22 @@ type GroupSettingsView struct {
 type GroupMembersView struct {
 	ShowEmails bool
 	CanManage  bool
-	Members    []GroupMemberView
+	// CanLink is true for staff: parents and players show their guardian
+	// links with the link and unlink forms of the children page.
+	CanLink   bool
+	LinkURL   string
+	UnlinkURL string
+	Members   []GroupMemberView
 }
 
 // GroupMemberView is one member row and its available actions.
 type GroupMemberView struct {
+	// Players are the players a parent is linked to; Parents are the parents
+	// of a player. LinkOptions are the players a parent can still be linked to.
+	Players       []GuardianRowView
+	Parents       []GuardianRowView
+	LinkOptions   []SelectOptionView
+	IsParent      bool
 	UserID        int64
 	Label         string
 	Email         string
@@ -640,6 +651,18 @@ func (h *groupHandler) renderSection(writer http.ResponseWriter, request *http.R
 			return
 		}
 		view.Members = h.membersView(current, group.ID, members)
+		if view.Members.CanLink {
+			if h.dependencies.Profiles == nil {
+				h.renderError(writer, request, http.StatusInternalServerError)
+				return
+			}
+			overview, err := h.dependencies.Profiles.Children(ctx, current.access)
+			if err != nil {
+				h.renderLoadError(writer, request, current.language, err)
+				return
+			}
+			h.addGuardianLinks(current, view.Members, members, overview.Children)
+		}
 	case groupSectionTeams:
 		if !h.loadTeams(writer, request, current, group.ID, form, view) {
 			return
@@ -767,7 +790,13 @@ func (h *groupHandler) groupShell(current groupRequest, group service.Group, sec
 func (h *groupHandler) membersView(current groupRequest, groupID int64, members []service.GroupMember) *GroupMembersView {
 	language := current.language
 	access := current.access
-	view := &GroupMembersView{ShowEmails: access.CanViewAllMembers(), CanManage: access.CanManageGroup()}
+	view := &GroupMembersView{
+		ShowEmails: access.CanViewAllMembers(),
+		CanManage:  access.CanManageGroup(),
+		CanLink:    access.CanManageGuardians(),
+		LinkURL:    h.groupPath(language, groupID, "/guardians/add"),
+		UnlinkURL:  h.groupPath(language, groupID, "/guardians/remove"),
+	}
 	for _, member := range members {
 		base := h.groupPath(language, groupID, "/members/"+strconv.FormatInt(member.UserID, 10))
 		row := GroupMemberView{
@@ -804,6 +833,45 @@ func (h *groupHandler) membersView(current groupRequest, groupID int64, members 
 		view.Members = append(view.Members, row)
 	}
 	return view
+}
+
+// addGuardianLinks fills the parent and player links of the members page
+// from the children overview.
+func (h *groupHandler) addGuardianLinks(current groupRequest, view *GroupMembersView, members []service.GroupMember, children []service.ChildEntry) {
+	language := current.language
+	row := make(map[int64]*GroupMemberView, len(view.Members))
+	for index := range view.Members {
+		row[view.Members[index].UserID] = &view.Members[index]
+	}
+	linked := make(map[[2]int64]bool)
+	for _, child := range children {
+		for _, guardian := range child.Guardians {
+			linked[[2]int64{guardian.UserID, child.Person.UserID}] = true
+			if parent := row[guardian.UserID]; parent != nil {
+				parent.Players = append(parent.Players, GuardianRowView{UserID: child.Person.UserID, Label: h.memberLabel(language, child.Person.UserID, child.Person.DisplayName, child.Person.Username, nil)})
+			}
+			if player := row[child.Person.UserID]; player != nil {
+				player.Parents = append(player.Parents, GuardianRowView{UserID: guardian.UserID, Label: h.memberLabel(language, guardian.UserID, guardian.DisplayName, guardian.Username, nil)})
+			}
+		}
+	}
+	for _, parent := range members {
+		if !parent.HasRole(service.GroupRoleParent) {
+			continue
+		}
+		target := row[parent.UserID]
+		if target == nil {
+			continue
+		}
+		target.IsParent = true
+		target.LinkOptions = append(target.LinkOptions, SelectOptionView{Value: "", Label: h.t(language, "groups.members.link_player"), Selected: true})
+		for _, player := range members {
+			if !player.HasRole(service.GroupRolePlayer) || player.UserID == parent.UserID || linked[[2]int64{parent.UserID, player.UserID}] {
+				continue
+			}
+			target.LinkOptions = append(target.LinkOptions, SelectOptionView{Value: strconv.FormatInt(player.UserID, 10), Label: h.memberLabel(language, player.UserID, player.DisplayName, player.Username, nil)})
+		}
+	}
 }
 
 func (h *groupHandler) renderGroupPage(writer http.ResponseWriter, request *http.Request, current groupRequest, view *GroupDetailView, form FormData, alerts []Alert, status int) {

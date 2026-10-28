@@ -375,6 +375,39 @@ Refinements made in #15 (open for the owner to confirm):
 - Audit: `group.plan.events_generated` with the part, the weeks, and counts
   of created, rebuilt, removed, kept, and unchanged events.
 
+Refinements made in #38 (open for the owner to confirm):
+
+- The Members page shows the guardian links to staff (`CanManageGuardians`,
+  the same people as on the Children page; nobody else sees them or loads
+  them). A parent's row lists the linked players, each an unlink button, and
+  a "Link to player" select of the player members not yet linked; a player's
+  row lists the linked parents. It reuses the Children routes
+  (`/groups/{id}/guardians/add|remove`) and their service, authorization,
+  audit and messages; a hidden `return=members` makes the write render the
+  Members page again (errors included) instead of the Children page. Child
+  profiles appear on Members as players, so a parent can be linked to a
+  profile there too.
+- The A/B flag stays on `season_parts.alternating_weeks` (week 1 of the part
+  is A). Staff switch it with one button on the slot plan page and on the
+  training plan board, for the selected part: `POST
+  /groups/{id}/seasons/{seasonID}/parts/{partID}/alternating` with the
+  season's `version`. It is a season edit (`SeasonService.SetPartAlternating`
+  rebuilds the season input with one flag changed and goes through
+  `Update`): `CanManageSeasons` (admins, managers, site administrators;
+  `CanManagePlan` is the same set), revision check with `ClassifyStaleWrite`
+  (stale is a conflict, a vanished season is not-found), and the
+  `group.season.updated` audit entry. Coaches see the plan pages read only,
+  without the switch; a forged request from a coach is refused with 403.
+- Turning a part off keeps the stored week of its slots and trainings; the
+  plans and the event generation treat them as every-week, as in #7, #13 and
+  #14. The switch asks for confirmation before turning it off. The page
+  re-renders with the new state (plan page: whole page; training plan: the
+  board, discarding an unsaved draft).
+- The season edit form shows the flag of a stored part read only, with a link
+  to its plan page, and still posts the current value in a hidden field so
+  saving the season keeps it. The create form, and a part 2 added later, keep
+  the checkbox because those parts have no plan page yet.
+
 
 ## Data model
 

@@ -166,10 +166,15 @@ func (h *groupHandler) changeGuardian(writer http.ResponseWriter, request *http.
 		return
 	}
 	_ = request.ParseForm()
+	// The Members page posts return=members so it re-renders itself.
+	section := groupSectionChildren
+	if request.PostFormValue("return") == groupSectionMembers {
+		section = groupSectionMembers
+	}
 	parentID, parentErr := strconv.ParseInt(strings.TrimSpace(request.PostFormValue("parent_id")), 10, 64)
 	childID, childErr := strconv.ParseInt(strings.TrimSpace(request.PostFormValue("child_id")), 10, 64)
 	if parentErr != nil || childErr != nil || parentID <= 0 || childID <= 0 {
-		h.renderWriteError(writer, request, current, groupSectionChildren, 0, service.ErrInvalidGuardian, FormData{})
+		h.renderWriteError(writer, request, current, section, 0, service.ErrInvalidGuardian, FormData{})
 		return
 	}
 	var err error
@@ -181,10 +186,10 @@ func (h *groupHandler) changeGuardian(writer http.ResponseWriter, request *http.
 		err = h.dependencies.Profiles.RemoveGuardian(request.Context(), current.actor(), parentID, childID)
 	}
 	if err != nil {
-		h.renderWriteError(writer, request, current, groupSectionChildren, 0, err, FormData{})
+		h.renderWriteError(writer, request, current, section, 0, err, FormData{})
 		return
 	}
-	h.renderChildrenAfterWrite(writer, request, current, []Alert{{Level: "success", Message: h.t(current.language, message)}})
+	h.renderGuardianAfterWrite(writer, request, current, section, []Alert{{Level: "success", Message: h.t(current.language, message)}})
 }
 
 func (h *groupHandler) childRequest(writer http.ResponseWriter, request *http.Request) (groupRequest, bool) {
@@ -293,13 +298,18 @@ func (h *groupHandler) loadChildren(writer http.ResponseWriter, request *http.Re
 // a write here can change the account's own children (a parent's new
 // profile is linked to them), which the request's access was built without.
 func (h *groupHandler) renderChildrenAfterWrite(writer http.ResponseWriter, request *http.Request, current groupRequest, alerts []Alert) {
+	h.renderGuardianAfterWrite(writer, request, current, groupSectionChildren, alerts)
+}
+
+// renderGuardianAfterWrite renders the section a guardian write came from.
+func (h *groupHandler) renderGuardianAfterWrite(writer http.ResponseWriter, request *http.Request, current groupRequest, section string, alerts []Alert) {
 	access, err := h.dependencies.GroupAccess.For(request.Context(), current.user.ID, current.access.GroupID())
 	if err != nil {
 		h.renderLoadError(writer, request, current.language, err)
 		return
 	}
 	current.access = access
-	h.renderSection(writer, request, current, groupSectionChildren, 0, FormData{}, alerts, http.StatusOK)
+	h.renderSection(writer, request, current, section, 0, FormData{}, alerts, http.StatusOK)
 }
 
 // profileForm reads the profile name and birth year. An unparseable year

@@ -439,22 +439,24 @@ func TestSeasonsHungarianLabels(t *testing.T) {
 }
 
 type seasonsUseCaseStub struct {
-	list           []service.Season
-	found          service.Season
-	findErr        error
-	current        service.Season
-	hasCurrent     bool
-	coaches        []service.SeasonCoach
-	coaching       service.TeamCoaching
-	coachingErr    error
-	writeErr       error
-	calls          int
-	writes         int
-	lastInput      service.SeasonInput
-	lastID         int64
-	lastVersion    int64
-	lastAssignment service.CoachAssignment
-	lastRemoved    [3]int64
+	list            []service.Season
+	found           service.Season
+	findErr         error
+	current         service.Season
+	hasCurrent      bool
+	coaches         []service.SeasonCoach
+	coaching        service.TeamCoaching
+	coachingErr     error
+	writeErr        error
+	calls           int
+	writes          int
+	lastInput       service.SeasonInput
+	lastID          int64
+	lastVersion     int64
+	lastAssignment  service.CoachAssignment
+	lastRemoved     [3]int64
+	lastPart        int64
+	lastAlternating bool
 }
 
 func (s *seasonsUseCaseStub) write() error {

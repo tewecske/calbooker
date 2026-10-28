@@ -204,13 +204,44 @@
               </tr>
             </thead>
             <tbody>
-              {{$manage := .CanManage}}
+              {{$manage := .CanManage}}{{$link := .CanLink}}{{$linkURL := .LinkURL}}{{$unlink := .UnlinkURL}}
               {{range .Members}}
                 {{$member := .}}
                 <tr data-member-id="{{.UserID}}">
                   <td>
                     <div class="font-medium">{{.Label}}{{if .IsSelf}} <span class="badge badge-ghost badge-sm">{{$L.groups_members_you}}</span>{{end}}{{if .IsGuest}} <span class="badge badge-outline badge-sm">{{$L.groups_members_guest}}</span>{{end}}{{if .IsProfile}} <span class="badge badge-outline badge-sm">{{$L.groups_members_profile}}</span>{{end}}</div>
                     {{if .Email}}<div class="text-sm opacity-70">{{.Email}}</div>{{end}}
+                    {{if $link}}
+                      {{if .IsParent}}
+                        <div class="mt-2 flex flex-wrap items-center gap-1 text-sm" data-testid="member-players">{{$L.groups_members_players}}:
+                          {{range .Players}}
+                            <form method="post" action="{{$unlink}}" hx-post="{{$unlink}}" hx-target="#page-content" hx-swap="outerHTML" hx-disabled-elt="this">
+                              <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
+                              <input type="hidden" name="return" value="members">
+                              <input type="hidden" name="parent_id" value="{{$member.UserID}}">
+                              <input type="hidden" name="child_id" value="{{.UserID}}">
+                              <button class="badge badge-soft gap-1" type="submit" data-player="{{.UserID}}" aria-label="{{$L.groups_members_unlink_player}}: {{.Label}}">{{.Label}} <span aria-hidden="true">×</span></button>
+                            </form>
+                          {{else}}
+                            <span class="opacity-70">{{$L.groups_members_no_players}}</span>
+                          {{end}}
+                        </div>
+                        {{if gt (len .LinkOptions) 1}}
+                          <form class="join mt-1" method="post" action="{{$linkURL}}" hx-post="{{$linkURL}}" hx-target="#page-content" hx-swap="outerHTML" hx-disabled-elt="this">
+                            <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
+                            <input type="hidden" name="return" value="members">
+                            <input type="hidden" name="parent_id" value="{{.UserID}}">
+                            <select class="select select-sm join-item" name="child_id" required aria-label="{{$L.groups_members_link_player}}: {{.Label}}">{{template "select-options" .LinkOptions}}</select>
+                            <button class="btn btn-sm join-item" type="submit">{{$L.groups_members_link_submit}}</button>
+                          </form>
+                        {{end}}
+                      {{end}}
+                      {{if .Parents}}
+                        <div class="mt-2 flex flex-wrap items-center gap-1 text-sm" data-testid="member-parents">{{$L.groups_members_parents}}:
+                          {{range .Parents}}<span class="badge badge-soft" data-parent="{{.UserID}}">{{.Label}}</span>{{end}}
+                        </div>
+                      {{end}}
+                    {{end}}
                   </td>
                   <td>
                     <div class="flex flex-wrap gap-1" data-testid="member-roles">

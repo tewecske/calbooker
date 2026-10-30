@@ -507,6 +507,38 @@ Refinements made in #47 (open for the owner to confirm):
   `group.event.participant_left_out`; removals use
   `group.event.participant_removed`. Own answers stay unaudited.
 
+Refinements made in #46 (open for the owner to confirm):
+
+- After a single sign-on sign-in (and a guest upgrade) the start page is
+  decided in one function (`landingRoute`, `landing.go`), first match wins:
+  exactly one active team over all the account's groups (teams the account
+  belongs to as player, parent or coach; staff do not count every team of
+  the group) goes to that team's page; a player or parent whose only group
+  this is goes to the group's calendar; someone in exactly one group goes
+  to the group page; everyone else, including several groups, goes to the
+  home page. This order follows the issue text: a single-team player lands
+  on the team, a player or parent in several teams lands on the calendar.
+  Any lookup failure falls back to the home page. There is no return URL in
+  the sign-in flow, so none is honoured.
+- "Player or parent" means a member whose roles are only player and/or
+  parent (`GroupAccess.IsFamilyOnly`); a parent who also coaches or
+  manages keeps the full staff menu. Their menu is Calendar, Teams, Events
+  (plus Statistics where allowed): no Overview, Members or Children. With
+  one active team, the Teams entry shows that team's name and links
+  straight to the team page; with several it reads "Teams".
+- The Children and Guardians entries are gone from the menu for everyone.
+  The routes (`.../children`, guardian add/remove on Members) and the data
+  stay; parents reach the Children page only by URL for now.
+- The group calendar (also the team Calendar tab) gives a guardian a colour
+  per child from a fixed palette of eight CSS classes (`child-color-0` ...
+  `child-color-7`), assigned in order of the child's user ID so colours stay
+  stable. An event for several of a parent's children carries all their
+  dots (grid) and name badges (day list); a legend lists the children. The
+  child filter (`?child=<user id>`, group calendar only) keeps the events
+  whose teams include one of that child's teams; an ID that is not one of
+  the viewer's own children is ignored. Visibility is unchanged
+  (`EventService.List`); players get no colours.
+
 ## Data model
 
 All tables carry `group_id` (directly or through their parent) so every query

@@ -90,7 +90,7 @@ func (h *authHandler) ssoCallback(writer http.ResponseWriter, request *http.Requ
 		h.ssoCallbackFailure(writer, request, guest, err)
 		return
 	}
-	h.finishSignIn(writer, request, recoveryLanguage(request), result.Session.ID, "/home")
+	h.finishSignIn(writer, request, recoveryLanguage(request), result.Session.ID, landingFor(request.Context(), h.dependencies, result.Session.UserID))
 }
 
 // ssoGuestUpgrade offers a signed-in guest one button that signs in at the

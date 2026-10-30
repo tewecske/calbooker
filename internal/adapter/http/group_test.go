@@ -233,16 +233,15 @@ func TestGroupOverviewByRole(t *testing.T) {
 		name         string
 		access       *service.GroupAccess
 		wantInvite   bool
-		wantChildren bool
 		wantSettings bool
 		wantLeave    bool
 	}{
-		{name: "admin", access: groupMemberAs(service.GroupRoleAdmin), wantInvite: true, wantChildren: true, wantSettings: true, wantLeave: true},
-		{name: "manager", access: groupMemberAs(service.GroupRoleManager), wantInvite: true, wantChildren: true, wantSettings: true, wantLeave: true},
+		{name: "admin", access: groupMemberAs(service.GroupRoleAdmin), wantInvite: true, wantSettings: true, wantLeave: true},
+		{name: "manager", access: groupMemberAs(service.GroupRoleManager), wantInvite: true, wantSettings: true, wantLeave: true},
 		{name: "coach", access: groupMemberAs(service.GroupRoleCoach), wantInvite: true, wantLeave: true},
-		{name: "parent", access: groupMemberAs(service.GroupRoleParent), wantChildren: true, wantLeave: true},
+		{name: "parent", access: groupMemberAs(service.GroupRoleParent), wantLeave: true},
 		{name: "player", access: groupMemberAs(service.GroupRolePlayer), wantLeave: true},
-		{name: "site administrator", access: groupAccessAs(service.GroupAccessGrants{SiteAdmin: true}), wantInvite: true, wantChildren: true, wantSettings: true},
+		{name: "site administrator", access: groupAccessAs(service.GroupAccessGrants{SiteAdmin: true}), wantInvite: true, wantSettings: true},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -254,7 +253,7 @@ func TestGroupOverviewByRole(t *testing.T) {
 			}
 			checks := map[string]bool{
 				`data-section="invites"`:  test.wantInvite,
-				`data-section="children"`: test.wantChildren,
+				`data-section="children"`: false, // removed from the menus (#46)
 				`data-section="settings"`: test.wantSettings,
 				"Leave group":             test.wantLeave,
 			}

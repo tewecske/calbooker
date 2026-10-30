@@ -48,6 +48,15 @@
               </select>
             </fieldset>
           {{end}}
+          {{if .ChildOptions}}
+            <fieldset class="fieldset">
+              <label class="fieldset-legend" for="calendar-filter-child">{{$L.calendar_filter_child}}</label>
+              <select id="calendar-filter-child" class="select select-sm" name="child">
+                <option value="">{{$L.calendar_all_children}}</option>
+                {{range .ChildOptions}}<option value="{{.Value}}"{{if .Selected}} selected{{end}}>{{.Label}}</option>{{end}}
+              </select>
+            </fieldset>
+          {{end}}
           {{if .ResourceOptions}}
             <fieldset class="fieldset">
               <label class="fieldset-legend" for="calendar-filter-resource">{{$L.calendar_filter_resource}}</label>
@@ -68,6 +77,11 @@
           {{if .Filtered}}<a class="btn btn-sm btn-ghost" href="{{.ClearURL}}" data-testid="calendar-clear">{{$L.calendar_clear}}</a>{{end}}
         </form>
 
+        {{if .Children}}
+          <ul class="flex flex-wrap items-center gap-3 text-sm" aria-label="{{$L.calendar_children_legend}}" data-testid="calendar-children">
+            {{range .Children}}<li class="flex items-center gap-1"><span class="child-dot {{.Class}}" aria-hidden="true"></span>{{.Name}}</li>{{end}}
+          </ul>
+        {{end}}
         <p class="text-sm opacity-70" data-testid="calendar-time-zone">{{$L.events_times_in}} {{.TimeZone}}</p>
         {{if .Empty}}
           <p class="text-sm opacity-70" role="status" data-testid="calendar-empty">{{if .Filtered}}{{$L.calendar_empty_filtered}}{{else}}{{$L.calendar_empty}}{{end}}</p>
@@ -95,6 +109,7 @@
                             <a class="link font-semibold{{if .Cancelled}} line-through{{end}}" href="{{.URL}}">{{.Title}}</a>
                             {{template "event-kind-badge" .}}
                             {{if .Cancelled}}<span class="badge badge-error badge-soft badge-sm">{{$L.events_cancelled}}</span>{{end}}
+                            {{range .Children}}<span class="badge badge-outline badge-sm gap-1" data-calendar-for="{{.Name}}"><span class="child-dot {{.Class}}" aria-hidden="true"></span>{{.Name}}</span>{{end}}
                             {{range .Answers}}<span class="badge badge-outline badge-sm" data-calendar-status="{{.Code}}"{{if not .Self}} data-calendar-child="true"{{end}}>{{if .Self}}<span class="sr-only">{{$L.calendar_your_status}} </span>{{end}}{{.Label}}</span>{{end}}
                           </p>
                           {{if or .Teams .Place}}<p class="text-sm opacity-70">{{.Teams}}{{if and .Teams .Place}} · {{end}}{{.Place}}</p>{{end}}

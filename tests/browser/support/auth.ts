@@ -68,6 +68,20 @@ export async function signInAtProvider(
   );
 }
 
+/** Where a signed-in account can start (#46): home, or a group or team page. */
+export const landingPattern = new RegExp(`^${appURL.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}/en/(home|groups/[a-z0-9-]+(/.*)?)$`);
+
+/**
+ * Waits for the sign-in to finish on any start page (the landing depends on
+ * the account's groups and teams) and moves to home, where callers expect to
+ * start.
+ */
+export async function settleOnHome(page: Page): Promise<void> {
+  await expect(page).toHaveURL(landingPattern);
+  await page.goto(`${appURL}/en/home`);
+  await expect(page).toHaveURL(`${appURL}/en/home`);
+}
+
 /** Starts calbooker's single sign-on flow from its sign-in page. */
 export async function startSignIn(page: Page): Promise<void> {
   await page.goto(`${appURL}/en/sign-in`);
@@ -103,7 +117,7 @@ export async function signIn(browser: Browser, email: string, password: string):
   await startSignIn(page);
   await expect(page).toHaveURL(`${providerURL}/en/sign-in`);
   await signInAtProvider(page, email, password, { retryInvalidCredentials: true });
-  await expect(page).toHaveURL(`${appURL}/en/home`);
+  await settleOnHome(page);
   return { context, page, email, password };
 }
 

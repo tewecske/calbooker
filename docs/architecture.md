@@ -425,7 +425,7 @@ get `service.ErrGroupNotFound`, which handlers render as 404.
   `/{language}/groups/{group}/kinds` (POSTs `/kinds/{events|resources}[/{id}[/archive|/move|/delete]]`)
   for admins and managers; the event `training` kind is protected. Audited as
   `group.event_kind.*` and `group.resource_kind.*`.
-
+- Child colours (#46): when the viewer guards children (`ChildUserIDs`),
   `ProfileService.Children` supplies each child and their teams; events get
   the dots of the children whose teams they include (`WeekGridItem.Markers`
   on the grid, `CalendarItemView.Children` in the day list) and the

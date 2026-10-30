@@ -106,7 +106,7 @@ type calendarSelection struct {
 // registerCalendarRoutes registers each group's weekly calendar.
 func registerCalendarRoutes(mux *http.ServeMux, groups *groupHandler) {
 	for _, prefix := range localizedPrefixes() {
-		mux.HandleFunc("GET "+prefix+"/groups/{id}/calendar", groups.calendar)
+		mux.HandleFunc("GET "+prefix+"/groups/{group}/calendar", groups.calendar)
 	}
 }
 
@@ -153,7 +153,7 @@ func (h *groupHandler) loadCalendar(writer http.ResponseWriter, request *http.Re
 	page := &CalendarView{
 		TimeZone:    group.TimeZone,
 		Week:        service.FormatSeasonDate(week.Monday),
-		BaseURL:     h.groupPath(language, group.ID, "/calendar"),
+		BaseURL:     h.groupPath(language, group.Slug, "/calendar"),
 		CurrentWeek: week.Contains(today),
 	}
 	teamOptions, ok := h.calendarTeamOptions(writer, request, current)
@@ -280,7 +280,7 @@ func (h *groupHandler) calendarGroups(writer http.ResponseWriter, request *http.
 	}
 	groups := make([]CalendarGroupView, 0, len(summaries))
 	for _, summary := range summaries {
-		base := h.groupPath(current.language, summary.Group.ID, "/calendar")
+		base := h.groupPath(current.language, summary.Group.Slug, "/calendar")
 		groups = append(groups, CalendarGroupView{
 			Name:    summary.Group.Name,
 			URL:     calendarURL(base, monday, service.CalendarFilter{Kind: kind}),
@@ -332,7 +332,7 @@ func (h *groupHandler) calendarItems(language locale.Code, group service.Group, 
 	)
 	cancelled := h.t(language, "events.cancelled")
 	for _, event := range events {
-		row := h.eventRow(language, group.ID, group.TimeZone, event)
+		row := h.eventRow(language, group.Slug, group.TimeZone, event)
 		segments := week.Segments(event)
 		for _, segment := range segments {
 			entry := CalendarItemView{

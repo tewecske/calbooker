@@ -11,6 +11,9 @@ import (
 	"unicode/utf8"
 )
 
+// slugCreateAttempts bounds retries when two requests pick the same slug.
+const slugCreateAttempts = 3
+
 const (
 	maxGroupNameLength = 64
 	maxTimeZoneLength  = 64
@@ -67,8 +70,10 @@ const (
 
 // Group is a club with an optimistic-lock revision.
 type Group struct {
-	ID        int64
-	Name      string
+	ID   int64
+	Name string
+	// Slug addresses the group in URLs; unique site-wide.
+	Slug      string
 	NameNorm  string
 	TimeZone  string
 	CreatedBy *int64
@@ -131,6 +136,10 @@ type GroupActor struct {
 // revision so stale writes are reported as conflicts.
 type GroupRepository interface {
 	FindGroupByID(context.Context, int64) (Group, error)
+	// FindGroupBySlug returns ErrGroupNotFound for an unknown slug.
+	FindGroupBySlug(context.Context, string) (Group, error)
+	// GroupSlugTaken reports whether a group other than exceptID uses slug.
+	GroupSlugTaken(ctx context.Context, slug string, exceptID int64) (bool, error)
 	ListGroupsForUser(context.Context, int64) ([]GroupSummary, error)
 	// ListAllGroupsForUser returns every group with the account's real
 	// roles when present. It backs site-administrator listing.
@@ -221,15 +230,36 @@ func (s *GroupService) Create(ctx context.Context, userID int64, origin, name, t
 		return GroupSummary{}, ErrGroupRequiresAccount
 	}
 
-	group := Group{Name: strings.TrimSpace(name), NameNorm: normalized, TimeZone: zone, CreatedBy: &userID, CreatedAt: s.now().Unix()}
-	created, membership, err := s.memberships.CreateGroupWithAdmin(ctx, group, userID)
-	if err != nil {
-		return GroupSummary{}, fmt.Errorf("create group: %w", err)
+	var (
+		created    Group
+		membership GroupMembership
+		inserted   bool
+	)
+	for attempt := 0; attempt < slugCreateAttempts; attempt++ {
+		slug, err := uniqueSlug(name, "group", func(candidate string) (bool, error) {
+			return s.groups.GroupSlugTaken(ctx, candidate, 0)
+		})
+		if err != nil {
+			return GroupSummary{}, fmt.Errorf("find group slug: %w", err)
+		}
+		group := Group{Name: strings.TrimSpace(name), Slug: slug, NameNorm: normalized, TimeZone: zone, CreatedBy: &userID, CreatedAt: s.now().Unix()}
+		created, membership, err = s.memberships.CreateGroupWithAdmin(ctx, group, userID)
+		if errors.Is(err, ErrSlugTaken) {
+			continue
+		}
+		if err != nil {
+			return GroupSummary{}, fmt.Errorf("create group: %w", err)
+		}
+		inserted = true
+		break
+	}
+	if !inserted {
+		return GroupSummary{}, ErrSlugTaken
 	}
 	if err := validateCreatedGroup(created, membership, userID); err != nil {
 		return GroupSummary{}, err
 	}
-	s.record(ctx, userID, origin, created.ID, AuditActionGroupCreated, "name: "+created.Name+"; time zone: "+created.TimeZone)
+	s.record(ctx, userID, origin, created.ID, AuditActionGroupCreated, "name: "+created.Name+"; slug: "+created.Slug+"; time zone: "+created.TimeZone)
 	return GroupSummary{Group: created, MemberCount: 1, Roles: []string{GroupRoleAdmin}}, nil
 }
 
@@ -294,7 +324,7 @@ func (s *GroupService) Group(ctx context.Context, access *GroupAccess) (Group, e
 
 // UpdateSettings changes the group's name and time zone at the caller's
 // expected revision. Admins and managers only.
-func (s *GroupService) UpdateSettings(ctx context.Context, actor GroupActor, expectedVersion int64, name, timeZone string) (Group, error) {
+func (s *GroupService) UpdateSettings(ctx context.Context, actor GroupActor, expectedVersion int64, name, slug, timeZone string) (Group, error) {
 	if err := s.authorize(ctx, actor, actor.Access.CanManageGroup()); err != nil {
 		return Group{}, err
 	}
@@ -313,18 +343,43 @@ func (s *GroupService) UpdateSettings(ctx context.Context, actor GroupActor, exp
 	if err != nil {
 		return Group{}, err
 	}
+	if strings.TrimSpace(slug) != "" {
+		if group.Slug, err = normalizeSlugInput(slug); err != nil {
+			return Group{}, err
+		}
+		taken, err := s.groups.GroupSlugTaken(ctx, group.Slug, group.ID)
+		if err != nil {
+			return Group{}, fmt.Errorf("check group slug: %w", err)
+		}
+		if taken {
+			return Group{}, ErrSlugTaken
+		}
+	}
 	group.Name = strings.TrimSpace(name)
 	group.NameNorm = normalized
 	group.TimeZone = zone
 	updated, err := s.groups.UpdateGroup(ctx, group, expectedVersion)
 	if err != nil {
-		if IsWriteConflict(err) || errors.Is(err, ErrGroupNotFound) {
+		if IsWriteConflict(err) || errors.Is(err, ErrGroupNotFound) || errors.Is(err, ErrSlugTaken) {
 			return Group{}, err
 		}
 		return Group{}, fmt.Errorf("update group settings: %w", err)
 	}
-	s.recordActor(ctx, actor, AuditActionGroupSettings, "name: "+updated.Name+"; time zone: "+updated.TimeZone)
+	s.recordActor(ctx, actor, AuditActionGroupSettings, "name: "+updated.Name+"; slug: "+updated.Slug+"; time zone: "+updated.TimeZone)
 	return updated, nil
+}
+
+// BySlug resolves a group slug to the group. It does not check access: the
+// caller builds the account's GroupAccess for the returned ID, which answers
+// ErrGroupNotFound to accounts that may not see the group.
+func (s *GroupService) BySlug(ctx context.Context, slug string) (Group, error) {
+	if err := s.validate(ctx); err != nil {
+		return Group{}, err
+	}
+	if ValidateSlug(slug) != nil {
+		return Group{}, ErrGroupNotFound
+	}
+	return s.groups.FindGroupBySlug(ctx, slug)
 }
 
 // Leave removes the acting member from the group. The last administrator

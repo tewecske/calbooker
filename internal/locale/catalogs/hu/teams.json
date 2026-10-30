@@ -36,6 +36,10 @@
     "teams.error.invalid_birth_years": {"text": "Adjon meg 1900 és 2200 közötti születési éveket; az első nem lehet későbbi a másodiknál."},
     "teams.error.invalid_description": {"text": "Adjon meg legfeljebb 255 karakteres leírást."},
     "teams.error.roster_role_missing": {"text": "Előbb adjon a tagnak játékos vagy szülő szerepet."},
-    "teams.error.roster_entry_not_found": {"text": "Ez a tag már nincs a csapatban."}
+    "teams.error.roster_entry_not_found": {"text": "Ez a tag már nincs a csapatban."},
+    "teams.slug": {"text": "Hivatkozásnév"},
+    "teams.slug_help": {"text": "A csapat hivatkozásaiban szerepel. Kisbetűk, számok és kötőjelek; módosítása megváltoztatja a csapat webcímét."},
+    "teams.error.invalid_slug": {"text": "Használjon kisbetűket, számokat és egyes kötőjeleket, legfeljebb 64 karakterig. Csak számok, valamint az olyan szavak, mint a „new” vagy az „edit” nem engedélyezettek."},
+    "teams.error.slug_taken": {"text": "Ezt a hivatkozásnevet már használja a csoport egy másik csapata."}
   }
 }

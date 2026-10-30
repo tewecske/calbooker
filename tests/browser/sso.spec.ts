@@ -102,7 +102,7 @@ test.describe("single sign-on", () => {
     await owner.page.goto(`${appURL}/en/groups`);
     await owner.page.locator("#group-new-name").fill(uniqueName("SSO"));
     await owner.page.locator("#group-new-name").locator("xpath=ancestor::form").getByRole("button").click();
-    await owner.page.waitForURL(/\/en\/groups\/\d+$/);
+    await owner.page.waitForURL(/\/en\/groups\/(?!join$)[a-z0-9-]+$/);
     const groupName = await owner.page.locator("#group-summary-heading").innerText();
     const inviteCode = await createInvite(owner.page, owner.page.url(), { role: "player" });
     expect(inviteCode).toMatch(invitePattern);
@@ -111,7 +111,7 @@ test.describe("single sign-on", () => {
     await guest.goto(`${appURL}/en/groups/join`);
     await guest.locator("#group-invite-code").fill(inviteCode);
     await guest.locator("#group-invite-code").locator("xpath=ancestor::form").getByRole("button").click();
-    await guest.waitForURL(/\/en\/groups\/\d+$/);
+    await guest.waitForURL(/\/en\/groups\/(?!join$)[a-z0-9-]+$/);
     const groupURL = guest.url();
 
     await guest.goto(`${appURL}/en/guest/upgrade`);

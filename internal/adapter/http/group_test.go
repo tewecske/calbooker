@@ -28,8 +28,8 @@ func groupTestDependencies(t *testing.T, access *service.GroupAccess) (Dependenc
 	t.Helper()
 	dependencies := settingsStubDependencies(t)
 	groups := &groupsUseCaseStub{
-		group:    service.Group{ID: 3, Name: "Lions Club", TimeZone: "Europe/Budapest", Version: 2},
-		overview: service.GroupOverview{Group: service.Group{ID: 3, Name: "Lions Club", TimeZone: "Europe/Budapest"}, MemberCount: 2},
+		group:    service.Group{ID: 3, Slug: "lions", Name: "Lions Club", TimeZone: "Europe/Budapest", Version: 2},
+		overview: service.GroupOverview{Group: service.Group{ID: 3, Slug: "lions", Name: "Lions Club", TimeZone: "Europe/Budapest"}, MemberCount: 2},
 	}
 	teams := &teamsUseCaseStub{}
 	dependencies.Groups = groups
@@ -69,7 +69,7 @@ func TestGroupsListRequiresAuthentication(t *testing.T) {
 
 func TestGroupsListRendersRoles(t *testing.T) {
 	dependencies := settingsStubDependencies(t)
-	dependencies.Groups = &groupsUseCaseStub{summaries: []service.GroupSummary{{Group: service.Group{ID: 3, Name: "Lions Club"}, MemberCount: 2, Roles: []string{service.GroupRoleAdmin, service.GroupRoleCoach}}}}
+	dependencies.Groups = &groupsUseCaseStub{summaries: []service.GroupSummary{{Group: service.Group{ID: 3, Slug: "lions", Name: "Lions Club"}, MemberCount: 2, Roles: []string{service.GroupRoleAdmin, service.GroupRoleCoach}}}}
 	response := serveGroups(t, dependencies, http.MethodGet, "/en/groups", "", false)
 	body := response.Body.String()
 	if response.Code != http.StatusOK || !strings.Contains(body, "Lions Club") || !strings.Contains(body, "Administrator, Coach") {
@@ -83,7 +83,7 @@ func TestGroupsListRendersRoles(t *testing.T) {
 func TestGroupsListLabelsAllGroupsAndNonMembersForAdmin(t *testing.T) {
 	dependencies := settingsStubDependencies(t)
 	dependencies.Users = testUserFinder{user: service.User{ID: 7, IsAdmin: true, Version: 1}}
-	dependencies.Groups = &groupsUseCaseStub{summaries: []service.GroupSummary{{Group: service.Group{ID: 4, Name: "Other"}, MemberCount: 4}}}
+	dependencies.Groups = &groupsUseCaseStub{summaries: []service.GroupSummary{{Group: service.Group{ID: 4, Slug: "other", Name: "Other"}, MemberCount: 4}}}
 	body := serveGroups(t, dependencies, http.MethodGet, "/en/groups", "", false).Body.String()
 	for _, want := range []string{"All groups", "Other", "Not a member"} {
 		if !strings.Contains(body, want) {
@@ -113,11 +113,11 @@ func TestGroupsGuestSeesWhyTheyCannotCreate(t *testing.T) {
 
 func TestGroupsCreate(t *testing.T) {
 	dependencies := settingsStubDependencies(t)
-	groups := &groupsUseCaseStub{summary: service.GroupSummary{Group: service.Group{ID: 3, Name: "Club"}}}
+	groups := &groupsUseCaseStub{summary: service.GroupSummary{Group: service.Group{ID: 3, Slug: "lions", Name: "Club"}}}
 	dependencies.Groups = groups
 	response := serveGroups(t, dependencies, http.MethodPost, "/en/groups", "name=Club&time_zone=Europe%2FVienna", false)
-	if response.Code != http.StatusSeeOther || response.Header().Get("Location") != "/en/groups/3" {
-		t.Fatalf("create = %d %q, want 303 /en/groups/3", response.Code, response.Header().Get("Location"))
+	if response.Code != http.StatusSeeOther || response.Header().Get("Location") != "/en/groups/lions" {
+		t.Fatalf("create = %d %q, want 303 /en/groups/lions", response.Code, response.Header().Get("Location"))
 	}
 	if groups.createdZone != "Europe/Vienna" {
 		t.Fatalf("time zone = %q, want Europe/Vienna", groups.createdZone)
@@ -142,31 +142,31 @@ func TestGroupsCreate(t *testing.T) {
 // route answers 404 to an account that is not a member.
 func TestGroupRoutesAnswerNotFoundToOutsiders(t *testing.T) {
 	routes := []struct{ method, path string }{
-		{http.MethodGet, "/en/groups/3"},
-		{http.MethodGet, "/en/groups/3/invites"},
-		{http.MethodPost, "/en/groups/3/invites"},
-		{http.MethodPost, "/en/groups/3/invites/5/revoke"},
-		{http.MethodGet, "/en/groups/3/children"},
-		{http.MethodPost, "/en/groups/3/children"},
-		{http.MethodPost, "/en/groups/3/children/9"},
-		{http.MethodPost, "/en/groups/3/children/9/delete"},
-		{http.MethodPost, "/en/groups/3/guardians/add"},
-		{http.MethodPost, "/en/groups/3/guardians/remove"},
-		{http.MethodPost, "/en/groups/3/leave"},
-		{http.MethodGet, "/en/groups/3/settings"},
-		{http.MethodPost, "/en/groups/3/settings"},
-		{http.MethodGet, "/en/groups/3/members"},
-		{http.MethodPost, "/en/groups/3/members/8/roles/add"},
-		{http.MethodPost, "/en/groups/3/members/8/roles/remove"},
-		{http.MethodPost, "/en/groups/3/members/8/remove"},
-		{http.MethodGet, "/en/groups/3/teams"},
-		{http.MethodPost, "/en/groups/3/teams"},
-		{http.MethodGet, "/en/groups/3/teams/4"},
-		{http.MethodPost, "/en/groups/3/teams/4"},
-		{http.MethodPost, "/en/groups/3/teams/4/archive"},
-		{http.MethodPost, "/en/groups/3/teams/4/roster/add"},
-		{http.MethodPost, "/en/groups/3/teams/4/roster/remove"},
-		{http.MethodGet, "/hu/groups/3/members"},
+		{http.MethodGet, "/en/groups/lions"},
+		{http.MethodGet, "/en/groups/lions/invites"},
+		{http.MethodPost, "/en/groups/lions/invites"},
+		{http.MethodPost, "/en/groups/lions/invites/5/revoke"},
+		{http.MethodGet, "/en/groups/lions/children"},
+		{http.MethodPost, "/en/groups/lions/children"},
+		{http.MethodPost, "/en/groups/lions/children/9"},
+		{http.MethodPost, "/en/groups/lions/children/9/delete"},
+		{http.MethodPost, "/en/groups/lions/guardians/add"},
+		{http.MethodPost, "/en/groups/lions/guardians/remove"},
+		{http.MethodPost, "/en/groups/lions/leave"},
+		{http.MethodGet, "/en/groups/lions/settings"},
+		{http.MethodPost, "/en/groups/lions/settings"},
+		{http.MethodGet, "/en/groups/lions/members"},
+		{http.MethodPost, "/en/groups/lions/members/8/roles/add"},
+		{http.MethodPost, "/en/groups/lions/members/8/roles/remove"},
+		{http.MethodPost, "/en/groups/lions/members/8/remove"},
+		{http.MethodGet, "/en/groups/lions/teams"},
+		{http.MethodPost, "/en/groups/lions/teams"},
+		{http.MethodGet, "/en/groups/lions/teams/t4"},
+		{http.MethodPost, "/en/groups/lions/teams/t4"},
+		{http.MethodPost, "/en/groups/lions/teams/t4/archive"},
+		{http.MethodPost, "/en/groups/lions/teams/t4/roster/add"},
+		{http.MethodPost, "/en/groups/lions/teams/t4/roster/remove"},
+		{http.MethodGet, "/hu/groups/lions/members"},
 	}
 	for _, route := range routes {
 		t.Run(route.method+" "+route.path, func(t *testing.T) {
@@ -199,18 +199,18 @@ func TestGroupRoutesAnswerForbiddenToInsufficientRoles(t *testing.T) {
 		form   string
 		setup  func(*groupsUseCaseStub, *teamsUseCaseStub)
 	}{
-		{name: "settings page", method: http.MethodGet, path: "/en/groups/3/settings"},
-		{name: "settings update", method: http.MethodPost, path: "/en/groups/3/settings", form: "version=2&name=X&time_zone=UTC", setup: func(g *groupsUseCaseStub, _ *teamsUseCaseStub) { g.writeErr = service.ErrGroupForbidden }},
-		{name: "role grant", method: http.MethodPost, path: "/en/groups/3/members/8/roles/add", form: "version=0&role=coach", setup: func(g *groupsUseCaseStub, _ *teamsUseCaseStub) { g.writeErr = service.ErrGroupForbidden }},
-		{name: "member removal", method: http.MethodPost, path: "/en/groups/3/members/8/remove", form: "version=0", setup: func(g *groupsUseCaseStub, _ *teamsUseCaseStub) { g.writeErr = service.ErrGroupForbidden }},
-		{name: "team creation", method: http.MethodPost, path: "/en/groups/3/teams", form: "name=A&birth_year_from=2015&birth_year_to=2016", setup: func(_ *groupsUseCaseStub, s *teamsUseCaseStub) { s.writeErr = service.ErrGroupForbidden }},
-		{name: "roster change", method: http.MethodPost, path: "/en/groups/3/teams/4/roster/add", form: "entry=8:player", setup: func(_ *groupsUseCaseStub, s *teamsUseCaseStub) { s.writeErr = service.ErrGroupForbidden }},
+		{name: "settings page", method: http.MethodGet, path: "/en/groups/lions/settings"},
+		{name: "settings update", method: http.MethodPost, path: "/en/groups/lions/settings", form: "version=2&name=X&time_zone=UTC", setup: func(g *groupsUseCaseStub, _ *teamsUseCaseStub) { g.writeErr = service.ErrGroupForbidden }},
+		{name: "role grant", method: http.MethodPost, path: "/en/groups/lions/members/8/roles/add", form: "version=0&role=coach", setup: func(g *groupsUseCaseStub, _ *teamsUseCaseStub) { g.writeErr = service.ErrGroupForbidden }},
+		{name: "member removal", method: http.MethodPost, path: "/en/groups/lions/members/8/remove", form: "version=0", setup: func(g *groupsUseCaseStub, _ *teamsUseCaseStub) { g.writeErr = service.ErrGroupForbidden }},
+		{name: "team creation", method: http.MethodPost, path: "/en/groups/lions/teams", form: "name=A&birth_year_from=2015&birth_year_to=2016", setup: func(_ *groupsUseCaseStub, s *teamsUseCaseStub) { s.writeErr = service.ErrGroupForbidden }},
+		{name: "roster change", method: http.MethodPost, path: "/en/groups/lions/teams/t4/roster/add", form: "entry=8:player", setup: func(_ *groupsUseCaseStub, s *teamsUseCaseStub) { s.writeErr = service.ErrGroupForbidden }},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			for _, htmx := range []bool{false, true} {
 				dependencies, groups, teams := groupTestDependencies(t, player)
-				teams.detail = service.TeamDetail{Team: service.Team{ID: 4, GroupID: 3, Name: "U10"}}
+				teams.detail = service.TeamDetail{Team: service.Team{ID: 4, Slug: "t4", GroupID: 3, Name: "U10"}}
 				if test.setup != nil {
 					test.setup(groups, teams)
 				}
@@ -246,7 +246,7 @@ func TestGroupOverviewByRole(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			dependencies, _, _ := groupTestDependencies(t, test.access)
-			response := serveGroups(t, dependencies, http.MethodGet, "/en/groups/3", "", false)
+			response := serveGroups(t, dependencies, http.MethodGet, "/en/groups/lions", "", false)
 			body := response.Body.String()
 			if response.Code != http.StatusOK || !strings.Contains(body, `id="group-summary-heading"`) || !strings.Contains(body, "Europe/Budapest") {
 				t.Fatalf("status = %d, overview incomplete", response.Code)
@@ -268,12 +268,12 @@ func TestGroupOverviewByRole(t *testing.T) {
 
 func TestGroupSettings(t *testing.T) {
 	dependencies, groups, _ := groupTestDependencies(t, groupMemberAs(service.GroupRoleManager))
-	page := serveGroups(t, dependencies, http.MethodGet, "/en/groups/3/settings", "", false)
+	page := serveGroups(t, dependencies, http.MethodGet, "/en/groups/lions/settings", "", false)
 	if page.Code != http.StatusOK || !strings.Contains(page.Body.String(), `<input type="hidden" name="version" value="2">`) {
 		t.Fatalf("settings page = %d, want the form with the group revision", page.Code)
 	}
 
-	saved := serveGroups(t, dependencies, http.MethodPost, "/en/groups/3/settings", "version=2&name=New&time_zone=Europe%2FVienna", true)
+	saved := serveGroups(t, dependencies, http.MethodPost, "/en/groups/lions/settings", "version=2&name=New&time_zone=Europe%2FVienna", true)
 	if saved.Code != http.StatusOK || !strings.Contains(saved.Body.String(), "Group settings saved.") || !strings.Contains(saved.Body.String(), `id="alerts"`) {
 		t.Fatalf("save = %d, want fragment with success alert", saved.Code)
 	}
@@ -282,11 +282,11 @@ func TestGroupSettings(t *testing.T) {
 	}
 
 	groups.writeErr = service.ErrOptimisticLockConflict
-	if conflict := serveGroups(t, dependencies, http.MethodPost, "/en/groups/3/settings", "version=1&name=New&time_zone=UTC", false); conflict.Code != http.StatusConflict || !strings.Contains(conflict.Body.String(), "changed elsewhere") {
+	if conflict := serveGroups(t, dependencies, http.MethodPost, "/en/groups/lions/settings", "version=1&name=New&time_zone=UTC", false); conflict.Code != http.StatusConflict || !strings.Contains(conflict.Body.String(), "changed elsewhere") {
 		t.Fatalf("stale save = %d, want 409 with reload message", conflict.Code)
 	}
 	groups.writeErr = service.ErrInvalidTimeZone
-	invalid := serveGroups(t, dependencies, http.MethodPost, "/en/groups/3/settings", "version=2&name=New&time_zone=Mars", false)
+	invalid := serveGroups(t, dependencies, http.MethodPost, "/en/groups/lions/settings", "version=2&name=New&time_zone=Mars", false)
 	if invalid.Code != http.StatusUnprocessableEntity || !strings.Contains(invalid.Body.String(), `<option value="Mars" selected>`) {
 		t.Fatalf("invalid zone = %d, want 422 keeping the submitted value", invalid.Code)
 	}
@@ -300,8 +300,8 @@ func TestGroupMembersPage(t *testing.T) {
 	}
 	dependencies, groups, _ := groupTestDependencies(t, groupMemberAs(service.GroupRoleAdmin))
 	groups.members = members
-	body := serveGroups(t, dependencies, http.MethodGet, "/en/groups/3/members", "", false).Body.String()
-	for _, want := range []string{"player@example.test", `/en/groups/3/members/8/roles/add`, `value="4"`, `<option value="parent">Parent</option>`, "Guest", "Member #7"} {
+	body := serveGroups(t, dependencies, http.MethodGet, "/en/groups/lions/members", "", false).Body.String()
+	for _, want := range []string{"player@example.test", `/en/groups/lions/members/8/roles/add`, `value="4"`, `<option value="parent">Parent</option>`, "Guest", "Member #7"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("admin members page missing %q", want)
 		}
@@ -319,7 +319,7 @@ func TestGroupMembersPage(t *testing.T) {
 
 	dependencies, groups, _ = groupTestDependencies(t, groupMemberAs(service.GroupRolePlayer))
 	groups.members = []service.GroupMember{{UserID: 7, Roles: []string{service.GroupRolePlayer}}}
-	body = serveGroups(t, dependencies, http.MethodGet, "/en/groups/3/members", "", false).Body.String()
+	body = serveGroups(t, dependencies, http.MethodGet, "/en/groups/lions/members", "", false).Body.String()
 	if strings.Contains(body, "/roles/add") || !strings.Contains(body, "members of your teams") {
 		t.Error("player members page must be read only and explain the limited list")
 	}
@@ -327,11 +327,11 @@ func TestGroupMembersPage(t *testing.T) {
 
 func TestGroupRoleChanges(t *testing.T) {
 	dependencies, groups, _ := groupTestDependencies(t, groupMemberAs(service.GroupRoleAdmin))
-	added := serveGroups(t, dependencies, http.MethodPost, "/en/groups/3/members/8/roles/add", "version=4&role=parent", true)
+	added := serveGroups(t, dependencies, http.MethodPost, "/en/groups/lions/members/8/roles/add", "version=4&role=parent", true)
 	if added.Code != http.StatusOK || !strings.Contains(added.Body.String(), "Role added.") || groups.lastRole != "parent" || groups.lastTarget != 8 || groups.lastVersion != 4 {
 		t.Fatalf("add role = %d (role %q target %d version %d)", added.Code, groups.lastRole, groups.lastTarget, groups.lastVersion)
 	}
-	removed := serveGroups(t, dependencies, http.MethodPost, "/en/groups/3/members/8/roles/remove", "version=5&role=parent", true)
+	removed := serveGroups(t, dependencies, http.MethodPost, "/en/groups/lions/members/8/roles/remove", "version=5&role=parent", true)
 	if removed.Code != http.StatusOK || !strings.Contains(removed.Body.String(), "Role removed.") {
 		t.Fatalf("remove role = %d", removed.Code)
 	}
@@ -348,7 +348,7 @@ func TestGroupRoleChanges(t *testing.T) {
 		{service.ErrInvalidGroupRole, http.StatusUnprocessableEntity, "valid role"},
 	} {
 		groups.writeErr = test.err
-		response := serveGroups(t, dependencies, http.MethodPost, "/en/groups/3/members/8/roles/remove", "version=5&role=admin", false)
+		response := serveGroups(t, dependencies, http.MethodPost, "/en/groups/lions/members/8/roles/remove", "version=5&role=admin", false)
 		if response.Code != test.status || !strings.Contains(response.Body.String(), test.text) {
 			t.Errorf("error %v = %d, want %d with %q", test.err, response.Code, test.status, test.text)
 		}
@@ -357,17 +357,17 @@ func TestGroupRoleChanges(t *testing.T) {
 
 func TestGroupWritesRequireARevision(t *testing.T) {
 	for _, test := range []struct{ name, path, body string }{
-		{"role without version", "/en/groups/3/members/8/roles/add", "role=coach"},
-		{"role with malformed version", "/en/groups/3/members/8/roles/remove", "role=coach&version=latest"},
-		{"remove without version", "/en/groups/3/members/8/remove", ""},
-		{"settings without version", "/en/groups/3/settings", "name=X&time_zone=UTC"},
-		{"team without version", "/en/groups/3/teams/4", "name=X&birth_year_from=2015&birth_year_to=2016"},
-		{"archive without version", "/en/groups/3/teams/4/archive", "archived=true"},
+		{"role without version", "/en/groups/lions/members/8/roles/add", "role=coach"},
+		{"role with malformed version", "/en/groups/lions/members/8/roles/remove", "role=coach&version=latest"},
+		{"remove without version", "/en/groups/lions/members/8/remove", ""},
+		{"settings without version", "/en/groups/lions/settings", "name=X&time_zone=UTC"},
+		{"team without version", "/en/groups/lions/teams/t4", "name=X&birth_year_from=2015&birth_year_to=2016"},
+		{"archive without version", "/en/groups/lions/teams/t4/archive", "archived=true"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			// The stubs would succeed, so only the missing revision can refuse.
 			dependencies, groups, teams := groupTestDependencies(t, groupMemberAs(service.GroupRoleAdmin))
-			teams.detail = service.TeamDetail{Team: service.Team{ID: 4, GroupID: 3, Name: "U10"}}
+			teams.detail = service.TeamDetail{Team: service.Team{ID: 4, Slug: "t4", GroupID: 3, Name: "U10"}}
 			response := serveGroups(t, dependencies, http.MethodPost, test.path, test.body, true)
 			if response.Code != http.StatusUnprocessableEntity || !strings.Contains(response.Body.String(), "changed elsewhere") {
 				t.Fatalf("status = %d, want 422 with the reload message", response.Code)
@@ -390,14 +390,14 @@ func TestGroupsJoin(t *testing.T) {
 	if response.Code != http.StatusUnprocessableEntity || strings.Contains(response.Body.String(), "UNKNOWN") {
 		t.Fatalf("invalid code status = %d, want 422 without echoing the code", response.Code)
 	}
-	dependencies.JoinGroup = &rateLimitedJoinStub{redemption: service.InviteRedemption{Membership: service.GroupMembership{GroupID: 3}}}
-	if response := serveGroups(t, dependencies, http.MethodPost, "/en/groups/join", "code=ABCDEFGHJKLM", false); response.Header().Get("Location") != "/en/groups/3" {
-		t.Fatalf("join redirect = %q, want /en/groups/3", response.Header().Get("Location"))
+	dependencies.JoinGroup = &rateLimitedJoinStub{redemption: service.InviteRedemption{Membership: service.GroupMembership{GroupID: 3}, GroupSlug: "lions"}}
+	if response := serveGroups(t, dependencies, http.MethodPost, "/en/groups/join", "code=ABCDEFGHJKLM", false); response.Header().Get("Location") != "/en/groups/lions" {
+		t.Fatalf("join redirect = %q, want /en/groups/lions", response.Header().Get("Location"))
 	}
 	// A team invite lands on the team page.
-	dependencies.JoinGroup = &rateLimitedJoinStub{redemption: service.InviteRedemption{Membership: service.GroupMembership{GroupID: 3}, TeamID: 4}}
-	if response := serveGroups(t, dependencies, http.MethodPost, "/en/groups/join", "code=ABCDEFGHJKLM", false); response.Header().Get("Location") != "/en/groups/3/teams/4" {
-		t.Fatalf("team join redirect = %q, want /en/groups/3/teams/4", response.Header().Get("Location"))
+	dependencies.JoinGroup = &rateLimitedJoinStub{redemption: service.InviteRedemption{Membership: service.GroupMembership{GroupID: 3}, GroupSlug: "lions", TeamID: 4, TeamSlug: "t4"}}
+	if response := serveGroups(t, dependencies, http.MethodPost, "/en/groups/join", "code=ABCDEFGHJKLM", false); response.Header().Get("Location") != "/en/groups/lions/teams/t4" {
+		t.Fatalf("team join redirect = %q, want /en/groups/lions/teams/t4", response.Header().Get("Location"))
 	}
 	for _, test := range []struct {
 		err  error
@@ -418,11 +418,11 @@ func TestGroupsJoin(t *testing.T) {
 
 func TestGroupsLeaveRedirectsToList(t *testing.T) {
 	dependencies, _, _ := groupTestDependencies(t, groupMemberAs(service.GroupRolePlayer))
-	response := serveGroups(t, dependencies, http.MethodPost, "/en/groups/3/leave", "", false)
+	response := serveGroups(t, dependencies, http.MethodPost, "/en/groups/lions/leave", "", false)
 	if response.Code != http.StatusSeeOther || response.Header().Get("Location") != "/en/groups" {
 		t.Fatalf("leave = %d %q, want 303 /en/groups", response.Code, response.Header().Get("Location"))
 	}
-	htmx := serveGroups(t, dependencies, http.MethodPost, "/en/groups/3/leave", "", true)
+	htmx := serveGroups(t, dependencies, http.MethodPost, "/en/groups/lions/leave", "", true)
 	if htmx.Code != http.StatusOK || htmx.Header().Get("HX-Redirect") != "/en/groups" {
 		t.Fatalf("HTMX leave = %d %q, want HX-Redirect /en/groups", htmx.Code, htmx.Header().Get("HX-Redirect"))
 	}
@@ -484,6 +484,7 @@ type groupsUseCaseStub struct {
 	createdZone string
 	lastVersion int64
 	lastName    string
+	lastSlug    string
 	lastZone    string
 	lastOrigin  string
 	lastRole    string
@@ -506,7 +507,29 @@ func (s *groupsUseCaseStub) Overview(context.Context, *service.GroupAccess) (ser
 
 func (s *groupsUseCaseStub) Group(context.Context, *service.GroupAccess) (service.Group, error) {
 	s.calls++
-	return s.group, nil
+	return s.stubGroup(), nil
+}
+
+// stubGroup is the group the slug "lions" resolves to (group 3).
+func (s *groupsUseCaseStub) stubGroup() service.Group {
+	group := s.group
+	if group.ID == 0 {
+		group.ID = 3
+	}
+	if group.Slug == "" {
+		group.Slug = "lions"
+	}
+	return group
+}
+
+// BySlug resolves "lions" to the stub group and every other slug to not
+// found. It does not count as a use case call: it runs before the access
+// check.
+func (s *groupsUseCaseStub) BySlug(_ context.Context, slug string) (service.Group, error) {
+	if group := s.stubGroup(); slug == group.Slug {
+		return group, nil
+	}
+	return service.Group{}, service.ErrGroupNotFound
 }
 
 func (s *groupsUseCaseStub) write() error {
@@ -515,9 +538,13 @@ func (s *groupsUseCaseStub) write() error {
 	return s.writeErr
 }
 
-func (s *groupsUseCaseStub) UpdateSettings(_ context.Context, actor service.GroupActor, version int64, name, timeZone string) (service.Group, error) {
-	s.lastVersion, s.lastName, s.lastZone, s.lastOrigin = version, name, timeZone, actor.Origin
-	return s.group, s.write()
+func (s *groupsUseCaseStub) UpdateSettings(_ context.Context, actor service.GroupActor, version int64, name, slug, timeZone string) (service.Group, error) {
+	s.lastVersion, s.lastName, s.lastSlug, s.lastZone, s.lastOrigin = version, name, slug, timeZone, actor.Origin
+	group := s.stubGroup()
+	if slug != "" {
+		group.Slug = slug
+	}
+	return group, s.write()
 }
 
 func (s *groupsUseCaseStub) Leave(context.Context, *service.GroupAccess) error {

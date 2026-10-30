@@ -44,7 +44,7 @@ func TestResourcesListByRole(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			dependencies, resources := resourceDependencies(t, test.access)
-			response := serveGroups(t, dependencies, http.MethodGet, "/en/groups/3/resources", "", false)
+			response := serveGroups(t, dependencies, http.MethodGet, "/en/groups/lions/resources", "", false)
 			if response.Code != test.wantStatus {
 				t.Fatalf("status = %d, want %d", response.Code, test.wantStatus)
 			}
@@ -55,7 +55,7 @@ func TestResourcesListByRole(t *testing.T) {
 				}
 				return
 			}
-			for _, want := range []string{`id="group-resources-heading"`, "Main field", "North end", "Field", `data-testid="resource-capacity">2<`, "Archived resources", "Old hall", "Sports hall", `data-section="resources"`, `href="/en/groups/3/resources/4"`} {
+			for _, want := range []string{`id="group-resources-heading"`, "Main field", "North end", "Field", `data-testid="resource-capacity">2<`, "Archived resources", "Old hall", "Sports hall", `data-section="resources"`, `href="/en/groups/lions/resources/4"`} {
 				if !strings.Contains(body, want) {
 					t.Errorf("resources page missing %q", want)
 				}
@@ -80,7 +80,7 @@ func TestResourcesNavigationFollowsAccess(t *testing.T) {
 		{groupMemberAs(service.GroupRolePlayer), false},
 	} {
 		dependencies, _ := resourceDependencies(t, test.access)
-		body := serveGroups(t, dependencies, http.MethodGet, "/en/groups/3", "", false).Body.String()
+		body := serveGroups(t, dependencies, http.MethodGet, "/en/groups/lions", "", false).Body.String()
 		if strings.Contains(body, `data-section="resources"`) != test.want {
 			t.Errorf("roles %v: resources tab shown = %v, want %v", test.access.Roles(), !test.want, test.want)
 		}
@@ -91,11 +91,11 @@ func TestResourcesOutsiderGetsNotFound(t *testing.T) {
 	dependencies, resources := resourceDependencies(t, nil)
 	dependencies.GroupAccess = &groupAccessStub{err: service.ErrGroupNotFound}
 	for _, test := range []struct{ method, target string }{
-		{http.MethodGet, "/en/groups/3/resources"},
-		{http.MethodPost, "/en/groups/3/resources"},
-		{http.MethodGet, "/en/groups/3/resources/4"},
-		{http.MethodPost, "/en/groups/3/resources/4"},
-		{http.MethodPost, "/en/groups/3/resources/4/archive"},
+		{http.MethodGet, "/en/groups/lions/resources"},
+		{http.MethodPost, "/en/groups/lions/resources"},
+		{http.MethodGet, "/en/groups/lions/resources/4"},
+		{http.MethodPost, "/en/groups/lions/resources/4"},
+		{http.MethodPost, "/en/groups/lions/resources/4/archive"},
 	} {
 		if response := serveGroups(t, dependencies, test.method, test.target, "version=1&name=X&kind=field", false); response.Code != http.StatusNotFound {
 			t.Errorf("%s %s = %d, want 404", test.method, test.target, response.Code)
@@ -108,19 +108,19 @@ func TestResourcesOutsiderGetsNotFound(t *testing.T) {
 
 func TestResourceCreate(t *testing.T) {
 	dependencies, resources := resourceDependencies(t, groupMemberAs(service.GroupRoleAdmin))
-	created := serveGroups(t, dependencies, http.MethodPost, "/en/groups/3/resources", "name=Court+1&kind=court&description=Indoor&max_concurrent_teams=3", true)
+	created := serveGroups(t, dependencies, http.MethodPost, "/en/groups/lions/resources", "name=Court+1&kind=court&description=Indoor&max_concurrent_teams=3", true)
 	if created.Code != http.StatusOK || !strings.Contains(created.Body.String(), "Resource added.") || !strings.Contains(created.Body.String(), `id="alerts"`) {
 		t.Fatalf("create = %d, want the list with the success alert", created.Code)
 	}
 	if resources.lastInput != (service.ResourceInput{Name: "Court 1", Kind: service.ResourceKindCourt, Description: "Indoor", MaxConcurrentTeams: 3}) {
 		t.Fatalf("input = %+v", resources.lastInput)
 	}
-	serveGroups(t, dependencies, http.MethodPost, "/en/groups/3/resources", "name=Pool&kind=pool&max_concurrent_teams=", true)
+	serveGroups(t, dependencies, http.MethodPost, "/en/groups/lions/resources", "name=Pool&kind=pool&max_concurrent_teams=", true)
 	if resources.lastInput.MaxConcurrentTeams != 0 {
 		t.Fatalf("empty limit = %d, want 0 (no limit)", resources.lastInput.MaxConcurrentTeams)
 	}
 	for _, raw := range []string{"abc", "0", "-3", "1.5"} {
-		serveGroups(t, dependencies, http.MethodPost, "/en/groups/3/resources", "name=Pool&kind=pool&max_concurrent_teams="+raw, true)
+		serveGroups(t, dependencies, http.MethodPost, "/en/groups/lions/resources", "name=Pool&kind=pool&max_concurrent_teams="+raw, true)
 		if resources.lastInput.MaxConcurrentTeams != -1 {
 			t.Errorf("limit %q = %d, want -1 so validation refuses it", raw, resources.lastInput.MaxConcurrentTeams)
 		}
@@ -138,7 +138,7 @@ func TestResourceCreate(t *testing.T) {
 		{service.ErrInvalidResourceCapacity, "from 1 to 99", `id="resource-new-max-teams-error"`},
 	} {
 		resources.writeErr = test.err
-		response := serveGroups(t, dependencies, http.MethodPost, "/en/groups/3/resources", "name=Kept+name&kind=pool&max_concurrent_teams=500", true)
+		response := serveGroups(t, dependencies, http.MethodPost, "/en/groups/lions/resources", "name=Kept+name&kind=pool&max_concurrent_teams=500", true)
 		body := response.Body.String()
 		if response.Code != http.StatusUnprocessableEntity || !strings.Contains(body, test.text) || !strings.Contains(body, test.field) || !strings.Contains(body, `value="Kept name"`) || !strings.Contains(body, `value="500"`) {
 			t.Errorf("error %v = %d, want 422 with %q on the field and the submitted values", test.err, response.Code, test.text)
@@ -152,14 +152,14 @@ func TestResourceCreate(t *testing.T) {
 func TestResourceCreateForbiddenForCoach(t *testing.T) {
 	dependencies, resources := resourceDependencies(t, groupMemberAs(service.GroupRoleCoach))
 	resources.writeErr = service.ErrGroupForbidden
-	if response := serveGroups(t, dependencies, http.MethodPost, "/en/groups/3/resources", "name=X&kind=field", false); response.Code != http.StatusForbidden {
+	if response := serveGroups(t, dependencies, http.MethodPost, "/en/groups/lions/resources", "name=X&kind=field", false); response.Code != http.StatusForbidden {
 		t.Fatalf("coach create = %d, want 403", response.Code)
 	}
-	if response := serveGroups(t, dependencies, http.MethodPost, "/en/groups/3/resources", "name=X&kind=field", true); response.Code != http.StatusUnprocessableEntity {
+	if response := serveGroups(t, dependencies, http.MethodPost, "/en/groups/lions/resources", "name=X&kind=field", true); response.Code != http.StatusUnprocessableEntity {
 		t.Fatalf("coach HTMX create = %d, want 422 so the alert swaps", response.Code)
 	}
 	player, playerResources := resourceDependencies(t, groupMemberAs(service.GroupRolePlayer))
-	if response := serveGroups(t, player, http.MethodPost, "/en/groups/3/resources", "name=X&kind=field", false); response.Code != http.StatusForbidden || playerResources.writes != 0 {
+	if response := serveGroups(t, player, http.MethodPost, "/en/groups/lions/resources", "name=X&kind=field", false); response.Code != http.StatusForbidden || playerResources.writes != 0 {
 		t.Fatalf("player create = %d (writes %d), want 403 before the use case", response.Code, playerResources.writes)
 	}
 }
@@ -175,12 +175,12 @@ func TestResourceDetailByRole(t *testing.T) {
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			dependencies, _ := resourceDependencies(t, test.access)
-			response := serveGroups(t, dependencies, http.MethodGet, "/en/groups/3/resources/4", "", false)
+			response := serveGroups(t, dependencies, http.MethodGet, "/en/groups/lions/resources/4", "", false)
 			body := response.Body.String()
 			if response.Code != http.StatusOK || !strings.Contains(body, `id="resource-heading"`) || !strings.Contains(body, "North end") || !strings.Contains(body, `data-section="resources" aria-current="page"`) {
 				t.Fatalf("status = %d, resource page incomplete", response.Code)
 			}
-			for _, needle := range []string{`id="resource-edit-name"`, `/en/groups/3/resources/4/archive`, `name="version" value="6"`} {
+			for _, needle := range []string{`id="resource-edit-name"`, `/en/groups/lions/resources/4/archive`, `name="version" value="6"`} {
 				if strings.Contains(body, needle) != test.wantEdit {
 					t.Errorf("body contains %q = %v, want %v", needle, !test.wantEdit, test.wantEdit)
 				}
@@ -192,35 +192,35 @@ func TestResourceDetailByRole(t *testing.T) {
 	}
 	dependencies, resources := resourceDependencies(t, groupMemberAs(service.GroupRoleAdmin))
 	resources.findErr = service.ErrResourceNotFound
-	if response := serveGroups(t, dependencies, http.MethodGet, "/en/groups/3/resources/9", "", false); response.Code != http.StatusNotFound {
+	if response := serveGroups(t, dependencies, http.MethodGet, "/en/groups/lions/resources/9", "", false); response.Code != http.StatusNotFound {
 		t.Fatalf("missing resource = %d, want 404", response.Code)
 	}
-	if response := serveGroups(t, dependencies, http.MethodGet, "/en/groups/3/resources/x", "", false); response.Code != http.StatusNotFound {
+	if response := serveGroups(t, dependencies, http.MethodGet, "/en/groups/lions/resources/x", "", false); response.Code != http.StatusNotFound {
 		t.Fatalf("malformed id = %d, want 404", response.Code)
 	}
 	player, _ := resourceDependencies(t, groupMemberAs(service.GroupRolePlayer))
-	if response := serveGroups(t, player, http.MethodGet, "/en/groups/3/resources/4", "", false); response.Code != http.StatusForbidden {
+	if response := serveGroups(t, player, http.MethodGet, "/en/groups/lions/resources/4", "", false); response.Code != http.StatusForbidden {
 		t.Fatalf("player detail = %d, want 403", response.Code)
 	}
 }
 
 func TestResourceUpdateAndArchive(t *testing.T) {
 	dependencies, resources := resourceDependencies(t, groupMemberAs(service.GroupRoleAdmin))
-	saved := serveGroups(t, dependencies, http.MethodPost, "/en/groups/3/resources/4", "version=6&name=Main+pitch&kind=field&max_concurrent_teams=4", true)
+	saved := serveGroups(t, dependencies, http.MethodPost, "/en/groups/lions/resources/4", "version=6&name=Main+pitch&kind=field&max_concurrent_teams=4", true)
 	if saved.Code != http.StatusOK || !strings.Contains(saved.Body.String(), "Resource saved.") || resources.lastVersion != 6 || resources.lastID != 4 || resources.lastInput.Name != "Main pitch" {
 		t.Fatalf("save = %d (version %d, id %d, input %+v)", saved.Code, resources.lastVersion, resources.lastID, resources.lastInput)
 	}
-	archived := serveGroups(t, dependencies, http.MethodPost, "/en/groups/3/resources/4/archive", "version=7&archived=true", true)
+	archived := serveGroups(t, dependencies, http.MethodPost, "/en/groups/lions/resources/4/archive", "version=7&archived=true", true)
 	if archived.Code != http.StatusOK || !strings.Contains(archived.Body.String(), "Resource archived.") || !resources.lastArchived {
 		t.Fatalf("archive = %d", archived.Code)
 	}
-	restored := serveGroups(t, dependencies, http.MethodPost, "/en/groups/3/resources/4/archive", "version=8&archived=false", true)
+	restored := serveGroups(t, dependencies, http.MethodPost, "/en/groups/lions/resources/4/archive", "version=8&archived=false", true)
 	if restored.Code != http.StatusOK || !strings.Contains(restored.Body.String(), "Resource restored.") || resources.lastArchived {
 		t.Fatalf("restore = %d", restored.Code)
 	}
 
 	writes := resources.writes
-	for _, target := range []string{"/en/groups/3/resources/4", "/en/groups/3/resources/4/archive"} {
+	for _, target := range []string{"/en/groups/lions/resources/4", "/en/groups/lions/resources/4/archive"} {
 		for _, version := range []string{"", "x", "-1"} {
 			response := serveGroups(t, dependencies, http.MethodPost, target, "version="+version+"&name=A&kind=field&archived=true", false)
 			if response.Code != http.StatusConflict {
@@ -238,12 +238,12 @@ func TestResourceUpdateAndArchive(t *testing.T) {
 		status int
 		text   string
 	}{
-		{"/en/groups/3/resources/4", service.ErrOptimisticLockConflict, http.StatusConflict, "changed elsewhere"},
-		{"/en/groups/3/resources/4", service.ErrResourceNotFound, http.StatusNotFound, ""},
-		{"/en/groups/3/resources/4", service.ErrInvalidResourceCapacity, http.StatusUnprocessableEntity, "from 1 to 99"},
-		{"/en/groups/3/resources/4/archive", service.ErrResourceNameTaken, http.StatusUnprocessableEntity, "already has this name"},
-		{"/en/groups/3/resources/4/archive", service.ErrGroupForbidden, http.StatusForbidden, ""},
-		{"/en/groups/3/resources/4/archive", service.ErrOptimisticLockConflict, http.StatusConflict, "changed elsewhere"},
+		{"/en/groups/lions/resources/4", service.ErrOptimisticLockConflict, http.StatusConflict, "changed elsewhere"},
+		{"/en/groups/lions/resources/4", service.ErrResourceNotFound, http.StatusNotFound, ""},
+		{"/en/groups/lions/resources/4", service.ErrInvalidResourceCapacity, http.StatusUnprocessableEntity, "from 1 to 99"},
+		{"/en/groups/lions/resources/4/archive", service.ErrResourceNameTaken, http.StatusUnprocessableEntity, "already has this name"},
+		{"/en/groups/lions/resources/4/archive", service.ErrGroupForbidden, http.StatusForbidden, ""},
+		{"/en/groups/lions/resources/4/archive", service.ErrOptimisticLockConflict, http.StatusConflict, "changed elsewhere"},
 	} {
 		resources.writeErr = test.err
 		response := serveGroups(t, dependencies, http.MethodPost, test.target, "version=6&name=A&kind=field&archived=false", false)
@@ -255,8 +255,8 @@ func TestResourceUpdateAndArchive(t *testing.T) {
 
 func TestResourcesHungarianLabels(t *testing.T) {
 	dependencies, _ := resourceDependencies(t, groupMemberAs(service.GroupRoleAdmin))
-	body := serveGroups(t, dependencies, http.MethodGet, "/hu/groups/3/resources", "", false).Body.String()
-	for _, want := range []string{"Helyszínek", "Füves pálya", "Archivált helyszínek", "Helyszín hozzáadása", `href="/hu/groups/3/resources/4"`} {
+	body := serveGroups(t, dependencies, http.MethodGet, "/hu/groups/lions/resources", "", false).Body.String()
+	for _, want := range []string{"Helyszínek", "Füves pálya", "Archivált helyszínek", "Helyszín hozzáadása", `href="/hu/groups/lions/resources/4"`} {
 		if !strings.Contains(body, want) {
 			t.Errorf("Hungarian resources page missing %q", want)
 		}

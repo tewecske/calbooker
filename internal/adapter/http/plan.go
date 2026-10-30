@@ -141,13 +141,13 @@ type PlanSlotFormView struct {
 // registerPlanRoutes registers each group's resource slot plan.
 func registerPlanRoutes(mux *http.ServeMux, groups *groupHandler) {
 	for _, prefix := range localizedPrefixes() {
-		mux.HandleFunc("GET "+prefix+"/groups/{id}/plan", groups.plan)
-		mux.HandleFunc("POST "+prefix+"/groups/{id}/plan/slots/create", groups.createPlanSlot)
-		mux.HandleFunc("POST "+prefix+"/groups/{id}/plan/slots/move", groups.movePlanSlot)
-		mux.HandleFunc("POST "+prefix+"/groups/{id}/plan/copy", groups.copyPlan)
-		mux.HandleFunc("GET "+prefix+"/groups/{id}/plan/slots/{slotID}", groups.planSlot)
-		mux.HandleFunc("POST "+prefix+"/groups/{id}/plan/slots/{slotID}", groups.updatePlanSlot)
-		mux.HandleFunc("POST "+prefix+"/groups/{id}/plan/slots/{slotID}/delete", groups.deletePlanSlot)
+		mux.HandleFunc("GET "+prefix+"/groups/{group}/plan", groups.plan)
+		mux.HandleFunc("POST "+prefix+"/groups/{group}/plan/slots/create", groups.createPlanSlot)
+		mux.HandleFunc("POST "+prefix+"/groups/{group}/plan/slots/move", groups.movePlanSlot)
+		mux.HandleFunc("POST "+prefix+"/groups/{group}/plan/copy", groups.copyPlan)
+		mux.HandleFunc("GET "+prefix+"/groups/{group}/plan/slots/{slotID}", groups.planSlot)
+		mux.HandleFunc("POST "+prefix+"/groups/{group}/plan/slots/{slotID}", groups.updatePlanSlot)
+		mux.HandleFunc("POST "+prefix+"/groups/{group}/plan/slots/{slotID}/delete", groups.deletePlanSlot)
 	}
 }
 
@@ -193,8 +193,8 @@ func (q planQuery) encode() string {
 	return ""
 }
 
-func (h *groupHandler) planURL(language locale.Code, groupID int64, suffix string, query planQuery) string {
-	return h.groupPath(language, groupID, "/plan"+suffix) + query.encode()
+func (h *groupHandler) planURL(language locale.Code, groupSlug string, suffix string, query planQuery) string {
+	return h.groupPath(language, groupSlug, "/plan"+suffix) + query.encode()
 }
 
 func (h *groupHandler) plan(writer http.ResponseWriter, request *http.Request) {
@@ -282,7 +282,7 @@ func (h *groupHandler) planGridResult(writer http.ResponseWriter, request *http.
 		alert, status = Alert{Level: "error", Message: h.t(current.language, message)}, formFailureStatus(request, failure)
 	} else {
 		if !IsHTMX(request) {
-			http.Redirect(writer, request, h.planURL(current.language, current.access.GroupID(), "", query), http.StatusSeeOther)
+			http.Redirect(writer, request, h.planURL(current.language, current.slug, "", query), http.StatusSeeOther)
 			return
 		}
 		alert = Alert{Level: "success", Message: h.t(current.language, "plan.saved")}
@@ -361,7 +361,7 @@ func (h *groupHandler) updatePlanSlot(writer http.ResponseWriter, request *http.
 		h.planSlotWriteError(writer, request, current, slotID, err, form)
 		return
 	}
-	h.redirectLocalized(writer, request, current.language, h.planRoute(current.access.GroupID(), slot))
+	h.redirectLocalized(writer, request, current.language, h.planRoute(current.slug, slot))
 }
 
 func (h *groupHandler) deletePlanSlot(writer http.ResponseWriter, request *http.Request) {
@@ -384,16 +384,16 @@ func (h *groupHandler) deletePlanSlot(writer http.ResponseWriter, request *http.
 		h.planSlotWriteError(writer, request, current, slotID, err, FormData{})
 		return
 	}
-	h.redirectLocalized(writer, request, current.language, h.planRoute(current.access.GroupID(), slot))
+	h.redirectLocalized(writer, request, current.language, h.planRoute(current.slug, slot))
 }
 
 // planRoute is the unlocalized plan route showing slot's part and week.
-func (h *groupHandler) planRoute(groupID int64, slot service.PlanSlot) string {
+func (h *groupHandler) planRoute(groupSlug string, slot service.PlanSlot) string {
 	query := planQuery{part: slot.SeasonPartID}
 	if slot.Week == service.SeasonWeekA || slot.Week == service.SeasonWeekB {
 		query.week = slot.Week
 	}
-	return "/groups/" + strconv.FormatInt(groupID, 10) + "/plan" + query.encode()
+	return "/groups/" + groupSlug + "/plan" + query.encode()
 }
 
 // planRequest authorizes a plan page: outsiders get 404 from groupRequest,
@@ -572,14 +572,13 @@ type planLayoutResult struct {
 
 func (h *groupHandler) planLayout(current groupRequest, board service.PlanBoard, query planQuery) planLayoutResult {
 	language := current.language
-	groupID := current.access.GroupID()
 	canEdit := current.access.CanManagePlan()
 	view := &PlanView{
 		L:            h.labels[language],
 		CanEdit:      canEdit,
-		SeasonsURL:   h.groupPath(language, groupID, "/seasons"),
-		ResourcesURL: h.groupPath(language, groupID, "/resources"),
-		PickerURL:    h.groupPath(language, groupID, "/plan"),
+		SeasonsURL:   h.groupPath(language, current.slug, "/seasons"),
+		ResourcesURL: h.groupPath(language, current.slug, "/resources"),
+		PickerURL:    h.groupPath(language, current.slug, "/plan"),
 	}
 	if !board.Found {
 		view.Empty = true
@@ -591,7 +590,7 @@ func (h *groupHandler) planLayout(current groupRequest, board service.PlanBoard,
 	view.SeasonName, view.PartName = board.Season.Name, part.Name
 	view.PartDates = service.FormatSeasonDate(part.StartsOn) + " – " + service.FormatSeasonDate(part.EndsOn)
 	view.Alternating = part.AlternatingWeeks
-	view.SwitchURL = h.groupPath(language, groupID, "/seasons/"+strconv.FormatInt(board.Season.ID, 10)+"/parts/"+strconv.FormatInt(part.ID, 10)+"/alternating")
+	view.SwitchURL = h.groupPath(language, current.slug, "/seasons/"+strconv.FormatInt(board.Season.ID, 10)+"/parts/"+strconv.FormatInt(part.ID, 10)+"/alternating")
 	view.SeasonVersion = board.Season.Version
 	for _, season := range board.Seasons {
 		for _, candidate := range season.Parts {
@@ -679,18 +678,18 @@ func (h *groupHandler) planLayout(current groupRequest, board service.PlanBoard,
 	if part.AlternatingWeeks {
 		weekA, weekB := query, query
 		weekA.week, weekB.week = service.SeasonWeekA, service.SeasonWeekB
-		config.WeekAURL = h.planURL(language, groupID, "", weekA)
-		config.WeekBURL = h.planURL(language, groupID, "", weekB)
+		config.WeekAURL = h.planURL(language, current.slug, "", weekA)
+		config.WeekBURL = h.planURL(language, current.slug, "", weekB)
 	}
 	if canEdit && !view.NoResources {
-		config.MoveURL = h.planURL(language, groupID, "/slots/move", query)
-		config.CreateURL = h.planURL(language, groupID, "/slots/create", query)
+		config.MoveURL = h.planURL(language, current.slug, "/slots/move", query)
+		config.CreateURL = h.planURL(language, current.slug, "/slots/create", query)
 	}
 
 	items := make([]WeekGridItem, 0, len(shown))
 	for _, slot := range shown {
 		resource := resources[slot.ResourceID]
-		row := h.planSlotRow(language, groupID, slot, resource, part.AlternatingWeeks)
+		row := h.planSlotRow(language, current.slug, slot, resource, part.AlternatingWeeks)
 		row.Warning = len(warningTexts[slot.ID]) > 0
 		view.Slots = append(view.Slots, row)
 		item := WeekGridItem{
@@ -716,7 +715,7 @@ func (h *groupHandler) planLayout(current groupRequest, board service.PlanBoard,
 	}
 
 	if canEdit {
-		copyForm := &PlanCopyFormView{ActionURL: h.planURL(language, groupID, "/copy", query), SlotCount: len(board.Slots)}
+		copyForm := &PlanCopyFormView{ActionURL: h.planURL(language, current.slug, "/copy", query), SlotCount: len(board.Slots)}
 		for index, source := range board.CopySources {
 			copyForm.Sources = append(copyForm.Sources, SelectOptionView{
 				Value: strconv.FormatInt(source.Part.ID, 10),
@@ -742,14 +741,14 @@ func (h *groupHandler) planResourceLabel(language locale.Code, resource service.
 	return resource.Name
 }
 
-func (h *groupHandler) planSlotRow(language locale.Code, groupID int64, slot service.PlanSlot, resource service.Resource, alternating bool) PlanSlotRowView {
+func (h *groupHandler) planSlotRow(language locale.Code, groupSlug string, slot service.PlanSlot, resource service.Resource, alternating bool) PlanSlotRowView {
 	row := PlanSlotRowView{
 		ID:       slot.ID,
 		Day:      h.t(language, "weekgrid.day."+strconv.Itoa(slot.Weekday)),
 		Time:     service.FormatPlanMinute(slot.StartMinute) + "–" + service.FormatPlanMinute(slot.EndMinute),
 		Resource: h.planResourceLabel(language, resource),
 		Archived: resource.Archived(),
-		URL:      h.groupPath(language, groupID, "/plan/slots/"+strconv.FormatInt(slot.ID, 10)),
+		URL:      h.groupPath(language, groupSlug, "/plan/slots/"+strconv.FormatInt(slot.ID, 10)),
 	}
 	if alternating || slot.Week != service.SeasonWeekAll {
 		row.Week = h.t(language, "plan.slot_week."+strings.ToLower(slot.Week))
@@ -805,25 +804,24 @@ func (h *groupHandler) renderPlanSlot(writer http.ResponseWriter, request *http.
 		return
 	}
 	language := current.language
-	groupID := current.access.GroupID()
 	var resource service.Resource
 	for _, candidate := range board.Resources {
 		if candidate.ID == slot.ResourceID {
 			resource = candidate
 		}
 	}
-	slotURL := h.groupPath(language, groupID, "/plan/slots/"+strconv.FormatInt(slot.ID, 10))
+	slotURL := h.groupPath(language, current.slug, "/plan/slots/"+strconv.FormatInt(slot.ID, 10))
 	detail := &PlanSlotDetailView{
 		L:          h.labels[language],
 		ID:         slot.ID,
 		Version:    slot.Version,
 		CanEdit:    current.access.CanManagePlan(),
-		PlanURL:    h.path(language, h.planRoute(groupID, slot)),
+		PlanURL:    h.path(language, h.planRoute(current.slug, slot)),
 		ActionURL:  slotURL,
 		DeleteURL:  slotURL + "/delete",
 		SeasonName: board.Season.Name,
 		PartName:   board.Part.Name,
-		Row:        h.planSlotRow(language, groupID, slot, resource, board.Part.AlternatingWeeks),
+		Row:        h.planSlotRow(language, current.slug, slot, resource, board.Part.AlternatingWeeks),
 	}
 	if detail.CanEdit {
 		detail.Form = h.planSlotFormView(language, board, slot, form)

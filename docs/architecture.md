@@ -84,6 +84,26 @@ in-memory items. It is registered only when `Dependencies.DevelopmentRoutes`
 is true, which `cmd/web` sets from `Config.DevelopmentRoutes()` (only
 `CALBOOKER_ENV=development`).
 
+## Readable URLs
+
+Groups and teams are addressed by name, not by ID: `/{language}/groups/{group}`
+and `/{language}/groups/{group}/teams/{team}`, for example
+`/en/groups/bvsc/teams/u10`. `{group}` is a group slug (unique site-wide) and
+`{team}` a team slug (unique within its group). Slugs are lowercase ASCII with
+hyphens, never only digits, and never a reserved route word (`new`, `edit`,
+`settings`, `members`, ...); `internal/service/slug.go` generates and validates
+them in one place, migration `000013` backfilled existing rows with the same
+rules. Staff edit them on the group settings and team pages.
+
+Every group route resolves `{group}` once in `groupHandler.groupRequest`
+(`GroupService.BySlug`, then `GroupAccess` as before, so unknown slugs and
+non-members both get 404), and team routes resolve `{team}` in
+`teamPathRequest` (`TeamService.BySlug`, scoped to the group). Links to teams
+known only by ID go through `groupHandler.teamPath`. The old numeric URLs
+(`/groups/3`, `/teams/4`) answer GET with a 301 to the slug URL, after the
+access check so outsiders learn nothing; POSTs to old URLs are 404. Tracing
+and usage labels use the route pattern (`{group}`, `{team}`), never the slug.
+
 ## Group access
 
 Every group-scoped page and use case is authorized by one type,
@@ -159,7 +179,7 @@ get `service.ErrGroupNotFound`, which handlers render as 404.
   `ChildUserIDs`), and `ListTeams` counts each parent once. `team_members`
   stays the record of explicit roster entries, so its foreign key to the
   member's roles is unchanged.
-- Pages: `/{language}/groups/{id}/invites` and `/{language}/groups/{id}/children`
+- Pages: `/{language}/groups/{group}/invites` and `/{language}/groups/{group}/children`
   (`internal/adapter/http/invite.go`, `children.go`; templates
   `invites.html`, `children.html`; catalogs `invites.json`, `children.json`).
 - Roles: `admin`, `manager`, `coach` need a full account
@@ -193,8 +213,8 @@ get `service.ErrGroupNotFound`, which handlers render as 404.
 - Later tables reference a resource as `(group_id, resource_id)` with a
   composite foreign key to `resources (group_id, id)`
   (`resources_group_id_unique`), so a reference never crosses groups.
-- Pages: `/{language}/groups/{id}/resources` and
-  `/{language}/groups/{id}/resources/{resourceID}` (`resource.go`,
+- Pages: `/{language}/groups/{group}/resources` and
+  `/{language}/groups/{group}/resources/{resourceID}` (`resource.go`,
   `resources.html`, catalogs `resources.json`). Coaches see them read only;
   players and parents get access denied and no navigation entry.
 
@@ -241,10 +261,10 @@ get `service.ErrGroupNotFound`, which handlers render as 404.
 - Later tables reference a season as `(group_id, season_id)` to
   `seasons (group_id, id)` and a part as `(group_id, season_part_id)` to
   `season_parts (group_id, id)`, so a reference never crosses groups.
-- Pages: `/{language}/groups/{id}/seasons` and
-  `/{language}/groups/{id}/seasons/{seasonID}` (`season.go`, `seasons.html`,
+- Pages: `/{language}/groups/{group}/seasons` and
+  `/{language}/groups/{group}/seasons/{seasonID}` (`season.go`, `seasons.html`,
   catalogs `seasons.json`), plus the coaches card on the team page
-  (`POST .../teams/{teamID}/coaches/add`, `/head`, `/remove`). Coaches see the
+  (`POST .../teams/{team}/coaches/add`, `/head`, `/remove`). Coaches see the
   season pages read only; players and parents get access denied and no
   navigation entry.
 
@@ -295,9 +315,9 @@ get `service.ErrGroupNotFound`, which handlers render as 404.
   coach of its teams) also coaches an overlapping non-cancelled event.
   `Create` and `Update` return them; the event page shows them to accounts
   that may edit the event.
-- Pages: `/{language}/groups/{id}/events` (upcoming, `?when=past`,
+- Pages: `/{language}/groups/{group}/events` (upcoming, `?when=past`,
   `?team=<id>`; the create form for those who create events) and
-  `/{language}/groups/{id}/events/{eventID}` with `POST .../cancel` and
+  `/{language}/groups/{group}/events/{eventID}` with `POST .../cancel` and
   `.../delete` (`event.go`, `events.html`, catalogs `events.json`). Every
   member has the Events tab and sees the events visible to them.
 - Deleting an event with participant rows is refused
@@ -329,7 +349,7 @@ get `service.ErrGroupNotFound`, which handlers render as 404.
   two players cannot both take the last place.
 - Pages: the participants card on the event page (`templates/participants.html`,
   catalogs `participation.json`) with `POST
-  /{language}/groups/{id}/events/{eventID}/participation` (`user_id`,
+  /{language}/groups/{group}/events/{eventID}/participation` (`user_id`,
   `status`: an answer or `none`) and `.../attendance` (`listed`, `attended`,
   optional `walk_in`) in `internal/adapter/http/participation.go`. Both
   re-render the event page (HTMX: the fragment with out-of-band alerts;
@@ -337,7 +357,7 @@ get `service.ErrGroupNotFound`, which handlers render as 404.
 
 ## Calendar
 
-- `/{language}/groups/{id}/calendar?week=YYYY-MM-DD&team=&resource=&kind=`
+- `/{language}/groups/{group}/calendar?week=YYYY-MM-DD&team=&resource=&kind=`
   (`internal/adapter/http/calendar.go`, `templates/calendar.html`, catalogs
   `calendar.json`) shows one Monday-based week of events in the group's time
   zone. `week` is any day of the wanted week (missing or invalid: the current
@@ -393,7 +413,7 @@ get `service.ErrGroupNotFound`, which handlers render as 404.
   coaches, none for players and parents) and `StatisticsPlayerScope`
   (everyone, the players of the coached teams, plus the account and its
   linked children). Emails show for staff only.
-- Page: `GET /{language}/groups/{id}/statistics?period=&date=&season=&part=`
+- Page: `GET /{language}/groups/{group}/statistics?period=&date=&season=&part=`
   in `internal/adapter/http/statistics.go`, template `statistics.html`,
   catalogs `statistics.json`. Read-only, server-rendered tables.
 ## Coaches
@@ -425,10 +445,10 @@ get `service.ErrGroupNotFound`, which handlers render as 404.
   part, applies the change, merges, and replaces them in one transaction, so
   concurrent edits never lose each other. Window IDs change on every edit;
   the grid re-renders after each change.
-- Pages: `/{language}/groups/{id}/coaches` (qualifications and team ages),
-  `/{language}/groups/{id}/coaches/{coachID}/availability?part=&week=` (the
+- Pages: `/{language}/groups/{group}/coaches` (qualifications and team ages),
+  `/{language}/groups/{group}/coaches/{coachID}/availability?part=&week=` (the
   week grid with `move`, `create`, `delete`, `copy` posts), and
-  `/{language}/groups/{id}/coaches/availability` (staff, side by side)
+  `/{language}/groups/{group}/coaches/availability` (staff, side by side)
   (`coach.go`, `coaches.html`, catalogs `coaches.json`). The week grid is
   used unchanged: alternating parts get A / B / every-week tabs of their own,
   the grid's `Week` is `A` or `B` on those tabs and empty otherwise.
@@ -481,7 +501,7 @@ get `service.ErrGroupNotFound`, which handlers render as 404.
   parts check weeks A and B apart (`all` slots count in both); a warning of
   both weeks is reported once. They never block a write; the page lists
   them and marks the slots on the grid.
-- Page: `/{language}/groups/{id}/plan?part=&week=&r=` (`plan.go`,
+- Page: `/{language}/groups/{group}/plan?part=&week=&r=` (`plan.go`,
   `plan.html`, catalogs `plan.json`): a part picker, the week grid with the
   active resources (plus archived ones that still hold slots, marked and not
   draggable) as columns, at most eight at once (`r` picks them when there
@@ -526,7 +546,7 @@ get `service.ErrGroupNotFound`, which handlers render as 404.
   a different set is `ErrOptimisticLockConflict`, a deleted season
   `ErrSeasonNotFound`. Saves that change something are audited as
   `group.season.coaches_saved` (season ID and name, counts).
-- Page: `/{language}/groups/{id}/seasons/{seasonID}/coach-board` (GET, POST
+- Page: `/{language}/groups/{group}/seasons/{seasonID}/coach-board` (GET, POST
   saves) and `.../coach-board/draft` (re-render, add, remove, suggest)
   (`coach_board.go`, `coach_board.html`, catalogs `coach_board.json`), linked
   from the season page. The board is one form: hidden `a=<team>:<coach>`
@@ -580,7 +600,7 @@ get `service.ErrGroupNotFound`, which handlers render as 404.
 - `events (group_id, plan_training_id)` now has a composite foreign key with
   `ON DELETE SET NULL (plan_training_id)`; `plan_trainings.plan_slot_id` uses
   the same column-list form against `plan_slots`.
-- Page: `/{language}/groups/{id}/training-plan?part=&week=` (GET, POST saves)
+- Page: `/{language}/groups/{group}/training-plan?part=&week=` (GET, POST saves)
   and `.../training-plan/draft` (`training_plan.go`, `training_plan.html`,
   catalogs `training_plan.json`). Hidden `t=<id>:<team>:<resource>:<week>:
   <day>:<start>:<end>:<reason>` values hold the draft; the week grid beside
@@ -633,7 +653,7 @@ get `service.ErrGroupNotFound`, which handlers render as 404.
   for the same training and week impossible even in a race.
 - Audit `group.plan.events_generated` (part, weeks, counts; never names),
   written only when something changed.
-- Page: `/{language}/groups/{id}/event-generation?part=&week=&weeks=` (GET
+- Page: `/{language}/groups/{group}/event-generation?part=&week=&weeks=` (GET
   shows the choice and, with `week`, the preview; POST confirms and shows
   the result). Linked from the training plan board (`event_generation.go`,
   `event_generation.html`, catalogs `event_generation.json`). Plain forms,

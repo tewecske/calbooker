@@ -20,7 +20,10 @@ type GroupUseCases interface {
 	List(ctx context.Context, userID int64) ([]service.GroupSummary, error)
 	Overview(ctx context.Context, access *service.GroupAccess) (service.GroupOverview, error)
 	Group(ctx context.Context, access *service.GroupAccess) (service.Group, error)
-	UpdateSettings(ctx context.Context, actor service.GroupActor, expectedVersion int64, name, timeZone string) (service.Group, error)
+	UpdateSettings(ctx context.Context, actor service.GroupActor, expectedVersion int64, name, slug, timeZone string) (service.Group, error)
+	// BySlug resolves a group slug; access is checked afterwards through
+	// GroupAccessProvider.
+	BySlug(ctx context.Context, slug string) (service.Group, error)
 	Leave(ctx context.Context, access *service.GroupAccess) error
 	Members(ctx context.Context, access *service.GroupAccess) ([]service.GroupMember, error)
 	AddRole(ctx context.Context, actor service.GroupActor, targetUserID, expectedVersion int64, role string) (service.GroupMembership, error)
@@ -134,6 +137,7 @@ type GroupOverviewView struct {
 type GroupSettingsView struct {
 	ActionURL string
 	Name      string
+	Slug      string
 	Version   int64
 	TimeZones []TimeZoneOption
 }
@@ -201,6 +205,10 @@ type groupRequest struct {
 	language locale.Code
 	access   *service.GroupAccess
 	origin   string
+	// slug is the group's canonical URL slug, resolved from the request path.
+	slug string
+	// teamSlugs resolves team IDs to URL slugs on demand.
+	teamSlugs *teamSlugLookup
 }
 
 func (g groupRequest) actor() service.GroupActor {
@@ -215,14 +223,14 @@ func registerGroupRoutes(mux *http.ServeMux, groups *groupHandler) {
 		mux.HandleFunc("POST "+prefix+"/groups", groups.create)
 		mux.HandleFunc("GET "+prefix+"/groups/join", groups.join)
 		mux.HandleFunc("POST "+prefix+"/groups/join", groups.join)
-		mux.HandleFunc("GET "+prefix+"/groups/{id}", groups.overview)
-		mux.HandleFunc("POST "+prefix+"/groups/{id}/leave", groups.leave)
-		mux.HandleFunc("GET "+prefix+"/groups/{id}/settings", groups.settingsPage)
-		mux.HandleFunc("POST "+prefix+"/groups/{id}/settings", groups.updateSettings)
-		mux.HandleFunc("GET "+prefix+"/groups/{id}/members", groups.members)
-		mux.HandleFunc("POST "+prefix+"/groups/{id}/members/{memberID}/roles/add", groups.addRole)
-		mux.HandleFunc("POST "+prefix+"/groups/{id}/members/{memberID}/roles/remove", groups.removeRole)
-		mux.HandleFunc("POST "+prefix+"/groups/{id}/members/{memberID}/remove", groups.removeMember)
+		mux.HandleFunc("GET "+prefix+"/groups/{group}", groups.overview)
+		mux.HandleFunc("POST "+prefix+"/groups/{group}/leave", groups.leave)
+		mux.HandleFunc("GET "+prefix+"/groups/{group}/settings", groups.settingsPage)
+		mux.HandleFunc("POST "+prefix+"/groups/{group}/settings", groups.updateSettings)
+		mux.HandleFunc("GET "+prefix+"/groups/{group}/members", groups.members)
+		mux.HandleFunc("POST "+prefix+"/groups/{group}/members/{memberID}/roles/add", groups.addRole)
+		mux.HandleFunc("POST "+prefix+"/groups/{group}/members/{memberID}/roles/remove", groups.removeRole)
+		mux.HandleFunc("POST "+prefix+"/groups/{group}/members/{memberID}/remove", groups.removeMember)
 	}
 	registerTeamRoutes(mux, groups)
 	registerInviteRoutes(mux, groups)
@@ -323,7 +331,7 @@ func (h *groupHandler) create(writer http.ResponseWriter, request *http.Request)
 		h.renderGroups(writer, request, language, user, nil, form, []Alert{{Level: "error", Message: h.t(language, message)}}, status, true)
 		return
 	}
-	h.redirectLocalized(writer, request, language, "/groups/"+strconv.FormatInt(summary.Group.ID, 10))
+	h.redirectLocalized(writer, request, language, "/groups/"+summary.Group.Slug)
 }
 
 func (h *groupHandler) join(writer http.ResponseWriter, request *http.Request) {
@@ -369,9 +377,9 @@ func (h *groupHandler) join(writer http.ResponseWriter, request *http.Request) {
 		h.renderGroups(writer, request, language, user, nil, form, []Alert{{Level: "error", Message: h.t(language, message)}}, status, false)
 		return
 	}
-	route := "/groups/" + strconv.FormatInt(redemption.Membership.GroupID, 10)
-	if redemption.TeamID > 0 {
-		route += "/teams/" + strconv.FormatInt(redemption.TeamID, 10)
+	route := "/groups/" + redemption.GroupSlug
+	if redemption.TeamSlug != "" {
+		route += "/teams/" + redemption.TeamSlug
 	}
 	h.redirectLocalized(writer, request, language, route)
 }
@@ -403,21 +411,32 @@ func (h *groupHandler) updateSettings(writer http.ResponseWriter, request *http.
 	}
 	_ = request.ParseForm()
 	name := request.PostFormValue("name")
+	slug := request.PostFormValue("slug")
 	timeZone := request.PostFormValue("time_zone")
-	form := FormData{Submitted: true, Values: map[string]string{"name": name, "time_zone": timeZone}}
+	form := FormData{Submitted: true, Values: map[string]string{"name": name, "slug": slug, "time_zone": timeZone}}
 	version, err := parseVersion(request.PostFormValue("version"))
 	if err != nil {
 		h.renderWriteError(writer, request, current, groupSectionSettings, 0, service.ErrOptimisticLockConflict, form)
 		return
 	}
-	if _, err := h.dependencies.Groups.UpdateSettings(request.Context(), current.actor(), version, name, timeZone); err != nil {
+	updated, err := h.dependencies.Groups.UpdateSettings(request.Context(), current.actor(), version, name, slug, timeZone)
+	if err != nil {
 		switch {
+		case errors.Is(err, service.ErrInvalidSlug):
+			form.Errors = []FieldError{{Field: "slug", Message: h.t(current.language, "groups.error.invalid_slug")}}
+		case errors.Is(err, service.ErrSlugTaken):
+			form.Errors = []FieldError{{Field: "slug", Message: h.t(current.language, "groups.error.slug_taken")}}
 		case errors.Is(err, service.ErrInvalidGroupName):
 			form.Errors = []FieldError{{Field: "name", Message: h.t(current.language, "groups.error.invalid_name")}}
 		case errors.Is(err, service.ErrInvalidTimeZone):
 			form.Errors = []FieldError{{Field: "time_zone", Message: h.t(current.language, "groups.error.invalid_time_zone")}}
 		}
 		h.renderWriteError(writer, request, current, groupSectionSettings, 0, err, form)
+		return
+	}
+	if updated.Slug != current.slug {
+		// The group has a new address: continue there, not at the old URL.
+		h.redirectLocalized(writer, request, current.language, "/groups/"+updated.Slug+"/settings")
 		return
 	}
 	h.renderSection(writer, request, current, groupSectionSettings, 0, FormData{}, []Alert{{Level: "success", Message: h.t(current.language, "groups.settings.saved")}}, http.StatusOK)
@@ -516,10 +535,25 @@ func (h *groupHandler) groupRequest(writer http.ResponseWriter, request *http.Re
 		h.renderError(writer, request, http.StatusInternalServerError)
 		return groupRequest{}, false
 	}
-	groupID, err := pathPositiveID(request, "id")
-	if err != nil {
-		h.renderGroupNotFound(writer, request, language)
-		return groupRequest{}, false
+	reference := strings.TrimSpace(request.PathValue("group"))
+	legacyID, legacy := legacyPathID(reference)
+	var (
+		groupID int64
+		slug    string
+	)
+	if legacy {
+		groupID = legacyID
+	} else {
+		group, err := h.dependencies.Groups.BySlug(request.Context(), reference)
+		if err != nil {
+			if errors.Is(err, service.ErrGroupNotFound) {
+				h.renderGroupNotFound(writer, request, language)
+				return groupRequest{}, false
+			}
+			h.renderError(writer, request, http.StatusInternalServerError)
+			return groupRequest{}, false
+		}
+		groupID, slug = group.ID, group.Slug
 	}
 	access, err := h.dependencies.GroupAccess.For(request.Context(), user.ID, groupID)
 	if err != nil {
@@ -534,7 +568,16 @@ func (h *groupHandler) groupRequest(writer http.ResponseWriter, request *http.Re
 		h.renderGroupNotFound(writer, request, language)
 		return groupRequest{}, false
 	}
-	return groupRequest{user: user, language: language, access: access, origin: requestOrigin(request)}, true
+	if legacy {
+		// Old numeric links keep working for GET: a permanent redirect to the
+		// slug URL, once the account is known to see the group.
+		group, err := h.dependencies.Groups.Group(request.Context(), access)
+		if err != nil || !redirectLegacyPath(writer, request, "/groups/"+reference, "/groups/"+group.Slug) {
+			h.renderGroupNotFound(writer, request, language)
+		}
+		return groupRequest{}, false
+	}
+	return groupRequest{user: user, language: language, access: access, origin: requestOrigin(request), slug: slug, teamSlugs: &teamSlugLookup{ctx: request.Context(), access: access}}, true
 }
 
 // renderWriteError maps a failed write to its page outcome. HTMX requests
@@ -561,6 +604,14 @@ func (h *groupHandler) renderWriteError(writer http.ResponseWriter, request *htt
 		message = "groups.error.invalid_role"
 	case errors.Is(err, service.ErrInvalidGroupName):
 		message = "groups.error.invalid_name"
+	case errors.Is(err, service.ErrInvalidSlug), errors.Is(err, service.ErrSlugTaken):
+		message = "groups.error.invalid_slug"
+		if errors.Is(err, service.ErrSlugTaken) {
+			message = "groups.error.slug_taken"
+		}
+		if section == groupSectionTeam || section == groupSectionTeams {
+			message = strings.Replace(message, "groups.", "teams.", 1)
+		}
 	case errors.Is(err, service.ErrInvalidTimeZone):
 		message = "groups.error.invalid_time_zone"
 	case errors.Is(err, service.ErrInvalidTeamName):
@@ -630,17 +681,19 @@ func (h *groupHandler) renderSection(writer http.ResponseWriter, request *http.R
 			MemberCount: overview.MemberCount,
 			TimeZone:    overview.Group.TimeZone,
 			IsMember:    current.access.IsMember(),
-			LeaveURL:    h.groupPath(current.language, group.ID, "/leave"),
+			LeaveURL:    h.groupPath(current.language, group.Slug, "/leave"),
 		}
 	case groupSectionSettings:
 		name := group.Name
+		slug := group.Slug
 		zone := group.TimeZone
 		if form.Submitted {
-			name, zone = form.Value("name"), form.Value("time_zone")
+			name, slug, zone = form.Value("name"), form.Value("slug"), form.Value("time_zone")
 		}
 		view.Settings = &GroupSettingsView{
-			ActionURL: h.groupPath(current.language, group.ID, "/settings"),
+			ActionURL: h.groupPath(current.language, group.Slug, "/settings"),
 			Name:      name,
+			Slug:      slug,
 			Version:   group.Version,
 			TimeZones: timeZoneOptions(zone),
 		}
@@ -782,7 +835,7 @@ func (h *groupHandler) groupShell(current groupRequest, group service.Group, sec
 			(item.id == groupSectionCoaches && (section == groupSectionAvailability || section == groupSectionAvailabilityOverview)) ||
 			(section == groupSectionPlanSlot && item.id == groupSectionPlan) ||
 			(section == groupSectionEventGeneration && item.id == groupSectionTrainingPlan)
-		view.Nav = append(view.Nav, GroupNavItem{ID: item.id, Label: h.t(language, item.label), URL: h.groupPath(language, group.ID, item.route), Current: currentSection})
+		view.Nav = append(view.Nav, GroupNavItem{ID: item.id, Label: h.t(language, item.label), URL: h.groupPath(language, group.Slug, item.route), Current: currentSection})
 	}
 	return view
 }
@@ -794,11 +847,11 @@ func (h *groupHandler) membersView(current groupRequest, groupID int64, members 
 		ShowEmails: access.CanViewAllMembers(),
 		CanManage:  access.CanManageGroup(),
 		CanLink:    access.CanManageGuardians(),
-		LinkURL:    h.groupPath(language, groupID, "/guardians/add"),
-		UnlinkURL:  h.groupPath(language, groupID, "/guardians/remove"),
+		LinkURL:    h.groupPath(language, current.slug, "/guardians/add"),
+		UnlinkURL:  h.groupPath(language, current.slug, "/guardians/remove"),
 	}
 	for _, member := range members {
-		base := h.groupPath(language, groupID, "/members/"+strconv.FormatInt(member.UserID, 10))
+		base := h.groupPath(language, current.slug, "/members/"+strconv.FormatInt(member.UserID, 10))
 		row := GroupMemberView{
 			UserID:        member.UserID,
 			Label:         h.memberLabel(language, member.UserID, member.DisplayName, member.Username, member.Email),
@@ -923,7 +976,7 @@ func (h *groupHandler) renderGroups(writer http.ResponseWriter, request *http.Re
 		view.Summaries = append(view.Summaries, GroupSummaryView{
 			ID:          summary.Group.ID,
 			Name:        summary.Group.Name,
-			URL:         h.groupPath(language, summary.Group.ID, ""),
+			URL:         h.groupPath(language, summary.Group.Slug, ""),
 			MemberCount: summary.MemberCount,
 			RoleLabels:  labels,
 		})
@@ -1013,8 +1066,32 @@ func (h *groupHandler) path(language locale.Code, route string) string {
 	return path
 }
 
-func (h *groupHandler) groupPath(language locale.Code, groupID int64, suffix string) string {
-	return h.path(language, "/groups/"+strconv.FormatInt(groupID, 10)+suffix)
+func (h *groupHandler) groupPath(language locale.Code, groupSlug string, suffix string) string {
+	return h.path(language, "/groups/"+groupSlug+suffix)
+}
+
+// legacyPathID reads the numeric ID of an old /groups/{id} or /teams/{id}
+// URL. Slugs are never numeric only, so the two cannot be confused.
+func legacyPathID(reference string) (int64, bool) {
+	id, err := strconv.ParseInt(reference, 10, 64)
+	if err != nil || id <= 0 {
+		return 0, false
+	}
+	return id, true
+}
+
+// redirectLegacyPath sends GET and HEAD requests for an old numeric URL to
+// the slug URL with a permanent redirect, keeping the rest of the path and the
+// query. Other methods get false and answer 404.
+func redirectLegacyPath(writer http.ResponseWriter, request *http.Request, oldSegment, newSegment string) bool {
+	if request.Method != http.MethodGet && request.Method != http.MethodHead {
+		return false
+	}
+	target := *request.URL
+	target.Path = strings.Replace(request.URL.Path, oldSegment, newSegment, 1)
+	target.RawPath = ""
+	http.Redirect(writer, request, target.String(), http.StatusMovedPermanently)
+	return true
 }
 
 func (h *groupHandler) renderError(writer http.ResponseWriter, request *http.Request, status int) {

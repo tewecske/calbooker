@@ -202,10 +202,19 @@ func (r *InviteRepository) RedeemInvite(ctx context.Context, inviteID, userID, n
 	if err != nil {
 		return service.InviteRedemption{}, err
 	}
+	redemption := service.InviteRedemption{Membership: membership, TeamID: teamID, Changed: changed}
+	if err := tx.QueryRowContext(ctx, `SELECT slug FROM groups WHERE id = $1`, invite.GroupID).Scan(&redemption.GroupSlug); err != nil {
+		return service.InviteRedemption{}, mapInviteError(err)
+	}
+	if teamID > 0 {
+		if err := tx.QueryRowContext(ctx, `SELECT slug FROM teams WHERE group_id = $1 AND id = $2`, invite.GroupID, teamID).Scan(&redemption.TeamSlug); err != nil {
+			return service.InviteRedemption{}, mapInviteError(err)
+		}
+	}
 	if err := tx.Commit(); err != nil {
 		return service.InviteRedemption{}, mapInviteError(err)
 	}
-	return service.InviteRedemption{Membership: membership, TeamID: teamID, Changed: changed}, nil
+	return redemption, nil
 }
 
 func (r *InviteRepository) database(ctx context.Context) (*sql.DB, error) {

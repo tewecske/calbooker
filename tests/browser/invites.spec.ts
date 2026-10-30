@@ -18,7 +18,7 @@ test.describe("invites and children", () => {
     await page.goto(`${appURL}/en/groups`);
     await page.locator("#group-new-name").fill(clubName);
     await page.locator("#group-new-name").locator("xpath=ancestor::form").getByRole("button").click();
-    await page.waitForURL(/\/en\/groups\/\d+$/);
+    await page.waitForURL(/\/en\/groups\/(?!join$)[a-z0-9-]+$/);
     const groupURL = page.url();
 
     await page.locator("nav a[data-section=teams]").click();
@@ -26,7 +26,7 @@ test.describe("invites and children", () => {
     await page.locator("#team-new-birth-year-from").fill("2015");
     await page.locator("#team-new-birth-year-to").fill("2016");
     await page.getByRole("button", { name: "Create a team" }).click();
-    await page.waitForURL(/\/en\/groups\/\d+\/teams\/\d+$/);
+    await page.waitForURL(/\/en\/groups\/[a-z0-9-]+\/teams\/[a-z0-9-]+$/);
     const teamURL = page.url();
 
     // The admin creates a player invite for the team with a use limit.

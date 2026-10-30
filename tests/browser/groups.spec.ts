@@ -19,7 +19,7 @@ test.describe("groups", () => {
     await page.locator("#group-new-name").fill(clubName);
     await page.locator("#group-new-time-zone").selectOption("Europe/Vienna");
     await page.locator("#group-new-name").locator("xpath=ancestor::form").getByRole("button").click();
-    await page.waitForURL(/\/en\/groups\/\d+$/);
+    await page.waitForURL(/\/en\/groups\/(?!join$)[a-z0-9-]+$/);
     const groupURL = page.url();
     await expect(page.locator("#group-summary-heading")).toHaveText(clubName);
     await expect(page.getByTestId("group-time-zone")).toHaveText("Europe/Vienna");
@@ -40,10 +40,25 @@ test.describe("groups", () => {
     await page.locator("#team-new-birth-year-to").fill("2016");
     await page.locator("#team-new-description").fill("U10");
     await page.getByRole("button", { name: "Create a team" }).click();
-    await page.waitForURL(/\/en\/groups\/\d+\/teams\/\d+$/);
+    await page.waitForURL(/\/en\/groups\/[a-z0-9-]+\/teams\/[a-z0-9-]+$/);
     await expect(page.locator("#team-heading")).toContainText("Lions");
     await expect(page.getByTestId("team-birth-years")).toHaveText("2015–2016");
     const teamURL = page.url();
+
+    // Links use the names, and the old numeric links keep working. The team
+    // slug comes from the name; a staff member can edit it.
+    expect(teamURL).toMatch(/\/teams\/lions$/);
+    expect(groupURL).not.toMatch(/\/groups\/\d+$/);
+    const edited = `lions-${Date.now().toString(36)}`;
+    await page.locator("#team-edit-slug").fill(edited);
+    await page.locator("#team-edit-name").locator("xpath=ancestor::form").getByRole("button").click();
+    await page.waitForURL(new RegExp(`/teams/${edited}$`));
+    await expect(page.locator("#team-heading")).toContainText("Lions");
+    await page.locator("#team-edit-slug").fill("lions");
+    await page.locator("#team-edit-name").locator("xpath=ancestor::form").getByRole("button").click();
+    await page.waitForURL(/\/teams\/lions$/);
+    const old = await page.request.get(`${appURL}/en/groups/999999999`, { maxRedirects: 0 });
+    expect(old.status()).toBe(404);
 
     // A group invite without a team makes the new member a player.
     const inviteCode = await createInvite(page, groupURL, { role: "player" });

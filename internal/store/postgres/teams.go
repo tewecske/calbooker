@@ -26,7 +26,7 @@ func NewTeamRepository(db *sql.DB) (*TeamRepository, error) {
 
 var _ service.TeamRepository = (*TeamRepository)(nil)
 
-const teamColumns = `id, group_id, name, birth_year_from, birth_year_to, description, archived_at, created_at, version`
+const teamColumns = `id, group_id, name, slug, birth_year_from, birth_year_to, description, archived_at, created_at, version`
 
 // teamParentIDs selects the distinct parents of team t: roster parents and
 // guardians of the team's players.
@@ -45,10 +45,11 @@ func (r *TeamRepository) CreateTeam(ctx context.Context, team service.Team) (ser
 		return service.Team{}, err
 	}
 	return scanTeam(db.QueryRowContext(ctx, `
-		INSERT INTO teams (group_id, name, birth_year_from, birth_year_to, description, archived_at, created_at, version)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, 0)
+		WITH next AS (SELECT nextval(pg_get_serial_sequence('teams', 'id')) AS id)
+		INSERT INTO teams (id, group_id, name, slug, birth_year_from, birth_year_to, description, archived_at, created_at, version)
+		SELECT next.id, $1::bigint, $2::varchar, COALESCE(NULLIF($3::varchar, ''), 'team-' || next.id), $4::smallint, $5::smallint, $6::varchar, $7::bigint, $8::bigint, 0 FROM next
 		RETURNING `+teamColumns,
-		team.GroupID, team.Name, team.BirthYearFrom, team.BirthYearTo, team.Description, team.ArchivedAt, team.CreatedAt))
+		team.GroupID, team.Name, team.Slug, team.BirthYearFrom, team.BirthYearTo, team.Description, team.ArchivedAt, team.CreatedAt))
 }
 
 // FindTeam returns one team of the group.
@@ -63,6 +64,29 @@ func (r *TeamRepository) FindTeam(ctx context.Context, groupID, teamID int64) (s
 	return scanTeam(db.QueryRowContext(ctx, `SELECT `+teamColumns+` FROM teams WHERE group_id = $1 AND id = $2`, groupID, teamID))
 }
 
+// FindTeamBySlug returns one team of the group by its URL slug.
+func (r *TeamRepository) FindTeamBySlug(ctx context.Context, groupID int64, slug string) (service.Team, error) {
+	db, err := r.database(ctx)
+	if err != nil {
+		return service.Team{}, err
+	}
+	return scanTeam(db.QueryRowContext(ctx, `SELECT `+teamColumns+` FROM teams WHERE group_id = $1 AND slug = $2`, groupID, slug))
+}
+
+// TeamSlugTaken reports whether a team of the group other than exceptID uses
+// slug.
+func (r *TeamRepository) TeamSlugTaken(ctx context.Context, groupID int64, slug string, exceptID int64) (bool, error) {
+	db, err := r.database(ctx)
+	if err != nil {
+		return false, err
+	}
+	var taken bool
+	if err := db.QueryRowContext(ctx, `SELECT EXISTS (SELECT 1 FROM teams WHERE group_id = $1 AND slug = $2 AND id <> $3)`, groupID, slug, exceptID).Scan(&taken); err != nil {
+		return false, mapTeamError(err)
+	}
+	return taken, nil
+}
+
 // ListTeams returns the group's teams with roster counts: active teams first,
 // then by birth years and name. Parents count once whether they are on the
 // roster themselves or linked to a player on it.
@@ -72,7 +96,7 @@ func (r *TeamRepository) ListTeams(ctx context.Context, groupID int64) ([]servic
 		return nil, err
 	}
 	rows, err := db.QueryContext(ctx, `
-		SELECT t.id, t.group_id, t.name, t.birth_year_from, t.birth_year_to, t.description, t.archived_at, t.created_at, t.version,
+		SELECT t.id, t.group_id, t.name, t.slug, t.birth_year_from, t.birth_year_to, t.description, t.archived_at, t.created_at, t.version,
 			(SELECT count(*) FROM team_members tm WHERE tm.group_id = t.group_id AND tm.team_id = t.id AND tm.role = 'player'),
 			(SELECT count(*) FROM (`+teamParentIDs+`) parents)
 		FROM teams t
@@ -91,7 +115,7 @@ func (r *TeamRepository) ListTeams(ctx context.Context, groupID int64) ([]servic
 			archivedAt           sql.NullInt64
 			players, parentCount int64
 		)
-		if err := rows.Scan(&summary.Team.ID, &summary.Team.GroupID, &summary.Team.Name, &summary.Team.BirthYearFrom, &summary.Team.BirthYearTo,
+		if err := rows.Scan(&summary.Team.ID, &summary.Team.GroupID, &summary.Team.Name, &summary.Team.Slug, &summary.Team.BirthYearFrom, &summary.Team.BirthYearTo,
 			&description, &archivedAt, &summary.Team.CreatedAt, &summary.Team.Version, &players, &parentCount); err != nil {
 			return nil, mapTeamError(err)
 		}
@@ -115,10 +139,10 @@ func (r *TeamRepository) UpdateTeam(ctx context.Context, team service.Team, expe
 	}
 	updated, err := scanTeam(db.QueryRowContext(ctx, `
 		UPDATE teams
-		SET name = $1, birth_year_from = $2, birth_year_to = $3, description = $4, archived_at = $5, version = version + 1
-		WHERE group_id = $6 AND id = $7 AND version = $8
+		SET name = $1, slug = $2, birth_year_from = $3, birth_year_to = $4, description = $5, archived_at = $6, version = version + 1
+		WHERE group_id = $7 AND id = $8 AND version = $9
 		RETURNING `+teamColumns,
-		team.Name, team.BirthYearFrom, team.BirthYearTo, team.Description, team.ArchivedAt, team.GroupID, team.ID, expectedVersion))
+		team.Name, team.Slug, team.BirthYearFrom, team.BirthYearTo, team.Description, team.ArchivedAt, team.GroupID, team.ID, expectedVersion))
 	if err == nil {
 		return updated, nil
 	}
@@ -284,7 +308,7 @@ func scanTeam(row rowScanner) (service.Team, error) {
 		description sql.NullString
 		archivedAt  sql.NullInt64
 	)
-	if err := row.Scan(&team.ID, &team.GroupID, &team.Name, &team.BirthYearFrom, &team.BirthYearTo, &description, &archivedAt, &team.CreatedAt, &team.Version); err != nil {
+	if err := row.Scan(&team.ID, &team.GroupID, &team.Name, &team.Slug, &team.BirthYearFrom, &team.BirthYearTo, &description, &archivedAt, &team.CreatedAt, &team.Version); err != nil {
 		return service.Team{}, mapTeamError(err)
 	}
 	if team.ID <= 0 || team.GroupID <= 0 || team.Version < 0 || team.Name == "" {
@@ -309,6 +333,9 @@ func mapTeamError(err error) error {
 		return service.ErrTeamNotFound
 	}
 	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && pgErr.Code == "23505" && pgErr.ConstraintName == "teams_group_slug_unique" {
+		return service.ErrSlugTaken
+	}
 	if errors.As(err, &pgErr) && pgErr.Code == "23503" {
 		switch pgErr.ConstraintName {
 		case "team_members_role_fk":

@@ -72,6 +72,10 @@
     "groups.error.last_admin": {"text": "A csoportnak legalább egy adminisztrátort meg kell tartania."},
     "groups.error.role_needs_account": {"text": "Adminisztrátor, menedzser és edző csak bejelentkezett fiók lehet, vendég nem."},
     "groups.error.invalid_role": {"text": "Válasszon érvényes szerepet."},
-    "groups.error.member_not_found": {"text": "Ez a tag már nincs a csoportban."}
+    "groups.error.member_not_found": {"text": "Ez a tag már nincs a csoportban."},
+    "groups.slug": {"text": "Hivatkozásnév"},
+    "groups.slug_help": {"text": "A csoport hivatkozásaiban szerepel. Kisbetűk, számok és kötőjelek; módosítása megváltoztatja a csoport webcímét."},
+    "groups.error.invalid_slug": {"text": "Használjon kisbetűket, számokat és egyes kötőjeleket, legfeljebb 64 karakterig. Csak számok, valamint az olyan szavak, mint a „new” vagy a „settings” nem engedélyezettek."},
+    "groups.error.slug_taken": {"text": "Ezt a hivatkozásnevet már használja egy másik csoport."}
   }
 }

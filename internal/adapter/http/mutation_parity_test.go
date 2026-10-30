@@ -94,17 +94,17 @@ func TestSettingsMutationAuthenticationParity(t *testing.T) {
 func TestGroupMutationParity(t *testing.T) {
 	t.Run("create redirect", func(t *testing.T) {
 		dependencies := settingsStubDependencies(t)
-		dependencies.Groups = &groupsUseCaseStub{summary: service.GroupSummary{Group: service.Group{ID: 3, Name: "Team"}, Roles: []string{service.GroupRoleAdmin}}}
+		dependencies.Groups = &groupsUseCaseStub{summary: service.GroupSummary{Group: service.Group{ID: 3, Slug: "lions", Name: "Team"}, Roles: []string{service.GroupRoleAdmin}}}
 		handler, _ := newGroupsTestHandler(t, dependencies)
 
 		full, htmx := runBothModes(handler.create, func(htmx bool) *http.Request {
 			return mutationRequest(http.MethodPost, "/en/groups", "name=Team", htmx, nil)
 		})
-		if full.Code != http.StatusSeeOther || full.Header().Get("Location") != "/en/groups/3" {
-			t.Fatalf("full create = %d %q, want 303 /en/groups/3", full.Code, full.Header().Get("Location"))
+		if full.Code != http.StatusSeeOther || full.Header().Get("Location") != "/en/groups/lions" {
+			t.Fatalf("full create = %d %q, want 303 /en/groups/lions", full.Code, full.Header().Get("Location"))
 		}
-		if htmx.Code != http.StatusOK || htmx.Header().Get("HX-Redirect") != "/en/groups/3" {
-			t.Fatalf("HTMX create = %d %q, want 200 HX-Redirect /en/groups/3", htmx.Code, htmx.Header().Get("HX-Redirect"))
+		if htmx.Code != http.StatusOK || htmx.Header().Get("HX-Redirect") != "/en/groups/lions" {
+			t.Fatalf("HTMX create = %d %q, want 200 HX-Redirect /en/groups/lions", htmx.Code, htmx.Header().Get("HX-Redirect"))
 		}
 		if htmx.Header().Get("Location") != "" {
 			t.Fatalf("HTMX create also set Location = %q", htmx.Header().Get("Location"))
@@ -128,8 +128,8 @@ func TestGroupMutationParity(t *testing.T) {
 	t.Run("settings conflict", func(t *testing.T) {
 		dependencies, groups, _ := groupTestDependencies(t, groupMemberAs(service.GroupRoleAdmin))
 		groups.writeErr = service.ErrOptimisticLockConflict
-		full := serveGroups(t, dependencies, http.MethodPost, "/en/groups/3/settings", "name=New&time_zone=UTC&version=1", false)
-		htmx := serveGroups(t, dependencies, http.MethodPost, "/en/groups/3/settings", "name=New&time_zone=UTC&version=1", true)
+		full := serveGroups(t, dependencies, http.MethodPost, "/en/groups/lions/settings", "name=New&time_zone=UTC&version=1", false)
+		htmx := serveGroups(t, dependencies, http.MethodPost, "/en/groups/lions/settings", "name=New&time_zone=UTC&version=1", true)
 		// Full pages keep the specific status; HTMX gets 422 so the layout
 		// swaps the fragment and its alert in.
 		if full.Code != http.StatusConflict || htmx.Code != http.StatusUnprocessableEntity {
@@ -145,7 +145,7 @@ func TestGroupMutationParity(t *testing.T) {
 		handler, _ := newGroupsTestHandler(t, dependencies)
 
 		full, htmx := runBothModes(handler.leave, func(htmx bool) *http.Request {
-			return mutationRequest(http.MethodPost, "/en/groups/3/leave", "", htmx, nil)
+			return mutationRequest(http.MethodPost, "/en/groups/lions/leave", "", htmx, nil)
 		})
 		if full.Code != http.StatusNotFound {
 			t.Fatalf("status = %d, want %d", full.Code, http.StatusNotFound)
@@ -158,7 +158,7 @@ func TestGroupMutationParity(t *testing.T) {
 		handler, _ := newGroupsTestHandler(t, dependencies)
 
 		full, htmx := runBothModes(handler.leave, func(htmx bool) *http.Request {
-			return mutationRequest(http.MethodPost, "/en/groups/3/leave", "", htmx, nil)
+			return mutationRequest(http.MethodPost, "/en/groups/lions/leave", "", htmx, nil)
 		})
 		if full.Code != http.StatusSeeOther || full.Header().Get("Location") != "/en/groups" {
 			t.Fatalf("full leave = %d %q, want 303 /en/groups", full.Code, full.Header().Get("Location"))

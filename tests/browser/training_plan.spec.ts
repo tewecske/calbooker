@@ -59,7 +59,7 @@ test.describe("training plan", () => {
     await page.goto(`${appURL}/en/groups`);
     await page.locator("#group-new-name").fill(uniqueName("Club"));
     await page.locator("#group-new-name").locator("xpath=ancestor::form").getByRole("button").click();
-    await page.waitForURL(/\/en\/groups\/\d+$/);
+    await page.waitForURL(/\/en\/groups\/(?!join$)[a-z0-9-]+$/);
     const groupURL = page.url();
 
     // A team aged 9-10, one resource, and a season around today.
@@ -68,7 +68,7 @@ test.describe("training plan", () => {
     await page.locator("#team-new-birth-year-from").fill(String(startYear - 10));
     await page.locator("#team-new-birth-year-to").fill(String(startYear - 9));
     await page.getByRole("button", { name: "Create a team" }).click();
-    await page.waitForURL(/\/en\/groups\/\d+\/teams\/\d+$/);
+    await page.waitForURL(/\/en\/groups\/[a-z0-9-]+\/teams\/[a-z0-9-]+$/);
     const teamURL = page.url();
     await page.goto(`${groupURL}/resources`);
     await page.locator("#resource-new-name").fill(field);
@@ -82,7 +82,7 @@ test.describe("training plan", () => {
     await page.locator("#season-new-part1-starts-on").fill(dateFromToday(-30));
     await page.locator("#season-new-part1-ends-on").fill(dateFromToday(300));
     await page.getByRole("button", { name: "Add a season" }).click();
-    await page.waitForURL(/\/en\/groups\/\d+\/seasons\/\d+$/);
+    await page.waitForURL(/\/en\/groups\/[a-z0-9-]+\/seasons\/\d+$/);
 
     // The coach joins, coaches the team, and is free on Tuesday only.
     const coach = await poolUser(browser, "coach");

@@ -3,6 +3,7 @@ package httpadapter
 import (
 	"context"
 	"net/http"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -14,18 +15,18 @@ func TestTeamsListAndCreate(t *testing.T) {
 	archivedAt := int64(5)
 	dependencies, _, teams := groupTestDependencies(t, groupMemberAs(service.GroupRoleManager))
 	teams.summaries = []service.TeamSummary{
-		{Team: service.Team{ID: 4, GroupID: 3, Name: "Lions", BirthYearFrom: 2015, BirthYearTo: 2016, Description: &description}, Players: 2, Parents: 1},
-		{Team: service.Team{ID: 5, GroupID: 3, Name: "Old Boys", BirthYearFrom: 1980, BirthYearTo: 1980, ArchivedAt: &archivedAt}},
+		{Team: service.Team{ID: 4, Slug: "t4", GroupID: 3, Name: "Lions", BirthYearFrom: 2015, BirthYearTo: 2016, Description: &description}, Players: 2, Parents: 1},
+		{Team: service.Team{ID: 5, Slug: "t5", GroupID: 3, Name: "Old Boys", BirthYearFrom: 1980, BirthYearTo: 1980, ArchivedAt: &archivedAt}},
 	}
-	body := serveGroups(t, dependencies, http.MethodGet, "/en/groups/3/teams", "", false).Body.String()
+	body := serveGroups(t, dependencies, http.MethodGet, "/en/groups/lions/teams", "", false).Body.String()
 	for _, want := range []string{"Lions", "2015–2016", "U10", "Archived teams", "Old Boys", `id="team-new-name"`, `data-section="teams"`} {
 		if !strings.Contains(body, want) {
 			t.Errorf("teams page missing %q", want)
 		}
 	}
 
-	created := serveGroups(t, dependencies, http.MethodPost, "/en/groups/3/teams", "name=Tigers&birth_year_from=2014&birth_year_to=2015&description=U11", true)
-	if created.Header().Get("HX-Redirect") != "/en/groups/3/teams/99" {
+	created := serveGroups(t, dependencies, http.MethodPost, "/en/groups/lions/teams", "name=Tigers&birth_year_from=2014&birth_year_to=2015&description=U11", true)
+	if created.Header().Get("HX-Redirect") != "/en/groups/lions/teams/t99" {
 		t.Fatalf("create redirect = %q, want the new team", created.Header().Get("HX-Redirect"))
 	}
 	if teams.lastInput != (service.TeamInput{Name: "Tigers", BirthYearFrom: 2014, BirthYearTo: 2015, Description: "U11"}) {
@@ -33,7 +34,7 @@ func TestTeamsListAndCreate(t *testing.T) {
 	}
 
 	teams.writeErr = service.ErrInvalidTeamBirthYears
-	invalid := serveGroups(t, dependencies, http.MethodPost, "/en/groups/3/teams", "name=Tigers&birth_year_from=2016&birth_year_to=2015", false)
+	invalid := serveGroups(t, dependencies, http.MethodPost, "/en/groups/lions/teams", "name=Tigers&birth_year_from=2016&birth_year_to=2015", false)
 	invalidBody := invalid.Body.String()
 	if invalid.Code != http.StatusUnprocessableEntity || !strings.Contains(invalidBody, "between 1900 and 2200") || !strings.Contains(invalidBody, `value="2016"`) {
 		t.Fatalf("invalid create = %d, want 422 keeping values and showing the year error", invalid.Code)
@@ -42,7 +43,7 @@ func TestTeamsListAndCreate(t *testing.T) {
 
 func TestTeamsListHidesCreateFromPlayers(t *testing.T) {
 	dependencies, _, _ := groupTestDependencies(t, groupMemberAs(service.GroupRolePlayer))
-	body := serveGroups(t, dependencies, http.MethodGet, "/en/groups/3/teams", "", false).Body.String()
+	body := serveGroups(t, dependencies, http.MethodGet, "/en/groups/lions/teams", "", false).Body.String()
 	if strings.Contains(body, `id="team-new-name"`) || !strings.Contains(body, "no teams you can see") {
 		t.Fatal("player teams page must not offer the create form")
 	}
@@ -51,7 +52,7 @@ func TestTeamsListHidesCreateFromPlayers(t *testing.T) {
 func TestTeamDetailByRole(t *testing.T) {
 	email := "kid@example.test"
 	detail := service.TeamDetail{
-		Team:       service.Team{ID: 4, GroupID: 3, Name: "Lions", BirthYearFrom: 2015, BirthYearTo: 2016, Version: 6},
+		Team:       service.Team{ID: 4, Slug: "t4", GroupID: 3, Name: "Lions", BirthYearFrom: 2015, BirthYearTo: 2016, Version: 6},
 		Roster:     []service.TeamRosterEntry{{UserID: 8, Role: service.GroupRolePlayer, Email: &email}, {UserID: 9, Role: service.GroupRoleParent}},
 		Candidates: []service.GroupMember{{UserID: 10, Roles: []string{service.GroupRolePlayer, service.GroupRoleParent}}, {UserID: 8, Roles: []string{service.GroupRolePlayer}}},
 	}
@@ -76,7 +77,7 @@ func TestTeamDetailByRole(t *testing.T) {
 			if !test.access.CanManageRoster(4) {
 				teams.detail.Candidates = nil
 			}
-			response := serveGroups(t, dependencies, http.MethodGet, "/en/groups/3/teams/4", "", false)
+			response := serveGroups(t, dependencies, http.MethodGet, "/en/groups/lions/teams/t4", "", false)
 			body := response.Body.String()
 			if response.Code != http.StatusOK || !strings.Contains(body, `id="team-heading"`) || !strings.Contains(body, "2015–2016") {
 				t.Fatalf("status = %d, team page incomplete", response.Code)
@@ -105,38 +106,38 @@ func TestTeamDetailByRole(t *testing.T) {
 func TestTeamDetailOfInvisibleTeamIsNotFound(t *testing.T) {
 	dependencies, _, teams := groupTestDependencies(t, groupMemberAs(service.GroupRolePlayer))
 	teams.detailErr = service.ErrTeamNotFound
-	if response := serveGroups(t, dependencies, http.MethodGet, "/en/groups/3/teams/4", "", false); response.Code != http.StatusNotFound {
+	if response := serveGroups(t, dependencies, http.MethodGet, "/en/groups/lions/teams/t4", "", false); response.Code != http.StatusNotFound {
 		t.Fatalf("status = %d, want 404", response.Code)
 	}
-	if response := serveGroups(t, dependencies, http.MethodGet, "/en/groups/3/teams/x", "", false); response.Code != http.StatusNotFound {
+	if response := serveGroups(t, dependencies, http.MethodGet, "/en/groups/lions/teams/x", "", false); response.Code != http.StatusNotFound {
 		t.Fatalf("malformed team id status = %d, want 404", response.Code)
 	}
 }
 
 func TestTeamWrites(t *testing.T) {
 	dependencies, _, teams := groupTestDependencies(t, groupMemberAs(service.GroupRoleAdmin))
-	teams.detail = service.TeamDetail{Team: service.Team{ID: 4, GroupID: 3, Name: "Lions", BirthYearFrom: 2015, BirthYearTo: 2016, Version: 6}}
+	teams.detail = service.TeamDetail{Team: service.Team{ID: 4, Slug: "t4", GroupID: 3, Name: "Lions", BirthYearFrom: 2015, BirthYearTo: 2016, Version: 6}}
 
-	saved := serveGroups(t, dependencies, http.MethodPost, "/en/groups/3/teams/4", "version=6&name=Lions&birth_year_from=2015&birth_year_to=2016", true)
+	saved := serveGroups(t, dependencies, http.MethodPost, "/en/groups/lions/teams/t4", "version=6&name=Lions&birth_year_from=2015&birth_year_to=2016", true)
 	if saved.Code != http.StatusOK || !strings.Contains(saved.Body.String(), "Team saved.") || teams.lastVersion != 6 {
 		t.Fatalf("save = %d (version %d)", saved.Code, teams.lastVersion)
 	}
-	archived := serveGroups(t, dependencies, http.MethodPost, "/en/groups/3/teams/4/archive", "version=7&archived=true", true)
+	archived := serveGroups(t, dependencies, http.MethodPost, "/en/groups/lions/teams/t4/archive", "version=7&archived=true", true)
 	if archived.Code != http.StatusOK || !strings.Contains(archived.Body.String(), "Team archived.") || !teams.lastArchived {
 		t.Fatalf("archive = %d", archived.Code)
 	}
-	added := serveGroups(t, dependencies, http.MethodPost, "/en/groups/3/teams/4/roster/add", "entry=10%3Aparent", true)
+	added := serveGroups(t, dependencies, http.MethodPost, "/en/groups/lions/teams/t4/roster/add", "entry=10%3Aparent", true)
 	if added.Code != http.StatusOK || teams.lastUser != 10 || teams.lastRole != service.GroupRoleParent {
 		t.Fatalf("roster add = %d (user %d role %q)", added.Code, teams.lastUser, teams.lastRole)
 	}
-	removed := serveGroups(t, dependencies, http.MethodPost, "/en/groups/3/teams/4/roster/remove", "entry=10:parent", true)
+	removed := serveGroups(t, dependencies, http.MethodPost, "/en/groups/lions/teams/t4/roster/remove", "entry=10:parent", true)
 	if removed.Code != http.StatusOK || !strings.Contains(removed.Body.String(), "Removed from the team.") {
 		t.Fatalf("roster remove = %d", removed.Code)
 	}
 
 	writes := teams.writes
 	for _, entry := range []string{"", "10", "x:player", "10:coach", "-1:player"} {
-		response := serveGroups(t, dependencies, http.MethodPost, "/en/groups/3/teams/4/roster/add", "entry="+entry, false)
+		response := serveGroups(t, dependencies, http.MethodPost, "/en/groups/lions/teams/t4/roster/add", "entry="+entry, false)
 		if response.Code != http.StatusUnprocessableEntity {
 			t.Errorf("entry %q status = %d, want 422", entry, response.Code)
 		}
@@ -156,7 +157,7 @@ func TestTeamWrites(t *testing.T) {
 		{service.ErrTeamNotFound, http.StatusNotFound, ""},
 	} {
 		teams.writeErr = test.err
-		response := serveGroups(t, dependencies, http.MethodPost, "/en/groups/3/teams/4/roster/add", "entry=10:player", false)
+		response := serveGroups(t, dependencies, http.MethodPost, "/en/groups/lions/teams/t4/roster/add", "entry=10:player", false)
 		if response.Code != test.status || !strings.Contains(response.Body.String(), test.text) {
 			t.Errorf("error %v = %d, want %d with %q", test.err, response.Code, test.status, test.text)
 		}
@@ -190,7 +191,28 @@ func (s *teamsUseCaseStub) List(context.Context, *service.GroupAccess) ([]servic
 
 func (s *teamsUseCaseStub) Create(_ context.Context, _ service.GroupActor, input service.TeamInput) (service.Team, error) {
 	s.lastInput = input
-	return service.Team{ID: 99, GroupID: 3, Name: input.Name}, s.write()
+	return service.Team{ID: 99, Slug: "t99", GroupID: 3, Name: input.Name}, s.write()
+}
+
+// stubTeamSlug names team 4 "t4": stub teams are addressed as t<ID>.
+func (s *teamsUseCaseStub) BySlug(_ context.Context, _ *service.GroupAccess, slug string) (service.Team, error) {
+	id, err := strconv.ParseInt(strings.TrimPrefix(slug, "t"), 10, 64)
+	if err != nil || !strings.HasPrefix(slug, "t") {
+		return service.Team{}, service.ErrTeamNotFound
+	}
+	return service.Team{ID: id, GroupID: 3, Name: "Team " + slug, Slug: slug}, nil
+}
+
+func (s *teamsUseCaseStub) ByID(_ context.Context, _ *service.GroupAccess, teamID int64) (service.Team, error) {
+	return service.Team{ID: teamID, GroupID: 3, Slug: "t" + strconv.FormatInt(teamID, 10)}, nil
+}
+
+func (s *teamsUseCaseStub) Slugs(context.Context, *service.GroupAccess) (map[int64]string, error) {
+	slugs := make(map[int64]string)
+	for id := int64(1); id <= 100; id++ {
+		slugs[id] = "t" + strconv.FormatInt(id, 10)
+	}
+	return slugs, nil
 }
 
 func (s *teamsUseCaseStub) Detail(context.Context, *service.GroupAccess, int64) (service.TeamDetail, error) {

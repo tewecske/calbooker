@@ -176,6 +176,12 @@
             {{with $.Form.Error "name"}}<p id="group-settings-name-error" class="text-sm text-error" role="alert">{{.}}</p>{{end}}
           </fieldset>
           <fieldset class="fieldset">
+            <label class="fieldset-legend" for="group-settings-slug">{{$L.groups_slug}}</label>
+            <input id="group-settings-slug" class="input w-full" name="slug" required maxlength="64" pattern="[a-z0-9]+(-[a-z0-9]+)*" value="{{.Slug}}" aria-describedby="group-settings-slug-help group-settings-slug-error">
+            <p id="group-settings-slug-help" class="label">{{$L.groups_slug_help}}</p>
+            {{with $.Form.Error "slug"}}<p id="group-settings-slug-error" class="text-sm text-error" role="alert">{{.}}</p>{{end}}
+          </fieldset>
+          <fieldset class="fieldset">
             <label class="fieldset-legend" for="group-settings-time-zone">{{$L.groups_time_zone}}</label>
             <select id="group-settings-time-zone" class="select w-full" name="time_zone" aria-describedby="group-settings-time-zone-error">{{template "time-zone-options" .TimeZones}}</select>
             <p class="label">{{$L.groups_time_zone_help}}</p>

@@ -36,6 +36,10 @@
     "teams.error.invalid_birth_years": {"text": "Enter birth years between 1900 and 2200, the first not after the second."},
     "teams.error.invalid_description": {"text": "Enter a description up to 255 characters."},
     "teams.error.roster_role_missing": {"text": "Give the member the player or parent role first."},
-    "teams.error.roster_entry_not_found": {"text": "That member is no longer on this team."}
+    "teams.error.roster_entry_not_found": {"text": "That member is no longer on this team."},
+    "teams.slug": {"text": "Link name"},
+    "teams.slug_help": {"text": "Used in the team's links. Lowercase letters, digits, and hyphens; changing it changes the team's web address."},
+    "teams.error.invalid_slug": {"text": "Use lowercase letters, digits, and single hyphens, up to 64 characters. Numbers alone and words like \"new\" or \"edit\" are not allowed."},
+    "teams.error.slug_taken": {"text": "Another team in this group already uses that link name."}
   }
 }

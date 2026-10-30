@@ -135,7 +135,11 @@ type InviteInput struct {
 type InviteRedemption struct {
 	Membership GroupMembership
 	TeamID     int64
-	Changed    bool
+	// GroupSlug and TeamSlug address the group and team in URLs; TeamSlug is
+	// empty when the invite has no team.
+	GroupSlug string
+	TeamSlug  string
+	Changed   bool
 }
 
 // GroupInviteRepository persists invites. RedeemInvite re-checks the invite

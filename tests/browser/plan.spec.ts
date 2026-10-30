@@ -52,7 +52,7 @@ async function createSeason(page: Page, groupURL: string, name: string, from: nu
   await page.locator("#season-new-part1-ends-on").fill(dateFromToday(to));
   await page.locator("#season-new-part1-alternating").check();
   await page.getByRole("button", { name: "Add a season" }).click();
-  await page.waitForURL(/\/en\/groups\/\d+\/seasons\/\d+$/);
+  await page.waitForURL(/\/en\/groups\/[a-z0-9-]+\/seasons\/\d+$/);
 }
 
 test.describe("plan", () => {
@@ -70,7 +70,7 @@ test.describe("plan", () => {
     await page.goto(`${appURL}/en/groups`);
     await page.locator("#group-new-name").fill(uniqueName("Club"));
     await page.locator("#group-new-name").locator("xpath=ancestor::form").getByRole("button").click();
-    await page.waitForURL(/\/en\/groups\/\d+$/);
+    await page.waitForURL(/\/en\/groups\/(?!join$)[a-z0-9-]+$/);
     const groupURL = page.url();
 
     // Before seasons exist the plan says so.

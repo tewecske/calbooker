@@ -175,7 +175,7 @@ func TestCalendarShowsEachRoleItsEvents(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			dependencies, _ := calendarDependencies(t, test.access)
-			response := serveGroups(t, dependencies, http.MethodGet, "/en/groups/3/calendar?week=2026-10-21", "", false)
+			response := serveGroups(t, dependencies, http.MethodGet, "/en/groups/lions/calendar?week=2026-10-21", "", false)
 			if response.Code != http.StatusOK {
 				t.Fatalf("status = %d", response.Code)
 			}
@@ -238,11 +238,11 @@ func TestCalendarFiltersNeverWiden(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			dependencies, _ := calendarDependencies(t, test.access)
-			body := serveGroups(t, dependencies, http.MethodGet, "/en/groups/3/calendar?week=2026-10-19&"+test.query, "", false).Body.String()
+			body := serveGroups(t, dependencies, http.MethodGet, "/en/groups/lions/calendar?week=2026-10-19&"+test.query, "", false).Body.String()
 			if got := shownEventIDs(t, body); !slices.Equal(got, test.want) {
 				t.Errorf("shown = %v, want %v", got, test.want)
 			}
-			next := `href="/en/groups/3/calendar?` + strings.TrimPrefix(strings.ReplaceAll("&"+test.kept+"&week=2026-10-26", "&&", "&"), "&") + `"`
+			next := `href="/en/groups/lions/calendar?` + strings.TrimPrefix(strings.ReplaceAll("&"+test.kept+"&week=2026-10-26", "&&", "&"), "&") + `"`
 			if test.kept != "" && !strings.Contains(body, strings.ReplaceAll(next, "&", "&amp;")) {
 				t.Errorf("next week link does not keep the filter: want %s", next)
 			}
@@ -255,7 +255,7 @@ func TestCalendarFiltersNeverWiden(t *testing.T) {
 
 func TestCalendarWeekInGroupTimeZone(t *testing.T) {
 	dependencies, events := calendarDependencies(t, groupMemberAs(service.GroupRoleAdmin))
-	body := serveGroups(t, dependencies, http.MethodGet, "/en/groups/3/calendar?week=2026-10-25", "", false).Body.String()
+	body := serveGroups(t, dependencies, http.MethodGet, "/en/groups/lions/calendar?week=2026-10-25", "", false).Body.String()
 	// Any day of the week selects its Monday; the week runs from local
 	// midnight on Monday (summer time) to local midnight on the next Monday
 	// (winter time), 169 hours.
@@ -269,8 +269,8 @@ func TestCalendarWeekInGroupTimeZone(t *testing.T) {
 		// Across midnight: split into Friday and Saturday.
 		`data-wg-item="event-6-5" data-weekday="5" data-start="1320" data-end="1440"`,
 		`data-wg-item="event-6-6" data-weekday="6" data-start="0" data-end="120"`,
-		`href="/en/groups/3/calendar?week=2026-10-12"`,
-		`href="/en/groups/3/calendar?week=2026-10-26"`,
+		`href="/en/groups/lions/calendar?week=2026-10-12"`,
+		`href="/en/groups/lions/calendar?week=2026-10-26"`,
 		"Oct 19 – Oct 25, 2026",
 		"Spans several days: 2026-10-23 22:00 – 2026-10-24 02:00",
 	} {
@@ -283,13 +283,13 @@ func TestCalendarWeekInGroupTimeZone(t *testing.T) {
 	}
 
 	// The spring change: the week of 2026-03-29 is 167 hours.
-	serveGroups(t, dependencies, http.MethodGet, "/en/groups/3/calendar?week=2026-03-29", "", false)
+	serveGroups(t, dependencies, http.MethodGet, "/en/groups/lions/calendar?week=2026-03-29", "", false)
 	if from, to := events.lastQuery.From.UTC(), events.lastQuery.To.UTC(); !from.Equal(time.Date(2026, 3, 22, 23, 0, 0, 0, time.UTC)) || !to.Equal(time.Date(2026, 3, 29, 22, 0, 0, 0, time.UTC)) {
 		t.Fatalf("spring week = %s .. %s", from, to)
 	}
 
 	// No week or a bad one is the current week.
-	for _, target := range []string{"/en/groups/3/calendar", "/en/groups/3/calendar?week=yesterday", "/en/groups/3/calendar?week=1900-01-01"} {
+	for _, target := range []string{"/en/groups/lions/calendar", "/en/groups/lions/calendar?week=yesterday", "/en/groups/lions/calendar?week=1900-01-01"} {
 		body := serveGroups(t, dependencies, http.MethodGet, target, "", false).Body.String()
 		today, _ := service.LocalDate(time.Now(), "Europe/Budapest")
 		week, _ := service.NewCalendarWeek(today, "Europe/Budapest")
@@ -301,14 +301,14 @@ func TestCalendarWeekInGroupTimeZone(t *testing.T) {
 
 func TestCalendarMarksCancelledEventsAndLinksDetails(t *testing.T) {
 	dependencies, _ := calendarDependencies(t, groupMemberAs(service.GroupRoleAdmin))
-	body := serveGroups(t, dependencies, http.MethodGet, "/en/groups/3/calendar?week=2026-10-19", "", false).Body.String()
+	body := serveGroups(t, dependencies, http.MethodGet, "/en/groups/lions/calendar?week=2026-10-19", "", false).Body.String()
 	for _, want := range []string{
 		`class="wg-item wg-item-secondary wg-row-`, // other
-		`<a class="wg-item-label wg-item-link" href="/en/groups/3/events/1" data-wg-link>Event 1</a>`,
+		`<a class="wg-item-label wg-item-link" href="/en/groups/lions/events/1" data-wg-link>Event 1</a>`,
 		`<span class="wg-item-detail">Lions · Court 1</span>`,
 		`<span class="badge badge-xs">Cancelled</span>`,
 		`data-event-id="4" data-event-cancelled="true"`,
-		`<a class="link font-semibold line-through" href="/en/groups/3/events/4">Event 4</a>`,
+		`<a class="link font-semibold line-through" href="/en/groups/lions/events/4">Event 4</a>`,
 		`hx-boost="true" hx-target="#page-content"`,
 		`data-section="calendar" aria-current="page"`,
 		`data-testid="calendar-today"`,
@@ -327,7 +327,7 @@ func TestCalendarMarksCancelledEventsAndLinksDetails(t *testing.T) {
 
 func TestCalendarFragmentAndLanguages(t *testing.T) {
 	dependencies, _ := calendarDependencies(t, playerOfTeam(2))
-	response := serveGroups(t, dependencies, http.MethodGet, "/en/groups/3/calendar?week=2026-10-19&team=2", "", true)
+	response := serveGroups(t, dependencies, http.MethodGet, "/en/groups/lions/calendar?week=2026-10-19&team=2", "", true)
 	body := response.Body.String()
 	if response.Code != http.StatusOK || strings.Contains(body, "<html") || !strings.Contains(body, `id="page-content"`) || !strings.Contains(body, `id="alerts"`) || !strings.Contains(body, `id="calendar-heading"`) {
 		t.Fatalf("fragment status = %d", response.Code)
@@ -335,8 +335,8 @@ func TestCalendarFragmentAndLanguages(t *testing.T) {
 	if got := shownEventIDs(t, body); !slices.Equal(got, []int64{2, 5, 6}) {
 		t.Errorf("fragment shows %v", got)
 	}
-	hungarian := serveGroups(t, dependencies, http.MethodGet, "/hu/groups/3/calendar?week=2026-10-19", "", false).Body.String()
-	for _, want := range []string{"Heti naptár", "Minden csapat", `href="/hu/groups/3/events/2"`, "Mérkőzés"} {
+	hungarian := serveGroups(t, dependencies, http.MethodGet, "/hu/groups/lions/calendar?week=2026-10-19", "", false).Body.String()
+	for _, want := range []string{"Heti naptár", "Minden csapat", `href="/hu/groups/lions/events/2"`, "Mérkőzés"} {
 		if !strings.Contains(hungarian, want) {
 			t.Errorf("Hungarian calendar missing %q", want)
 		}
@@ -345,16 +345,16 @@ func TestCalendarFragmentAndLanguages(t *testing.T) {
 
 func TestCalendarGroupSwitcherKeepsTheWeek(t *testing.T) {
 	dependencies, _ := calendarDependencies(t, playerOfTeam(2))
-	body := serveGroups(t, dependencies, http.MethodGet, "/en/groups/3/calendar?week=2026-10-21&team=2&kind=match", "", false).Body.String()
+	body := serveGroups(t, dependencies, http.MethodGet, "/en/groups/lions/calendar?week=2026-10-21&team=2&kind=match", "", false).Body.String()
 	if strings.Contains(body, `data-testid="calendar-groups"`) {
 		t.Fatal("switcher shown for a single group")
 	}
 	groups := dependencies.Groups.(*groupsUseCaseStub)
-	groups.summaries = []service.GroupSummary{{Group: service.Group{ID: 3, Name: "Lions Club"}}, {Group: service.Group{ID: 9, Name: "Swim Club"}}}
-	body = serveGroups(t, dependencies, http.MethodGet, "/en/groups/3/calendar?week=2026-10-21&team=2&kind=match", "", false).Body.String()
+	groups.summaries = []service.GroupSummary{{Group: service.Group{ID: 3, Slug: "lions", Name: "Lions Club"}}, {Group: service.Group{ID: 9, Slug: "swim-club", Name: "Swim Club"}}}
+	body = serveGroups(t, dependencies, http.MethodGet, "/en/groups/lions/calendar?week=2026-10-21&team=2&kind=match", "", false).Body.String()
 	for _, want := range []string{
-		`<a href="/en/groups/9/calendar?kind=match&amp;week=2026-10-19" data-calendar-group>Swim Club</a>`,
-		`<a href="/en/groups/3/calendar?kind=match&amp;week=2026-10-19" class="menu-active" aria-current="page" data-calendar-group>Lions Club</a>`,
+		`<a href="/en/groups/swim-club/calendar?kind=match&amp;week=2026-10-19" data-calendar-group>Swim Club</a>`,
+		`<a href="/en/groups/lions/calendar?kind=match&amp;week=2026-10-19" class="menu-active" aria-current="page" data-calendar-group>Lions Club</a>`,
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("switcher missing %q", want)
@@ -365,23 +365,23 @@ func TestCalendarGroupSwitcherKeepsTheWeek(t *testing.T) {
 func TestCalendarOutsidersAndFailures(t *testing.T) {
 	dependencies, events := calendarDependencies(t, nil)
 	dependencies.GroupAccess = &groupAccessStub{err: service.ErrGroupNotFound}
-	if response := serveGroups(t, dependencies, http.MethodGet, "/en/groups/3/calendar", "", false); response.Code != http.StatusNotFound || events.calls != 0 {
+	if response := serveGroups(t, dependencies, http.MethodGet, "/en/groups/lions/calendar", "", false); response.Code != http.StatusNotFound || events.calls != 0 {
 		t.Fatalf("non-member status = %d, calls = %d", response.Code, events.calls)
 	}
 	dependencies, _ = calendarDependencies(t, groupAccessAs(service.GroupAccessGrants{}))
-	if response := serveGroups(t, dependencies, http.MethodGet, "/en/groups/3/calendar", "", false); response.Code != http.StatusNotFound {
+	if response := serveGroups(t, dependencies, http.MethodGet, "/en/groups/lions/calendar", "", false); response.Code != http.StatusNotFound {
 		t.Fatalf("access without membership status = %d", response.Code)
 	}
 	dependencies, _ = calendarDependencies(t, groupMemberAs())
 	dependencies.Events = nil
-	if response := serveGroups(t, dependencies, http.MethodGet, "/en/groups/3/calendar", "", false); response.Code != http.StatusInternalServerError {
+	if response := serveGroups(t, dependencies, http.MethodGet, "/en/groups/lions/calendar", "", false); response.Code != http.StatusInternalServerError {
 		t.Fatalf("missing events status = %d", response.Code)
 	}
 	handler, _ := newGroupsTestHandler(t, settingsStubDependencies(t))
 	mux := http.NewServeMux()
 	registerGroupRoutes(mux, handler)
 	response := httptest.NewRecorder()
-	mux.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/en/groups/3/calendar", nil))
+	mux.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/en/groups/lions/calendar", nil))
 	if response.Code != http.StatusSeeOther {
 		t.Fatalf("anonymous status = %d", response.Code)
 	}
@@ -390,7 +390,7 @@ func TestCalendarOutsidersAndFailures(t *testing.T) {
 func TestCalendarNavigationForEveryMember(t *testing.T) {
 	for _, access := range []*service.GroupAccess{groupMemberAs(), playerOfTeam(4), calendarParent(), calendarCoach(), groupMemberAs(service.GroupRoleAdmin)} {
 		dependencies, _ := calendarDependencies(t, access)
-		if body := serveGroups(t, dependencies, http.MethodGet, "/en/groups/3", "", false).Body.String(); !strings.Contains(body, `href="/en/groups/3/calendar" data-section="calendar"`) {
+		if body := serveGroups(t, dependencies, http.MethodGet, "/en/groups/lions", "", false).Body.String(); !strings.Contains(body, `href="/en/groups/lions/calendar" data-section="calendar"`) {
 			t.Errorf("roles %v: calendar tab missing", access.Roles())
 		}
 	}
@@ -457,7 +457,7 @@ func TestCalendarShowsOwnAndChildAnswers(t *testing.T) {
 		dependencies, _ := calendarDependencies(t, playerOfTeam(2))
 		answers := &calendarAnswersStub{participationUseCaseStub: &participationUseCaseStub{}, stored: calendarAnswerFixture()}
 		dependencies.Participation = answers
-		body := serveGroups(t, dependencies, http.MethodGet, "/en/groups/3/calendar?week=2026-10-19", "", false).Body.String()
+		body := serveGroups(t, dependencies, http.MethodGet, "/en/groups/lions/calendar?week=2026-10-19", "", false).Body.String()
 		if answers.calls != 1 {
 			t.Errorf("answer queries = %d, want 1", answers.calls)
 		}
@@ -482,7 +482,7 @@ func TestCalendarShowsOwnAndChildAnswers(t *testing.T) {
 		dependencies, _ := calendarDependencies(t, calendarParent())
 		answers := &calendarAnswersStub{participationUseCaseStub: &participationUseCaseStub{}, stored: calendarAnswerFixture()}
 		dependencies.Participation = answers
-		body := serveGroups(t, dependencies, http.MethodGet, "/en/groups/3/calendar?week=2026-10-19", "", false).Body.String()
+		body := serveGroups(t, dependencies, http.MethodGet, "/en/groups/lions/calendar?week=2026-10-19", "", false).Body.String()
 		if !strings.Contains(body, `data-calendar-status="nominated" data-calendar-child="true">Anna: Nominated</span>`) {
 			t.Errorf("child badge missing in %d bytes", len(body))
 		}
@@ -493,7 +493,7 @@ func TestCalendarShowsOwnAndChildAnswers(t *testing.T) {
 	t.Run("hungarian labels", func(t *testing.T) {
 		dependencies, _ := calendarDependencies(t, calendarParent())
 		dependencies.Participation = &calendarAnswersStub{participationUseCaseStub: &participationUseCaseStub{}, stored: calendarAnswerFixture()}
-		body := serveGroups(t, dependencies, http.MethodGet, "/hu/groups/3/calendar?week=2026-10-19", "", false).Body.String()
+		body := serveGroups(t, dependencies, http.MethodGet, "/hu/groups/lions/calendar?week=2026-10-19", "", false).Body.String()
 		if !strings.Contains(body, "Anna: ") || strings.Contains(body, "Anna: Nominated") {
 			t.Error("child badge is not localized")
 		}
@@ -501,7 +501,7 @@ func TestCalendarShowsOwnAndChildAnswers(t *testing.T) {
 	t.Run("a failing query is an error page", func(t *testing.T) {
 		dependencies, _ := calendarDependencies(t, playerOfTeam(2))
 		dependencies.Participation = &calendarAnswersStub{participationUseCaseStub: &participationUseCaseStub{}, err: errors.New("down")}
-		if response := serveGroups(t, dependencies, http.MethodGet, "/en/groups/3/calendar?week=2026-10-19", "", false); response.Code != http.StatusInternalServerError {
+		if response := serveGroups(t, dependencies, http.MethodGet, "/en/groups/lions/calendar?week=2026-10-19", "", false); response.Code != http.StatusInternalServerError {
 			t.Errorf("status = %d", response.Code)
 		}
 	})
@@ -509,7 +509,7 @@ func TestCalendarShowsOwnAndChildAnswers(t *testing.T) {
 		dependencies, _ := calendarDependencies(t, groupAccessAs(service.GroupAccessGrants{}))
 		answers := &calendarAnswersStub{participationUseCaseStub: &participationUseCaseStub{}, stored: calendarAnswerFixture()}
 		dependencies.Participation = answers
-		if response := serveGroups(t, dependencies, http.MethodGet, "/en/groups/3/calendar", "", false); response.Code != http.StatusNotFound || answers.calls != 0 {
+		if response := serveGroups(t, dependencies, http.MethodGet, "/en/groups/lions/calendar", "", false); response.Code != http.StatusNotFound || answers.calls != 0 {
 			t.Errorf("status = %d, queries = %d", response.Code, answers.calls)
 		}
 	})

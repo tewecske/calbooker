@@ -241,8 +241,8 @@ func (s *seeder) run(subjects map[string]string) {
 func (s *seeder) group(g GroupPlan) {
 	unix := s.now.Unix()
 	groupID := s.insert(`
-		INSERT INTO groups (name, name_norm, time_zone, created_by, created_at)
-		VALUES ($1, $2, $3, $4, $5)`, g.Name, strings.ToLower(g.Name), TimeZone, s.users[g.Admin()], unix)
+		INSERT INTO groups (name, slug, name_norm, time_zone, created_by, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6)`, g.Name, g.Slug, strings.ToLower(g.Name), TimeZone, s.users[g.Admin()], unix)
 	for _, m := range g.Members {
 		userID := s.users[m.Email]
 		s.exec(`INSERT INTO group_members (group_id, user_id, created_at) VALUES ($1, $2, $3)`, groupID, userID, unix)
@@ -279,8 +279,8 @@ func (s *seeder) group(g GroupPlan) {
 	// Guardians come first: a parent's role row must exist, which it does
 	// once the roles above are inserted.
 	for t, team := range g.Teams {
-		teamID := s.insert(`INSERT INTO teams (group_id, name, birth_year_from, birth_year_to, created_at) VALUES ($1, $2, $3, $4, $5)`,
-			groupID, team.Name, team.BirthYearFrom, team.BirthYearTo, unix)
+		teamID := s.insert(`INSERT INTO teams (group_id, name, slug, birth_year_from, birth_year_to, created_at) VALUES ($1, $2, $3, $4, $5, $6)`,
+			groupID, team.Name, team.Slug, team.BirthYearFrom, team.BirthYearTo, unix)
 		for i, player := range team.Players {
 			s.exec(`INSERT INTO team_members (group_id, team_id, user_id, role, created_at) VALUES ($1, $2, $3, 'player', $4)`,
 				groupID, teamID, s.users[player], unix)

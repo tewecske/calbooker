@@ -48,7 +48,7 @@ func seasonDependencies(t *testing.T, access *service.GroupAccess) (Dependencies
 		},
 	}
 	dependencies.Seasons = seasons
-	teams.detail = service.TeamDetail{Team: service.Team{ID: 4, GroupID: 3, Name: "Lions", BirthYearFrom: 2015, BirthYearTo: 2016, Version: 6}}
+	teams.detail = service.TeamDetail{Team: service.Team{ID: 4, Slug: "t4", GroupID: 3, Name: "Lions", BirthYearFrom: 2015, BirthYearTo: 2016, Version: 6}}
 	return dependencies, seasons, teams
 }
 
@@ -69,7 +69,7 @@ func TestSeasonsListByRole(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			dependencies, seasons, _ := seasonDependencies(t, test.access)
-			response := serveGroups(t, dependencies, http.MethodGet, "/en/groups/3/seasons", "", false)
+			response := serveGroups(t, dependencies, http.MethodGet, "/en/groups/lions/seasons", "", false)
 			if response.Code != test.wantStatus {
 				t.Fatalf("status = %d, want %d", response.Code, test.wantStatus)
 			}
@@ -80,7 +80,7 @@ func TestSeasonsListByRole(t *testing.T) {
 				}
 				return
 			}
-			for _, want := range []string{`id="group-seasons-heading"`, "2026/27", "2027/28", "Autumn", "Spring", "2026-08-01 – 2027-06-30", `data-season-id="1" data-season-current="true"`, "A/B weeks", `data-section="seasons" aria-current="page"`, `href="/en/groups/3/seasons/1"`} {
+			for _, want := range []string{`id="group-seasons-heading"`, "2026/27", "2027/28", "Autumn", "Spring", "2026-08-01 – 2027-06-30", `data-season-id="1" data-season-current="true"`, "A/B weeks", `data-section="seasons" aria-current="page"`, `href="/en/groups/lions/seasons/1"`} {
 				if !strings.Contains(body, want) {
 					t.Errorf("seasons page missing %q", want)
 				}
@@ -107,7 +107,7 @@ func TestSeasonsNavigationFollowsAccess(t *testing.T) {
 		{groupMemberAs(service.GroupRoleParent), false},
 	} {
 		dependencies, _, _ := seasonDependencies(t, test.access)
-		body := serveGroups(t, dependencies, http.MethodGet, "/en/groups/3", "", false).Body.String()
+		body := serveGroups(t, dependencies, http.MethodGet, "/en/groups/lions", "", false).Body.String()
 		if strings.Contains(body, `data-section="seasons"`) != test.want {
 			t.Errorf("roles %v: seasons tab shown = %v, want %v", test.access.Roles(), !test.want, test.want)
 		}
@@ -118,15 +118,15 @@ func TestSeasonRoutesOutsiderGetsNotFound(t *testing.T) {
 	dependencies, seasons, teams := seasonDependencies(t, nil)
 	dependencies.GroupAccess = &groupAccessStub{err: service.ErrGroupNotFound}
 	for _, test := range []struct{ method, target string }{
-		{http.MethodGet, "/en/groups/3/seasons"},
-		{http.MethodPost, "/en/groups/3/seasons"},
-		{http.MethodGet, "/en/groups/3/seasons/1"},
-		{http.MethodPost, "/en/groups/3/seasons/1"},
-		{http.MethodPost, "/en/groups/3/seasons/1/delete"},
-		{http.MethodPost, "/en/groups/3/teams/4/coaches/add"},
-		{http.MethodPost, "/en/groups/3/teams/4/coaches/head"},
-		{http.MethodPost, "/en/groups/3/teams/4/coaches/remove"},
-		{http.MethodGet, "/hu/groups/3/seasons"},
+		{http.MethodGet, "/en/groups/lions/seasons"},
+		{http.MethodPost, "/en/groups/lions/seasons"},
+		{http.MethodGet, "/en/groups/lions/seasons/1"},
+		{http.MethodPost, "/en/groups/lions/seasons/1"},
+		{http.MethodPost, "/en/groups/lions/seasons/1/delete"},
+		{http.MethodPost, "/en/groups/lions/teams/t4/coaches/add"},
+		{http.MethodPost, "/en/groups/lions/teams/t4/coaches/head"},
+		{http.MethodPost, "/en/groups/lions/teams/t4/coaches/remove"},
+		{http.MethodGet, "/hu/groups/lions/seasons"},
 	} {
 		response := serveGroups(t, dependencies, test.method, test.target, "version=1&name=X&season_id=1&coach_user_id=8", false)
 		if response.Code != http.StatusNotFound || strings.Contains(response.Body.String(), "Lions Club") {
@@ -143,20 +143,20 @@ func TestSeasonCreate(t *testing.T) {
 	form := "name=2026%2F27&starts_on=2026-08-01&ends_on=2027-06-30" +
 		"&part1_name=Autumn&part1_starts_on=2026-08-01&part1_ends_on=2026-12-20" +
 		"&part2_name=Spring&part2_starts_on=2027-01-04&part2_ends_on=2027-06-30&part2_alternating=true"
-	created := serveGroups(t, dependencies, http.MethodPost, "/en/groups/3/seasons", form, false)
-	if created.Code != http.StatusSeeOther || created.Header().Get("Location") != "/en/groups/3/seasons/99" {
+	created := serveGroups(t, dependencies, http.MethodPost, "/en/groups/lions/seasons", form, false)
+	if created.Code != http.StatusSeeOther || created.Header().Get("Location") != "/en/groups/lions/seasons/99" {
 		t.Fatalf("create = %d %q, want 303 to the new season", created.Code, created.Header().Get("Location"))
 	}
 	input := seasons.lastInput
 	if input.Name != "2026/27" || service.FormatSeasonDate(input.StartsOn) != "2026-08-01" || len(input.Parts) != 2 || input.Parts[0].AlternatingWeeks || !input.Parts[1].AlternatingWeeks || service.FormatSeasonDate(input.Parts[1].StartsOn) != "2027-01-04" {
 		t.Fatalf("input = %+v", input)
 	}
-	if htmx := serveGroups(t, dependencies, http.MethodPost, "/en/groups/3/seasons", form, true); htmx.Code != http.StatusOK || htmx.Header().Get("HX-Redirect") != "/en/groups/3/seasons/99" {
+	if htmx := serveGroups(t, dependencies, http.MethodPost, "/en/groups/lions/seasons", form, true); htmx.Code != http.StatusOK || htmx.Header().Get("HX-Redirect") != "/en/groups/lions/seasons/99" {
 		t.Fatalf("HTMX create = %d %q", htmx.Code, htmx.Header().Get("HX-Redirect"))
 	}
 
 	// An empty part 2 means one part; bad dates are passed on as zero.
-	serveGroups(t, dependencies, http.MethodPost, "/en/groups/3/seasons", "name=X&starts_on=soon&ends_on=2027-06-30&part1_name=A&part1_starts_on=2026-08-01&part1_ends_on=2026-12-20&part2_name=+&part2_starts_on=&part2_ends_on=", true)
+	serveGroups(t, dependencies, http.MethodPost, "/en/groups/lions/seasons", "name=X&starts_on=soon&ends_on=2027-06-30&part1_name=A&part1_starts_on=2026-08-01&part1_ends_on=2026-12-20&part2_name=+&part2_starts_on=&part2_ends_on=", true)
 	if len(seasons.lastInput.Parts) != 1 || !seasons.lastInput.StartsOn.IsZero() {
 		t.Fatalf("one-part input = %+v", seasons.lastInput)
 	}
@@ -177,7 +177,7 @@ func TestSeasonCreate(t *testing.T) {
 		{service.ErrSeasonPartsOverlap, "Part 2 must start after part 1 ends", `id="season-new-part2-dates-error"`},
 	} {
 		seasons.writeErr = test.err
-		response := serveGroups(t, dependencies, http.MethodPost, "/en/groups/3/seasons", form, true)
+		response := serveGroups(t, dependencies, http.MethodPost, "/en/groups/lions/seasons", form, true)
 		body := response.Body.String()
 		if response.Code != http.StatusUnprocessableEntity || !strings.Contains(body, test.text) || !strings.Contains(body, test.field) || !strings.Contains(body, `value="Spring"`) || !strings.Contains(body, `value="2027-01-04"`) {
 			t.Errorf("error %v = %d, want 422 with %q on the field and the submitted values", test.err, response.Code, test.text)
@@ -191,14 +191,14 @@ func TestSeasonCreate(t *testing.T) {
 func TestSeasonCreateForbiddenForCoach(t *testing.T) {
 	dependencies, seasons, _ := seasonDependencies(t, groupMemberAs(service.GroupRoleCoach))
 	seasons.writeErr = service.ErrGroupForbidden
-	if response := serveGroups(t, dependencies, http.MethodPost, "/en/groups/3/seasons", "name=X", false); response.Code != http.StatusForbidden {
+	if response := serveGroups(t, dependencies, http.MethodPost, "/en/groups/lions/seasons", "name=X", false); response.Code != http.StatusForbidden {
 		t.Fatalf("coach create = %d, want 403", response.Code)
 	}
-	if response := serveGroups(t, dependencies, http.MethodPost, "/en/groups/3/seasons", "name=X", true); response.Code != http.StatusUnprocessableEntity {
+	if response := serveGroups(t, dependencies, http.MethodPost, "/en/groups/lions/seasons", "name=X", true); response.Code != http.StatusUnprocessableEntity {
 		t.Fatalf("coach HTMX create = %d, want 422 so the alert swaps", response.Code)
 	}
 	player, playerSeasons, _ := seasonDependencies(t, groupMemberAs(service.GroupRolePlayer))
-	if response := serveGroups(t, player, http.MethodPost, "/en/groups/3/seasons", "name=X", false); response.Code != http.StatusForbidden || playerSeasons.writes != 0 {
+	if response := serveGroups(t, player, http.MethodPost, "/en/groups/lions/seasons", "name=X", false); response.Code != http.StatusForbidden || playerSeasons.writes != 0 {
 		t.Fatalf("player create = %d (writes %d), want 403 before the use case", response.Code, playerSeasons.writes)
 	}
 }
@@ -215,17 +215,17 @@ func TestSeasonDetailByRole(t *testing.T) {
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			dependencies, _, _ := seasonDependencies(t, test.access)
-			response := serveGroups(t, dependencies, http.MethodGet, "/en/groups/3/seasons/1", "", false)
+			response := serveGroups(t, dependencies, http.MethodGet, "/en/groups/lions/seasons/1", "", false)
 			body := response.Body.String()
 			if response.Code != http.StatusOK || !strings.Contains(body, `id="season-heading"`) || !strings.Contains(body, `data-testid="season-current-badge"`) || !strings.Contains(body, `data-section="seasons" aria-current="page"`) {
 				t.Fatalf("status = %d, season page incomplete", response.Code)
 			}
-			for _, want := range []string{`data-part-position="2"`, `data-testid="season-part-alternating"`, `data-testid="season-coaches"`, "Carla Coach", "Head coach", `href="/en/groups/3/teams/4"`} {
+			for _, want := range []string{`data-part-position="2"`, `data-testid="season-part-alternating"`, `data-testid="season-coaches"`, "Carla Coach", "Head coach", `href="/en/groups/lions/teams/t4"`} {
 				if !strings.Contains(body, want) {
 					t.Errorf("season page missing %q", want)
 				}
 			}
-			for _, needle := range []string{`id="season-edit-name"`, `/en/groups/3/seasons/1/delete`, `name="version" value="5"`} {
+			for _, needle := range []string{`id="season-edit-name"`, `/en/groups/lions/seasons/1/delete`, `name="version" value="5"`} {
 				if strings.Contains(body, needle) != test.wantEdit {
 					t.Errorf("body contains %q = %v, want %v", needle, !test.wantEdit, test.wantEdit)
 				}
@@ -237,14 +237,14 @@ func TestSeasonDetailByRole(t *testing.T) {
 	}
 	dependencies, seasons, _ := seasonDependencies(t, groupMemberAs(service.GroupRoleAdmin))
 	seasons.findErr = service.ErrSeasonNotFound
-	if response := serveGroups(t, dependencies, http.MethodGet, "/en/groups/3/seasons/9", "", false); response.Code != http.StatusNotFound {
+	if response := serveGroups(t, dependencies, http.MethodGet, "/en/groups/lions/seasons/9", "", false); response.Code != http.StatusNotFound {
 		t.Fatalf("missing season = %d, want 404", response.Code)
 	}
-	if response := serveGroups(t, dependencies, http.MethodGet, "/en/groups/3/seasons/x", "", false); response.Code != http.StatusNotFound {
+	if response := serveGroups(t, dependencies, http.MethodGet, "/en/groups/lions/seasons/x", "", false); response.Code != http.StatusNotFound {
 		t.Fatalf("malformed id = %d, want 404", response.Code)
 	}
 	player, _, _ := seasonDependencies(t, groupMemberAs(service.GroupRolePlayer))
-	if response := serveGroups(t, player, http.MethodGet, "/en/groups/3/seasons/1", "", false); response.Code != http.StatusForbidden {
+	if response := serveGroups(t, player, http.MethodGet, "/en/groups/lions/seasons/1", "", false); response.Code != http.StatusForbidden {
 		t.Fatalf("player detail = %d, want 403", response.Code)
 	}
 }
@@ -252,17 +252,17 @@ func TestSeasonDetailByRole(t *testing.T) {
 func TestSeasonUpdateAndDelete(t *testing.T) {
 	dependencies, seasons, _ := seasonDependencies(t, groupMemberAs(service.GroupRoleAdmin))
 	form := "version=5&name=Renamed&starts_on=2026-08-01&ends_on=2027-06-30&part1_name=Autumn&part1_starts_on=2026-08-01&part1_ends_on=2026-12-20"
-	saved := serveGroups(t, dependencies, http.MethodPost, "/en/groups/3/seasons/1", form, true)
+	saved := serveGroups(t, dependencies, http.MethodPost, "/en/groups/lions/seasons/1", form, true)
 	if saved.Code != http.StatusOK || !strings.Contains(saved.Body.String(), "Season saved.") || seasons.lastVersion != 5 || seasons.lastID != 1 || seasons.lastInput.Name != "Renamed" || len(seasons.lastInput.Parts) != 1 {
 		t.Fatalf("save = %d (version %d, id %d, input %+v)", saved.Code, seasons.lastVersion, seasons.lastID, seasons.lastInput)
 	}
-	deleted := serveGroups(t, dependencies, http.MethodPost, "/en/groups/3/seasons/1/delete", "version=6", false)
-	if deleted.Code != http.StatusSeeOther || deleted.Header().Get("Location") != "/en/groups/3/seasons" || seasons.lastVersion != 6 {
+	deleted := serveGroups(t, dependencies, http.MethodPost, "/en/groups/lions/seasons/1/delete", "version=6", false)
+	if deleted.Code != http.StatusSeeOther || deleted.Header().Get("Location") != "/en/groups/lions/seasons" || seasons.lastVersion != 6 {
 		t.Fatalf("delete = %d %q", deleted.Code, deleted.Header().Get("Location"))
 	}
 
 	writes := seasons.writes
-	for _, target := range []string{"/en/groups/3/seasons/1", "/en/groups/3/seasons/1/delete"} {
+	for _, target := range []string{"/en/groups/lions/seasons/1", "/en/groups/lions/seasons/1/delete"} {
 		for _, version := range []string{"", "x", "-1"} {
 			if response := serveGroups(t, dependencies, http.MethodPost, target, "version="+version+"&name=A", false); response.Code != http.StatusConflict {
 				t.Errorf("%s version %q = %d, want 409", target, version, response.Code)
@@ -279,12 +279,12 @@ func TestSeasonUpdateAndDelete(t *testing.T) {
 		status int
 		text   string
 	}{
-		{"/en/groups/3/seasons/1", service.ErrOptimisticLockConflict, http.StatusConflict, "changed elsewhere"},
-		{"/en/groups/3/seasons/1", service.ErrSeasonNotFound, http.StatusNotFound, ""},
-		{"/en/groups/3/seasons/1", service.ErrSeasonOverlap, http.StatusUnprocessableEntity, "overlap another season"},
-		{"/en/groups/3/seasons/1", service.ErrGroupForbidden, http.StatusForbidden, ""},
-		{"/en/groups/3/seasons/1/delete", service.ErrOptimisticLockConflict, http.StatusConflict, "changed elsewhere"},
-		{"/en/groups/3/seasons/1/delete", service.ErrSeasonNotFound, http.StatusNotFound, ""},
+		{"/en/groups/lions/seasons/1", service.ErrOptimisticLockConflict, http.StatusConflict, "changed elsewhere"},
+		{"/en/groups/lions/seasons/1", service.ErrSeasonNotFound, http.StatusNotFound, ""},
+		{"/en/groups/lions/seasons/1", service.ErrSeasonOverlap, http.StatusUnprocessableEntity, "overlap another season"},
+		{"/en/groups/lions/seasons/1", service.ErrGroupForbidden, http.StatusForbidden, ""},
+		{"/en/groups/lions/seasons/1/delete", service.ErrOptimisticLockConflict, http.StatusConflict, "changed elsewhere"},
+		{"/en/groups/lions/seasons/1/delete", service.ErrSeasonNotFound, http.StatusNotFound, ""},
 	} {
 		seasons.writeErr = test.err
 		response := serveGroups(t, dependencies, http.MethodPost, test.target, form, false)
@@ -316,7 +316,7 @@ func TestTeamCoachesCard(t *testing.T) {
 			if test.coaching != nil {
 				test.coaching(&seasons.coaching)
 			}
-			response := serveGroups(t, dependencies, http.MethodGet, "/en/groups/3/teams/4", "", false)
+			response := serveGroups(t, dependencies, http.MethodGet, "/en/groups/lions/teams/t4", "", false)
 			body := response.Body.String()
 			if response.Code != http.StatusOK || !strings.Contains(body, `id="team-heading"`) {
 				t.Fatalf("status = %d, team page incomplete", response.Code)
@@ -327,7 +327,7 @@ func TestTeamCoachesCard(t *testing.T) {
 			if test.wantCard && (!strings.Contains(body, "Carla Coach") || !strings.Contains(body, `data-coach-id="8" data-coach-head="true"`) || !strings.Contains(body, `data-season-id="1" data-season-current="true"`)) {
 				t.Error("coaches card misses the current head coach")
 			}
-			for _, needle := range []string{`id="team-coach-user"`, `/en/groups/3/teams/4/coaches/remove`, `/en/groups/3/teams/4/coaches/head`, `<option value="1" selected>2026/27</option>`} {
+			for _, needle := range []string{`id="team-coach-user"`, `/en/groups/lions/teams/t4/coaches/remove`, `/en/groups/lions/teams/t4/coaches/head`, `<option value="1" selected>2026/27</option>`} {
 				if strings.Contains(body, needle) != test.wantManage {
 					t.Errorf("body contains %q = %v, want %v", needle, !test.wantManage, test.wantManage)
 				}
@@ -337,50 +337,50 @@ func TestTeamCoachesCard(t *testing.T) {
 
 	// Admins without candidates or seasons get guidance instead of a form.
 	dependencies, seasons, _ := seasonDependencies(t, groupMemberAs(service.GroupRoleManager))
-	body := serveGroups(t, dependencies, http.MethodGet, "/en/groups/3/teams/4", "", false).Body.String()
+	body := serveGroups(t, dependencies, http.MethodGet, "/en/groups/lions/teams/t4", "", false).Body.String()
 	if !strings.Contains(body, `data-testid="team-coaches-no-candidates"`) || strings.Contains(body, `id="team-coach-user"`) {
 		t.Error("manager without coach candidates must see the hint")
 	}
 	seasons.coaching = service.TeamCoaching{}
-	body = serveGroups(t, dependencies, http.MethodGet, "/en/groups/3/teams/4", "", false).Body.String()
-	if !strings.Contains(body, `data-testid="team-coaches-no-seasons"`) || !strings.Contains(body, `href="/en/groups/3/seasons"`) {
+	body = serveGroups(t, dependencies, http.MethodGet, "/en/groups/lions/teams/t4", "", false).Body.String()
+	if !strings.Contains(body, `data-testid="team-coaches-no-seasons"`) || !strings.Contains(body, `href="/en/groups/lions/seasons"`) {
 		t.Error("manager without seasons must see the link to the seasons page")
 	}
 	seasons.coachingErr = service.ErrTeamNotFound
-	if response := serveGroups(t, dependencies, http.MethodGet, "/en/groups/3/teams/4", "", false); response.Code != http.StatusNotFound {
+	if response := serveGroups(t, dependencies, http.MethodGet, "/en/groups/lions/teams/t4", "", false); response.Code != http.StatusNotFound {
 		t.Fatalf("coaching not found = %d, want 404", response.Code)
 	}
 }
 
 func TestTeamCoachWrites(t *testing.T) {
 	dependencies, seasons, _ := seasonDependencies(t, groupMemberAs(service.GroupRoleAdmin))
-	added := serveGroups(t, dependencies, http.MethodPost, "/en/groups/3/teams/4/coaches/add", "season_id=1&coach_user_id=8&head=true", true)
+	added := serveGroups(t, dependencies, http.MethodPost, "/en/groups/lions/teams/t4/coaches/add", "season_id=1&coach_user_id=8&head=true", true)
 	if added.Code != http.StatusOK || !strings.Contains(added.Body.String(), "Coach assigned.") || !strings.Contains(added.Body.String(), `id="alerts"`) {
 		t.Fatalf("assign = %d", added.Code)
 	}
 	if seasons.lastAssignment != (service.CoachAssignment{SeasonID: 1, TeamID: 4, CoachUserID: 8, Head: true}) {
 		t.Fatalf("assignment = %+v", seasons.lastAssignment)
 	}
-	serveGroups(t, dependencies, http.MethodPost, "/en/groups/3/teams/4/coaches/add", "season_id=1&coach_user_id=9", true)
+	serveGroups(t, dependencies, http.MethodPost, "/en/groups/lions/teams/t4/coaches/add", "season_id=1&coach_user_id=9", true)
 	if seasons.lastAssignment.Head {
 		t.Fatal("assignment without the head box must not be head coach")
 	}
-	head := serveGroups(t, dependencies, http.MethodPost, "/en/groups/3/teams/4/coaches/head", "season_id=1&coach_user_id=9&head=true", true)
+	head := serveGroups(t, dependencies, http.MethodPost, "/en/groups/lions/teams/t4/coaches/head", "season_id=1&coach_user_id=9&head=true", true)
 	if head.Code != http.StatusOK || !strings.Contains(head.Body.String(), "Head coach set.") || !seasons.lastAssignment.Head || seasons.lastAssignment.CoachUserID != 9 {
 		t.Fatalf("set head = %d (%+v)", head.Code, seasons.lastAssignment)
 	}
-	unset := serveGroups(t, dependencies, http.MethodPost, "/en/groups/3/teams/4/coaches/head", "season_id=1&coach_user_id=9&head=false", true)
+	unset := serveGroups(t, dependencies, http.MethodPost, "/en/groups/lions/teams/t4/coaches/head", "season_id=1&coach_user_id=9&head=false", true)
 	if unset.Code != http.StatusOK || !strings.Contains(unset.Body.String(), "Head coach mark removed.") || seasons.lastAssignment.Head {
 		t.Fatalf("unset head = %d", unset.Code)
 	}
-	removed := serveGroups(t, dependencies, http.MethodPost, "/en/groups/3/teams/4/coaches/remove", "season_id=1&coach_user_id=8", true)
+	removed := serveGroups(t, dependencies, http.MethodPost, "/en/groups/lions/teams/t4/coaches/remove", "season_id=1&coach_user_id=8", true)
 	if removed.Code != http.StatusOK || !strings.Contains(removed.Body.String(), "Coach removed.") || seasons.lastRemoved != [3]int64{1, 4, 8} {
 		t.Fatalf("remove = %d (%v)", removed.Code, seasons.lastRemoved)
 	}
 
 	writes := seasons.writes
 	for _, form := range []string{"coach_user_id=8", "season_id=x&coach_user_id=8", "season_id=1", "season_id=1&coach_user_id=0"} {
-		response := serveGroups(t, dependencies, http.MethodPost, "/en/groups/3/teams/4/coaches/add", form, false)
+		response := serveGroups(t, dependencies, http.MethodPost, "/en/groups/lions/teams/t4/coaches/add", form, false)
 		if response.Code != http.StatusNotFound && response.Code != http.StatusUnprocessableEntity {
 			t.Errorf("form %q = %d, want 404 or 422", form, response.Code)
 		}
@@ -395,12 +395,12 @@ func TestTeamCoachWrites(t *testing.T) {
 		status int
 		text   string
 	}{
-		{"/en/groups/3/teams/4/coaches/add", service.ErrSeasonCoachRoleMissing, http.StatusUnprocessableEntity, "Only members with the coach role"},
-		{"/en/groups/3/teams/4/coaches/add", service.ErrGroupForbidden, http.StatusForbidden, ""},
-		{"/en/groups/3/teams/4/coaches/add", service.ErrSeasonNotFound, http.StatusNotFound, ""},
-		{"/en/groups/3/teams/4/coaches/add", service.ErrTeamNotFound, http.StatusNotFound, ""},
-		{"/en/groups/3/teams/4/coaches/head", service.ErrOptimisticLockConflict, http.StatusConflict, "changed elsewhere"},
-		{"/en/groups/3/teams/4/coaches/remove", service.ErrSeasonCoachNotFound, http.StatusNotFound, "no longer assigned"},
+		{"/en/groups/lions/teams/t4/coaches/add", service.ErrSeasonCoachRoleMissing, http.StatusUnprocessableEntity, "Only members with the coach role"},
+		{"/en/groups/lions/teams/t4/coaches/add", service.ErrGroupForbidden, http.StatusForbidden, ""},
+		{"/en/groups/lions/teams/t4/coaches/add", service.ErrSeasonNotFound, http.StatusNotFound, ""},
+		{"/en/groups/lions/teams/t4/coaches/add", service.ErrTeamNotFound, http.StatusNotFound, ""},
+		{"/en/groups/lions/teams/t4/coaches/head", service.ErrOptimisticLockConflict, http.StatusConflict, "changed elsewhere"},
+		{"/en/groups/lions/teams/t4/coaches/remove", service.ErrSeasonCoachNotFound, http.StatusNotFound, "no longer assigned"},
 	} {
 		seasons.writeErr = test.err
 		response := serveGroups(t, dependencies, http.MethodPost, test.target, "season_id=1&coach_user_id=8", false)
@@ -416,7 +416,7 @@ func TestTeamCoachWrites(t *testing.T) {
 	} {
 		dependencies, seasons, _ := seasonDependencies(t, access)
 		seasons.writeErr = service.ErrGroupForbidden
-		if response := serveGroups(t, dependencies, http.MethodPost, "/en/groups/3/teams/4/coaches/add", "season_id=1&coach_user_id=8", true); response.Code != http.StatusUnprocessableEntity {
+		if response := serveGroups(t, dependencies, http.MethodPost, "/en/groups/lions/teams/t4/coaches/add", "season_id=1&coach_user_id=8", true); response.Code != http.StatusUnprocessableEntity {
 			t.Errorf("roles %v HTMX assign = %d, want 422", access.Roles(), response.Code)
 		}
 	}
@@ -424,13 +424,13 @@ func TestTeamCoachWrites(t *testing.T) {
 
 func TestSeasonsHungarianLabels(t *testing.T) {
 	dependencies, _, _ := seasonDependencies(t, groupMemberAs(service.GroupRoleAdmin))
-	body := serveGroups(t, dependencies, http.MethodGet, "/hu/groups/3/seasons", "", false).Body.String()
-	for _, want := range []string{"Szezonok", "Szezon hozzáadása", "1. szakasz", "Váltakozó A/B hetek", "Aktuális", `href="/hu/groups/3/seasons/1"`} {
+	body := serveGroups(t, dependencies, http.MethodGet, "/hu/groups/lions/seasons", "", false).Body.String()
+	for _, want := range []string{"Szezonok", "Szezon hozzáadása", "1. szakasz", "Váltakozó A/B hetek", "Aktuális", `href="/hu/groups/lions/seasons/1"`} {
 		if !strings.Contains(body, want) {
 			t.Errorf("Hungarian seasons page missing %q", want)
 		}
 	}
-	team := serveGroups(t, dependencies, http.MethodGet, "/hu/groups/3/teams/4", "", false).Body.String()
+	team := serveGroups(t, dependencies, http.MethodGet, "/hu/groups/lions/teams/t4", "", false).Body.String()
 	for _, want := range []string{"Edzők", "Vezetőedző"} {
 		if !strings.Contains(team, want) {
 			t.Errorf("Hungarian team page missing %q", want)

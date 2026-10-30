@@ -84,9 +84,9 @@ type CoachBoardCoachView struct {
 // registerCoachBoardRoutes registers each season's coach board.
 func registerCoachBoardRoutes(mux *http.ServeMux, groups *groupHandler) {
 	for _, prefix := range localizedPrefixes() {
-		mux.HandleFunc("GET "+prefix+"/groups/{id}/seasons/{seasonID}/coach-board", groups.coachBoard)
-		mux.HandleFunc("POST "+prefix+"/groups/{id}/seasons/{seasonID}/coach-board", groups.saveCoachBoard)
-		mux.HandleFunc("POST "+prefix+"/groups/{id}/seasons/{seasonID}/coach-board/draft", groups.coachBoardDraft)
+		mux.HandleFunc("GET "+prefix+"/groups/{group}/seasons/{seasonID}/coach-board", groups.coachBoard)
+		mux.HandleFunc("POST "+prefix+"/groups/{group}/seasons/{seasonID}/coach-board", groups.saveCoachBoard)
+		mux.HandleFunc("POST "+prefix+"/groups/{group}/seasons/{seasonID}/coach-board/draft", groups.coachBoardDraft)
 	}
 }
 
@@ -156,7 +156,7 @@ func (h *groupHandler) saveCoachBoard(writer http.ResponseWriter, request *http.
 		return
 	}
 	if !IsHTMX(request) {
-		h.redirectLocalized(writer, request, current.language, "/groups/"+strconv.FormatInt(current.access.GroupID(), 10)+"/seasons/"+strconv.FormatInt(seasonID, 10)+"/coach-board")
+		h.redirectLocalized(writer, request, current.language, "/groups/"+current.slug+"/seasons/"+strconv.FormatInt(seasonID, 10)+"/coach-board")
 		return
 	}
 	message := h.t(current.language, "coach_board.no_changes")
@@ -411,16 +411,15 @@ func (h *groupHandler) respondCoachBoard(writer http.ResponseWriter, request *ht
 
 func (h *groupHandler) coachBoardView(current groupRequest, board service.CoachBoard) *CoachBoardView {
 	language := current.language
-	groupID := current.access.GroupID()
 	seasonPath := "/seasons/" + strconv.FormatInt(board.Season.ID, 10)
 	view := &CoachBoardView{
 		L:           h.labels[language],
 		CanEdit:     board.CanEdit,
 		SeasonName:  board.Season.Name,
 		SeasonDates: service.FormatSeasonDate(board.Season.StartsOn) + " – " + service.FormatSeasonDate(board.Season.EndsOn),
-		SeasonURL:   h.groupPath(language, groupID, seasonPath),
-		ActionURL:   h.groupPath(language, groupID, seasonPath+"/coach-board"),
-		DraftURL:    h.groupPath(language, groupID, seasonPath+"/coach-board/draft"),
+		SeasonURL:   h.groupPath(language, current.slug, seasonPath),
+		ActionURL:   h.groupPath(language, current.slug, seasonPath+"/coach-board"),
+		DraftURL:    h.groupPath(language, current.slug, seasonPath+"/coach-board/draft"),
 		Revision:    board.Revision,
 		Changed:     board.Changed,
 		Stale:       board.Stale(),
@@ -451,7 +450,7 @@ func (h *groupHandler) coachBoardView(current groupRequest, board service.CoachB
 		column := CoachBoardTeamView{
 			ID:       team.Team.ID,
 			Name:     team.Team.Name,
-			URL:      h.groupPath(language, groupID, "/teams/"+strconv.FormatInt(team.Team.ID, 10)),
+			URL:      h.teamPath(current, team.Team.ID, ""),
 			Archived: team.Team.Archived(),
 			AddLabel: h.tv(language, "coach_board.add_label", map[string]string{"team": team.Team.Name}),
 		}

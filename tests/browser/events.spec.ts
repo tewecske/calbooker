@@ -32,7 +32,7 @@ test.describe("events", () => {
     await page.goto(`${appURL}/en/groups`);
     await page.locator("#group-new-name").fill(clubName);
     await page.locator("#group-new-name").locator("xpath=ancestor::form").getByRole("button").click();
-    await page.waitForURL(/\/en\/groups\/\d+$/);
+    await page.waitForURL(/\/en\/groups\/(?!join$)[a-z0-9-]+$/);
     const groupURL = page.url();
 
     // Two teams.
@@ -43,7 +43,7 @@ test.describe("events", () => {
       await page.locator("#team-new-birth-year-from").fill(from);
       await page.locator("#team-new-birth-year-to").fill(from);
       await page.getByRole("button", { name: "Create a team" }).click();
-      await page.waitForURL(/\/en\/groups\/\d+\/teams\/\d+$/);
+      await page.waitForURL(/\/en\/groups\/[a-z0-9-]+\/teams\/[a-z0-9-]+$/);
       teamURLs[name] = page.url();
     }
 
@@ -56,7 +56,7 @@ test.describe("events", () => {
     await page.locator("#season-new-part1-starts-on").fill(dateFromToday(-30));
     await page.locator("#season-new-part1-ends-on").fill(dateFromToday(300));
     await page.getByRole("button", { name: "Add a season" }).click();
-    await page.waitForURL(/\/en\/groups\/\d+\/seasons\/\d+$/);
+    await page.waitForURL(/\/en\/groups\/[a-z0-9-]+\/seasons\/\d+$/);
 
     // The coach joins and is assigned to the Lions.
     const coach = await poolUser(browser, "coach");
@@ -72,7 +72,7 @@ test.describe("events", () => {
     const playerCode = await createInvite(page, groupURL, { role: "player", team: tigers });
     const player = await becomeGuest(browser);
     await joinWithCode(player.page, appURL, playerCode);
-    await player.page.waitForURL(/\/en\/groups\/\d+\/teams\/\d+$/);
+    await player.page.waitForURL(/\/en\/groups\/[a-z0-9-]+\/teams\/[a-z0-9-]+$/);
 
     // The coach creates the championship; only the Lions are on offer.
     await coach.page.goto(groupURL);
@@ -96,7 +96,7 @@ test.describe("events", () => {
 
     await coach.page.locator("#event-new-location").fill(location);
     await coach.page.getByRole("button", { name: "Add an event" }).click();
-    await coach.page.waitForURL(/\/en\/groups\/\d+\/events\/\d+$/);
+    await coach.page.waitForURL(/\/en\/groups\/[a-z0-9-]+\/events\/\d+$/);
     const eventURL = coach.page.url();
     await expect(coach.page.locator("#event-heading")).toContainText(title);
     await expect(coach.page.locator("#event-heading [data-event-kind=championship]")).toHaveText("Championship");

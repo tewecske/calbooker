@@ -19,7 +19,7 @@ async function createGroup(page: Page, name: string): Promise<string> {
   await page.goto(`${appURL}/en/groups`);
   await page.locator("#group-new-name").fill(name);
   await page.locator("#group-new-name").locator("xpath=ancestor::form").getByRole("button").click();
-  await page.waitForURL(/\/en\/groups\/\d+$/);
+  await page.waitForURL(/\/en\/groups\/(?!join$)[a-z0-9-]+$/);
   return page.url();
 }
 
@@ -32,7 +32,7 @@ async function createEvent(page: Page, groupURL: string, event: { kind: string; 
   await page.getByTestId("event-new-teams").getByLabel(event.team).check();
   await page.locator("#event-new-location").fill("Club ground");
   await page.getByRole("button", { name: "Add an event" }).click();
-  await page.waitForURL(/\/en\/groups\/\d+\/events\/\d+$/);
+  await page.waitForURL(/\/en\/groups\/[a-z0-9-]+\/events\/\d+$/);
 }
 
 test.describe("calendar", () => {
@@ -59,7 +59,7 @@ test.describe("calendar", () => {
       await page.locator("#team-new-birth-year-from").fill(year);
       await page.locator("#team-new-birth-year-to").fill(year);
       await page.getByRole("button", { name: "Create a team" }).click();
-      await page.waitForURL(/\/en\/groups\/\d+\/teams\/\d+$/);
+      await page.waitForURL(/\/en\/groups\/[a-z0-9-]+\/teams\/[a-z0-9-]+$/);
     }
     await createEvent(page, groupURL, { kind: "training", title: training, team: lions, day: nextWeekDay, from: "11:00", to: "12:30" });
     await createEvent(page, groupURL, { kind: "match", title: match, team: tigers, day: nextWeekDay, from: "13:00", to: "14:30" });
@@ -123,7 +123,7 @@ test.describe("calendar", () => {
     const playerCode = await createInvite(page, groupURL, { role: "player", team: tigers });
     const player = await becomeGuest(browser);
     await joinWithCode(player.page, appURL, playerCode);
-    await player.page.waitForURL(/\/en\/groups\/\d+\/teams\/\d+$/);
+    await player.page.waitForURL(/\/en\/groups\/[a-z0-9-]+\/teams\/[a-z0-9-]+$/);
     await player.page.goto(`${groupURL}/calendar?week=${nextWeek}`);
     await expect(player.page.locator("#calendar-grid").getByRole("link", { name: match })).toBeVisible();
     await expect(player.page.getByText(training)).toHaveCount(0);

@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/tewecske/calbooker/internal/service"
 )
@@ -15,10 +16,40 @@ type TeamUseCases interface {
 	List(ctx context.Context, access *service.GroupAccess) ([]service.TeamSummary, error)
 	Create(ctx context.Context, actor service.GroupActor, input service.TeamInput) (service.Team, error)
 	Detail(ctx context.Context, access *service.GroupAccess, teamID int64) (service.TeamDetail, error)
+	// BySlug and ByID resolve a team the account may see: the slug for
+	// current URLs, the ID for the redirect from old numeric URLs.
+	BySlug(ctx context.Context, access *service.GroupAccess, slug string) (service.Team, error)
+	ByID(ctx context.Context, access *service.GroupAccess, teamID int64) (service.Team, error)
+	// Slugs maps the group's team IDs to URL slugs for building links.
+	Slugs(ctx context.Context, access *service.GroupAccess) (map[int64]string, error)
 	Update(ctx context.Context, actor service.GroupActor, teamID, expectedVersion int64, input service.TeamInput) (service.Team, error)
 	SetArchived(ctx context.Context, actor service.GroupActor, teamID, expectedVersion int64, archived bool) (service.Team, error)
 	AddToRoster(ctx context.Context, actor service.GroupActor, teamID, userID int64, role string) error
 	RemoveFromRoster(ctx context.Context, actor service.GroupActor, teamID, userID int64, role string) error
+}
+
+// teamSlugLookup resolves team IDs to URL slugs once per request, for links to
+// teams that are known only by ID.
+type teamSlugLookup struct {
+	ctx    context.Context
+	access *service.GroupAccess
+	once   sync.Once
+	slugs  map[int64]string
+}
+
+// teamPath is the localized path of a team page (or a page below it). It
+// falls back to the numeric URL, which redirects, when the slug is unknown.
+func (h *groupHandler) teamPath(current groupRequest, teamID int64, suffix string) string {
+	reference := strconv.FormatInt(teamID, 10)
+	if current.teamSlugs != nil && h.dependencies.Teams != nil {
+		current.teamSlugs.once.Do(func() {
+			current.teamSlugs.slugs, _ = h.dependencies.Teams.Slugs(current.teamSlugs.ctx, current.access)
+		})
+		if slug := current.teamSlugs.slugs[teamID]; slug != "" {
+			reference = slug
+		}
+	}
+	return h.groupPath(current.language, current.slug, "/teams/"+reference+suffix)
 }
 
 // TeamsView is a group's team list. CreateForm is nil unless the account
@@ -31,10 +62,14 @@ type TeamsView struct {
 
 // TeamFormView holds the values and errors of the team create or edit form.
 type TeamFormView struct {
-	L                map[string]string
-	Prefix           string
-	ActionURL        string
-	Name             string
+	L         map[string]string
+	Prefix    string
+	ActionURL string
+	Name      string
+	// ShowSlug is true on the edit form; new teams get a slug from the name.
+	ShowSlug         bool
+	Slug             string
+	SlugError        string
 	BirthYearFrom    string
 	BirthYearTo      string
 	Description      string
@@ -117,13 +152,13 @@ type RosterCandidateView struct {
 // roster routes.
 func registerTeamRoutes(mux *http.ServeMux, groups *groupHandler) {
 	for _, prefix := range localizedPrefixes() {
-		mux.HandleFunc("GET "+prefix+"/groups/{id}/teams", groups.teams)
-		mux.HandleFunc("POST "+prefix+"/groups/{id}/teams", groups.createTeam)
-		mux.HandleFunc("GET "+prefix+"/groups/{id}/teams/{teamID}", groups.team)
-		mux.HandleFunc("POST "+prefix+"/groups/{id}/teams/{teamID}", groups.updateTeam)
-		mux.HandleFunc("POST "+prefix+"/groups/{id}/teams/{teamID}/archive", groups.archiveTeam)
-		mux.HandleFunc("POST "+prefix+"/groups/{id}/teams/{teamID}/roster/add", groups.addToRoster)
-		mux.HandleFunc("POST "+prefix+"/groups/{id}/teams/{teamID}/roster/remove", groups.removeFromRoster)
+		mux.HandleFunc("GET "+prefix+"/groups/{group}/teams", groups.teams)
+		mux.HandleFunc("POST "+prefix+"/groups/{group}/teams", groups.createTeam)
+		mux.HandleFunc("GET "+prefix+"/groups/{group}/teams/{team}", groups.team)
+		mux.HandleFunc("POST "+prefix+"/groups/{group}/teams/{team}", groups.updateTeam)
+		mux.HandleFunc("POST "+prefix+"/groups/{group}/teams/{team}/archive", groups.archiveTeam)
+		mux.HandleFunc("POST "+prefix+"/groups/{group}/teams/{team}/roster/add", groups.addToRoster)
+		mux.HandleFunc("POST "+prefix+"/groups/{group}/teams/{team}/roster/remove", groups.removeFromRoster)
 	}
 }
 
@@ -147,7 +182,7 @@ func (h *groupHandler) createTeam(writer http.ResponseWriter, request *http.Requ
 		h.renderWriteError(writer, request, current, groupSectionTeams, 0, err, h.teamFormErrors(current, form, err))
 		return
 	}
-	h.redirectLocalized(writer, request, current.language, "/groups/"+strconv.FormatInt(current.access.GroupID(), 10)+"/teams/"+strconv.FormatInt(team.ID, 10))
+	h.redirectLocalized(writer, request, current.language, "/groups/"+current.slug+"/teams/"+team.Slug)
 }
 
 func (h *groupHandler) team(writer http.ResponseWriter, request *http.Request) {
@@ -170,8 +205,14 @@ func (h *groupHandler) updateTeam(writer http.ResponseWriter, request *http.Requ
 		h.renderWriteError(writer, request, current, groupSectionTeam, teamID, service.ErrOptimisticLockConflict, form)
 		return
 	}
-	if _, err := h.dependencies.Teams.Update(request.Context(), current.actor(), teamID, version, input); err != nil {
+	updated, err := h.dependencies.Teams.Update(request.Context(), current.actor(), teamID, version, input)
+	if err != nil {
 		h.renderWriteError(writer, request, current, groupSectionTeam, teamID, err, h.teamFormErrors(current, form, err))
+		return
+	}
+	if updated.Slug != strings.TrimSpace(request.PathValue("team")) {
+		// The team has a new address: continue there, not at the old URL.
+		h.redirectLocalized(writer, request, current.language, "/groups/"+current.slug+"/teams/"+updated.Slug)
 		return
 	}
 	h.renderSection(writer, request, current, groupSectionTeam, teamID, FormData{}, []Alert{{Level: "success", Message: h.t(current.language, "teams.saved")}}, http.StatusOK)
@@ -251,11 +292,21 @@ func (h *groupHandler) teamPathRequest(writer http.ResponseWriter, request *http
 	if !ok {
 		return groupRequest{}, 0, false
 	}
-	teamID, err := pathPositiveID(request, "teamID")
+	reference := strings.TrimSpace(request.PathValue("team"))
+	if legacyID, legacy := legacyPathID(reference); legacy {
+		// Old numeric links keep working for GET.
+		team, err := h.dependencies.Teams.ByID(request.Context(), current.access, legacyID)
+		if err != nil || !redirectLegacyPath(writer, request, "/teams/"+reference, "/teams/"+team.Slug) {
+			h.renderGroupNotFound(writer, request, current.language)
+		}
+		return groupRequest{}, 0, false
+	}
+	team, err := h.dependencies.Teams.BySlug(request.Context(), current.access, reference)
 	if err != nil {
 		h.renderGroupNotFound(writer, request, current.language)
 		return groupRequest{}, 0, false
 	}
+	teamID := team.ID
 	return current, teamID, true
 }
 
@@ -271,14 +322,14 @@ func (h *groupHandler) loadTeams(writer http.ResponseWriter, request *http.Reque
 	}
 	list := &TeamsView{}
 	if current.access.CanCreateTeam() {
-		list.CreateForm = h.teamFormView(current, "team-new", h.groupPath(current.language, groupID, "/teams"), nil, form)
+		list.CreateForm = h.teamFormView(current, "team-new", h.groupPath(current.language, current.slug, "/teams"), nil, form)
 	}
 	for _, summary := range teams {
 		row := TeamRowView{
 			ID:      summary.Team.ID,
 			Name:    summary.Team.Name,
 			Years:   teamYears(summary.Team),
-			URL:     h.groupPath(current.language, groupID, "/teams/"+strconv.FormatInt(summary.Team.ID, 10)),
+			URL:     h.groupPath(current.language, current.slug, "/teams/"+summary.Team.Slug),
 			Players: summary.Players,
 			Parents: summary.Parents,
 		}
@@ -306,7 +357,7 @@ func (h *groupHandler) loadTeam(writer http.ResponseWriter, request *http.Reques
 		return false
 	}
 	language := current.language
-	base := h.groupPath(language, groupID, "/teams/"+strconv.FormatInt(teamID, 10))
+	base := h.groupPath(language, current.slug, "/teams/"+detail.Team.Slug)
 	team := &TeamDetailView{
 		ID:              detail.Team.ID,
 		Name:            detail.Team.Name,
@@ -316,7 +367,7 @@ func (h *groupHandler) loadTeam(writer http.ResponseWriter, request *http.Reques
 		CanEdit:         current.access.CanEditTeam(teamID),
 		CanManageRoster: current.access.CanManageRoster(teamID),
 		ShowEmails:      current.access.CanViewTeamEmails(teamID),
-		TeamsURL:        h.groupPath(language, groupID, "/teams"),
+		TeamsURL:        h.groupPath(language, current.slug, "/teams"),
 		EditURL:         base,
 		ArchiveURL:      base + "/archive",
 		RosterAddURL:    base + "/roster/add",
@@ -379,10 +430,12 @@ func (h *groupHandler) loadTeam(writer http.ResponseWriter, request *http.Reques
 // teamFormView fills the team form from submitted values after a failed
 // write, else from the stored team (nil for a new team).
 func (h *groupHandler) teamFormView(current groupRequest, prefix, actionURL string, team *service.Team, form FormData) *TeamFormView {
-	view := &TeamFormView{L: h.labels[current.language], Prefix: prefix, ActionURL: actionURL}
+	view := &TeamFormView{L: h.labels[current.language], Prefix: prefix, ActionURL: actionURL, ShowSlug: team != nil}
 	switch {
 	case form.Submitted:
 		view.Name = form.Value("name")
+		view.Slug = form.Value("slug")
+		view.SlugError = form.Error("slug")
 		view.BirthYearFrom = form.Value("birth_year_from")
 		view.BirthYearTo = form.Value("birth_year_to")
 		view.Description = form.Value("description")
@@ -391,6 +444,7 @@ func (h *groupHandler) teamFormView(current groupRequest, prefix, actionURL stri
 		view.DescriptionError = form.Error("description")
 	case team != nil:
 		view.Name = team.Name
+		view.Slug = team.Slug
 		view.BirthYearFrom = strconv.Itoa(team.BirthYearFrom)
 		view.BirthYearTo = strconv.Itoa(team.BirthYearTo)
 		if team.Description != nil {
@@ -405,6 +459,10 @@ func (h *groupHandler) teamFormErrors(current groupRequest, form FormData, err e
 	switch {
 	case errors.Is(err, service.ErrInvalidTeamName):
 		form.Errors = []FieldError{{Field: "name", Message: h.t(current.language, "teams.error.invalid_name")}}
+	case errors.Is(err, service.ErrInvalidSlug):
+		form.Errors = []FieldError{{Field: "slug", Message: h.t(current.language, "teams.error.invalid_slug")}}
+	case errors.Is(err, service.ErrSlugTaken):
+		form.Errors = []FieldError{{Field: "slug", Message: h.t(current.language, "teams.error.slug_taken")}}
 	case errors.Is(err, service.ErrInvalidTeamBirthYears):
 		form.Errors = []FieldError{{Field: "birth_year_from", Message: h.t(current.language, "teams.error.invalid_birth_years")}}
 	case errors.Is(err, service.ErrInvalidTeamDescription):
@@ -418,13 +476,14 @@ func (h *groupHandler) teamFormErrors(current groupRequest, form FormData, err e
 func teamForm(request *http.Request) (service.TeamInput, FormData) {
 	values := map[string]string{
 		"name":            request.PostFormValue("name"),
+		"slug":            request.PostFormValue("slug"),
 		"birth_year_from": strings.TrimSpace(request.PostFormValue("birth_year_from")),
 		"birth_year_to":   strings.TrimSpace(request.PostFormValue("birth_year_to")),
 		"description":     request.PostFormValue("description"),
 	}
 	from, _ := strconv.Atoi(values["birth_year_from"])
 	to, _ := strconv.Atoi(values["birth_year_to"])
-	input := service.TeamInput{Name: values["name"], BirthYearFrom: from, BirthYearTo: to, Description: values["description"]}
+	input := service.TeamInput{Name: values["name"], Slug: values["slug"], BirthYearFrom: from, BirthYearTo: to, Description: values["description"]}
 	return input, FormData{Submitted: true, Values: values}
 }
 

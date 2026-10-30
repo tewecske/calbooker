@@ -135,12 +135,12 @@ type EventFormView struct {
 // registerEventRoutes registers each group's event list and event pages.
 func registerEventRoutes(mux *http.ServeMux, groups *groupHandler) {
 	for _, prefix := range localizedPrefixes() {
-		mux.HandleFunc("GET "+prefix+"/groups/{id}/events", groups.events)
-		mux.HandleFunc("POST "+prefix+"/groups/{id}/events", groups.createEvent)
-		mux.HandleFunc("GET "+prefix+"/groups/{id}/events/{eventID}", groups.event)
-		mux.HandleFunc("POST "+prefix+"/groups/{id}/events/{eventID}", groups.updateEvent)
-		mux.HandleFunc("POST "+prefix+"/groups/{id}/events/{eventID}/cancel", groups.cancelEvent)
-		mux.HandleFunc("POST "+prefix+"/groups/{id}/events/{eventID}/delete", groups.deleteEvent)
+		mux.HandleFunc("GET "+prefix+"/groups/{group}/events", groups.events)
+		mux.HandleFunc("POST "+prefix+"/groups/{group}/events", groups.createEvent)
+		mux.HandleFunc("GET "+prefix+"/groups/{group}/events/{eventID}", groups.event)
+		mux.HandleFunc("POST "+prefix+"/groups/{group}/events/{eventID}", groups.updateEvent)
+		mux.HandleFunc("POST "+prefix+"/groups/{group}/events/{eventID}/cancel", groups.cancelEvent)
+		mux.HandleFunc("POST "+prefix+"/groups/{group}/events/{eventID}/delete", groups.deleteEvent)
 	}
 }
 
@@ -165,7 +165,7 @@ func (h *groupHandler) createEvent(writer http.ResponseWriter, request *http.Req
 		return
 	}
 	// The event page shows the warnings.
-	h.redirectLocalized(writer, request, current.language, "/groups/"+strconv.FormatInt(current.access.GroupID(), 10)+"/events/"+strconv.FormatInt(event.ID, 10))
+	h.redirectLocalized(writer, request, current.language, "/groups/"+current.slug+"/events/"+strconv.FormatInt(event.ID, 10))
 }
 
 func (h *groupHandler) event(writer http.ResponseWriter, request *http.Request) {
@@ -233,7 +233,7 @@ func (h *groupHandler) deleteEvent(writer http.ResponseWriter, request *http.Req
 		h.renderWriteError(writer, request, current, groupSectionEvent, eventID, err, FormData{})
 		return
 	}
-	h.redirectLocalized(writer, request, current.language, "/groups/"+strconv.FormatInt(current.access.GroupID(), 10)+"/events")
+	h.redirectLocalized(writer, request, current.language, "/groups/"+current.slug+"/events")
 }
 
 // eventRequest authorizes an event page: outsiders get 404 from
@@ -270,7 +270,7 @@ func (h *groupHandler) loadEvents(writer http.ResponseWriter, request *http.Requ
 	}
 	ctx := request.Context()
 	language := current.language
-	base := h.groupPath(language, group.ID, "/events")
+	base := h.groupPath(language, group.Slug, "/events")
 	list := &EventsView{TimeZone: group.TimeZone, UpcomingURL: base, PastURL: base + "?when=past", FilterURL: base}
 	values := request.URL.Query()
 	list.Past = request.Method == http.MethodGet && values.Get("when") == "past"
@@ -288,7 +288,7 @@ func (h *groupHandler) loadEvents(writer http.ResponseWriter, request *http.Requ
 		return false
 	}
 	for _, event := range events {
-		list.Rows = append(list.Rows, h.eventRow(language, group.ID, group.TimeZone, event))
+		list.Rows = append(list.Rows, h.eventRow(language, group.Slug, group.TimeZone, event))
 	}
 	if h.dependencies.Teams != nil {
 		teams, err := h.dependencies.Teams.List(ctx, current.access)
@@ -326,7 +326,7 @@ func (h *groupHandler) loadEvent(writer http.ResponseWriter, request *http.Reque
 		return false
 	}
 	event := detail.Event
-	row := h.eventRow(language, groupID, detail.TimeZone, event)
+	row := h.eventRow(language, current.slug, detail.TimeZone, event)
 	page := &EventDetailView{
 		EventRowView: row,
 		TimeZone:     detail.TimeZone,
@@ -335,7 +335,7 @@ func (h *groupHandler) loadEvent(writer http.ResponseWriter, request *http.Reque
 		Edited:       event.EditedAt != nil,
 		CanEdit:      detail.CanEdit,
 		Version:      event.Version,
-		ListURL:      h.groupPath(language, groupID, "/events"),
+		ListURL:      h.groupPath(language, current.slug, "/events"),
 		CancelURL:    row.URL + "/cancel",
 		DeleteURL:    row.URL + "/delete",
 	}
@@ -387,10 +387,10 @@ func (h *groupHandler) renderEventLoadError(writer http.ResponseWriter, request 
 	}
 }
 
-func (h *groupHandler) eventRow(language locale.Code, groupID int64, zone string, event service.Event) EventRowView {
+func (h *groupHandler) eventRow(language locale.Code, groupSlug string, zone string, event service.Event) EventRowView {
 	row := EventRowView{
 		ID:        event.ID,
-		URL:       h.groupPath(language, groupID, "/events/"+strconv.FormatInt(event.ID, 10)),
+		URL:       h.groupPath(language, groupSlug, "/events/"+strconv.FormatInt(event.ID, 10)),
 		Title:     event.Title,
 		Kind:      event.Kind,
 		KindLabel: h.t(language, "events.kind."+event.Kind),

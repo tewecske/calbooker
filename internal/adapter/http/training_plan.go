@@ -117,14 +117,14 @@ type TrainingAddView struct {
 // registerTrainingPlanRoutes registers each group's training plan board.
 func registerTrainingPlanRoutes(mux *http.ServeMux, groups *groupHandler) {
 	for _, prefix := range localizedPrefixes() {
-		mux.HandleFunc("GET "+prefix+"/groups/{id}/training-plan", groups.trainingPlan)
-		mux.HandleFunc("POST "+prefix+"/groups/{id}/training-plan", groups.saveTrainingPlan)
-		mux.HandleFunc("POST "+prefix+"/groups/{id}/training-plan/draft", groups.trainingPlanDraft)
+		mux.HandleFunc("GET "+prefix+"/groups/{group}/training-plan", groups.trainingPlan)
+		mux.HandleFunc("POST "+prefix+"/groups/{group}/training-plan", groups.saveTrainingPlan)
+		mux.HandleFunc("POST "+prefix+"/groups/{group}/training-plan/draft", groups.trainingPlanDraft)
 	}
 }
 
-func (h *groupHandler) trainingPlanURL(language locale.Code, groupID int64, suffix string, query planQuery) string {
-	return h.groupPath(language, groupID, "/training-plan"+suffix) + query.encode()
+func (h *groupHandler) trainingPlanURL(language locale.Code, groupSlug string, suffix string, query planQuery) string {
+	return h.groupPath(language, groupSlug, "/training-plan"+suffix) + query.encode()
 }
 
 func (h *groupHandler) trainingPlan(writer http.ResponseWriter, request *http.Request) {
@@ -297,7 +297,7 @@ func (h *groupHandler) saveTrainingPlan(writer http.ResponseWriter, request *htt
 		return
 	}
 	if !IsHTMX(request) {
-		http.Redirect(writer, request, h.trainingPlanURL(current.language, current.access.GroupID(), "", query), http.StatusSeeOther)
+		http.Redirect(writer, request, h.trainingPlanURL(current.language, current.slug, "", query), http.StatusSeeOther)
 		return
 	}
 	message := h.t(current.language, "training_plan.no_changes")
@@ -510,13 +510,12 @@ type trainingLayoutResult struct {
 // Change requests validate against the frame the draft produces.
 func (h *groupHandler) trainingLayout(current groupRequest, board service.TrainingBoard, query planQuery) trainingLayoutResult {
 	language := current.language
-	groupID := current.access.GroupID()
 	view := &TrainingPlanView{
 		L:            h.labels[language],
 		CanEdit:      board.CanEdit,
-		SeasonsURL:   h.groupPath(language, groupID, "/seasons"),
-		ResourcesURL: h.groupPath(language, groupID, "/resources"),
-		PickerURL:    h.groupPath(language, groupID, "/training-plan"),
+		SeasonsURL:   h.groupPath(language, current.slug, "/seasons"),
+		ResourcesURL: h.groupPath(language, current.slug, "/resources"),
+		PickerURL:    h.groupPath(language, current.slug, "/training-plan"),
 	}
 	if !board.Found {
 		view.Empty = true
@@ -528,7 +527,7 @@ func (h *groupHandler) trainingLayout(current groupRequest, board service.Traini
 	view.SeasonName, view.PartName = board.Season.Name, part.Name
 	view.PartDates = service.FormatSeasonDate(part.StartsOn) + " – " + service.FormatSeasonDate(part.EndsOn)
 	view.Alternating = part.AlternatingWeeks
-	view.SwitchURL = h.groupPath(language, groupID, "/seasons/"+strconv.FormatInt(board.Season.ID, 10)+"/parts/"+strconv.FormatInt(part.ID, 10)+"/alternating")
+	view.SwitchURL = h.groupPath(language, current.slug, "/seasons/"+strconv.FormatInt(board.Season.ID, 10)+"/parts/"+strconv.FormatInt(part.ID, 10)+"/alternating")
 	view.SeasonVersion = board.Season.Version
 	view.Revision = board.Revision
 	view.Changed = board.Changed
@@ -550,10 +549,10 @@ func (h *groupHandler) trainingLayout(current groupRequest, board service.Traini
 	}
 	query.week = week
 	view.Week = week
-	view.ActionURL = h.trainingPlanURL(language, groupID, "", query)
-	view.DraftURL = h.trainingPlanURL(language, groupID, "/draft", query)
-	view.DiscardURL = h.trainingPlanURL(language, groupID, "", query)
-	view.GenerateURL = h.eventGenerationURL(language, groupID) + "?part=" + strconv.FormatInt(part.ID, 10)
+	view.ActionURL = h.trainingPlanURL(language, current.slug, "", query)
+	view.DraftURL = h.trainingPlanURL(language, current.slug, "/draft", query)
+	view.DiscardURL = h.trainingPlanURL(language, current.slug, "", query)
+	view.GenerateURL = h.eventGenerationURL(language, current.slug) + "?part=" + strconv.FormatInt(part.ID, 10)
 
 	resources := make(map[int64]service.Resource, len(board.Resources))
 	for _, resource := range board.Resources {
@@ -619,8 +618,8 @@ func (h *groupHandler) trainingLayout(current groupRequest, board service.Traini
 	if part.AlternatingWeeks {
 		weekA, weekB := query, query
 		weekA.week, weekB.week = service.SeasonWeekA, service.SeasonWeekB
-		config.WeekAURL = h.trainingPlanURL(language, groupID, "", weekA)
-		config.WeekBURL = h.trainingPlanURL(language, groupID, "", weekB)
+		config.WeekAURL = h.trainingPlanURL(language, current.slug, "", weekA)
+		config.WeekBURL = h.trainingPlanURL(language, current.slug, "", weekB)
 	}
 	if board.CanEdit && !view.NoResources {
 		config.MoveURL = view.DraftURL
@@ -628,7 +627,7 @@ func (h *groupHandler) trainingLayout(current groupRequest, board service.Traini
 
 	var items []WeekGridItem
 	for _, slot := range shownSlots {
-		row := h.planSlotRow(language, groupID, slot, resources[slot.ResourceID], part.AlternatingWeeks)
+		row := h.planSlotRow(language, current.slug, slot, resources[slot.ResourceID], part.AlternatingWeeks)
 		items = append(items, WeekGridItem{
 			ID: "s" + strconv.FormatInt(slot.ID, 10), Weekday: slot.Weekday, StartMinute: slot.StartMinute, EndMinute: slot.EndMinute,
 			Resource: strconv.FormatInt(slot.ResourceID, 10), Label: row.Ages, Detail: strings.Join(nonEmpty(row.Week, row.MaxTeams), " · "),
@@ -679,7 +678,7 @@ func (h *groupHandler) trainingLayout(current groupRequest, board service.Traini
 			tr.Week = h.t(language, "plan.slot_week."+strings.ToLower(training.Week))
 		}
 		if row.HasSlot {
-			slotRow := h.planSlotRow(language, groupID, row.Slot, resource, part.AlternatingWeeks)
+			slotRow := h.planSlotRow(language, current.slug, row.Slot, resource, part.AlternatingWeeks)
 			tr.Slot = slotRow.Time
 		}
 		if row.Reason != "" {
@@ -689,7 +688,7 @@ func (h *groupHandler) trainingLayout(current groupRequest, board service.Traini
 	}
 	for _, team := range board.Teams {
 		card := TrainingTeamView{
-			ID: team.Team.ID, Name: team.Team.Name, URL: h.groupPath(language, groupID, "/teams/"+strconv.FormatInt(team.Team.ID, 10)),
+			ID: team.Team.ID, Name: team.Team.Name, URL: h.teamPath(current, team.Team.ID, ""),
 			Archived: team.Team.Archived(), Coaches: h.trainingCoaches(language, team.Coaches), NoCoach: len(team.Coaches) == 0,
 			Count: h.tv(language, "training_plan.team_trainings", map[string]string{"count": strconv.Itoa(team.Trainings)}),
 			Ages:  h.tv(language, "coach_board.ages", map[string]string{"min": strconv.Itoa(team.Ages.Min), "max": strconv.Itoa(team.Ages.Max)}),

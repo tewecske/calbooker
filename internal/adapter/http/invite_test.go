@@ -11,7 +11,7 @@ import (
 
 func TestInvitesPageListsAndCreates(t *testing.T) {
 	dependencies, _, teams := groupTestDependencies(t, groupMemberAs(service.GroupRoleManager))
-	teams.summaries = []service.TeamSummary{{Team: service.Team{ID: 4, GroupID: 3, Name: "Lions", BirthYearFrom: 2015, BirthYearTo: 2016}}}
+	teams.summaries = []service.TeamSummary{{Team: service.Team{ID: 4, Slug: "t4", GroupID: 3, Name: "Lions", BirthYearFrom: 2015, BirthYearTo: 2016}}}
 	teamName := "Lions"
 	teamID := int64(4)
 	maxUses := 10
@@ -22,22 +22,22 @@ func TestInvitesPageListsAndCreates(t *testing.T) {
 		{Invite: service.GroupInvite{ID: 2, Code: "REVOKEDCODE2", Role: service.GroupRoleCoach, RevokedAt: &revokedAt}},
 	}}
 	dependencies.Invites = invites
-	page := serveGroups(t, dependencies, http.MethodGet, "/en/groups/3/invites", "", false)
+	page := serveGroups(t, dependencies, http.MethodGet, "/en/groups/lions/invites", "", false)
 	body := page.Body.String()
 	if page.Code != http.StatusOK {
 		t.Fatalf("invites page status = %d", page.Code)
 	}
-	for _, want := range []string{"PLAYERCODE23", "3 / 10", "Lions", "2033-05-18", `data-invite-status="active"`, `data-invite-status="revoked"`, "/en/groups/3/invites/1/revoke", `<option value="manager"`, `<option value="">No team</option>`} {
+	for _, want := range []string{"PLAYERCODE23", "3 / 10", "Lions", "2033-05-18", `data-invite-status="active"`, `data-invite-status="revoked"`, "/en/groups/lions/invites/1/revoke", `<option value="manager"`, `<option value="">No team</option>`} {
 		if !strings.Contains(body, want) {
 			t.Errorf("invites page missing %q", want)
 		}
 	}
 	// Only admins invite admins; a manager is not offered the admin role.
-	if strings.Contains(body, `<option value="admin"`) || strings.Contains(body, "/en/groups/3/invites/2/revoke") {
+	if strings.Contains(body, `<option value="admin"`) || strings.Contains(body, "/en/groups/lions/invites/2/revoke") {
 		t.Error("manager page offers the admin role or revokes a revoked invite")
 	}
 
-	created := serveGroups(t, dependencies, http.MethodPost, "/en/groups/3/invites", "role=parent&team_id=4&expires_in=7&max_uses=5", true)
+	created := serveGroups(t, dependencies, http.MethodPost, "/en/groups/lions/invites", "role=parent&team_id=4&expires_in=7&max_uses=5", true)
 	if created.Code != http.StatusOK || !strings.Contains(created.Body.String(), `data-testid="invite-created-code"`) {
 		t.Fatalf("create = %d, want the new code shown", created.Code)
 	}
@@ -47,13 +47,13 @@ func TestInvitesPageListsAndCreates(t *testing.T) {
 
 	for _, form := range []string{"role=player&max_uses=abc", "role=player&expires_in=-1"} {
 		writes := invites.writes
-		response := serveGroups(t, dependencies, http.MethodPost, "/en/groups/3/invites", form, true)
+		response := serveGroups(t, dependencies, http.MethodPost, "/en/groups/lions/invites", form, true)
 		if response.Code != http.StatusUnprocessableEntity || invites.writes != writes {
 			t.Fatalf("malformed %q = %d (writes %d), want 422 without a write", form, response.Code, invites.writes-writes)
 		}
 	}
 	invites.writeErr = service.ErrInvalidInvite
-	if response := serveGroups(t, dependencies, http.MethodPost, "/en/groups/3/invites", "role=coach&team_id=4", false); response.Code != http.StatusUnprocessableEntity || !strings.Contains(response.Body.String(), "only for players and parents") {
+	if response := serveGroups(t, dependencies, http.MethodPost, "/en/groups/lions/invites", "role=coach&team_id=4", false); response.Code != http.StatusUnprocessableEntity || !strings.Contains(response.Body.String(), "only for players and parents") {
 		t.Fatalf("invalid invite = %d, want 422 with the rule", response.Code)
 	}
 }
@@ -61,8 +61,8 @@ func TestInvitesPageListsAndCreates(t *testing.T) {
 func TestInvitesPageForCoachRequiresTeam(t *testing.T) {
 	coach := groupAccessAs(service.GroupAccessGrants{Member: true, Roles: []string{service.GroupRoleCoach}, CoachedTeamIDs: []int64{4}})
 	dependencies, _, teams := groupTestDependencies(t, coach)
-	teams.summaries = []service.TeamSummary{{Team: service.Team{ID: 4, GroupID: 3, Name: "Lions", BirthYearFrom: 2015, BirthYearTo: 2016}}}
-	body := serveGroups(t, dependencies, http.MethodGet, "/en/groups/3/invites", "", false).Body.String()
+	teams.summaries = []service.TeamSummary{{Team: service.Team{ID: 4, Slug: "t4", GroupID: 3, Name: "Lions", BirthYearFrom: 2015, BirthYearTo: 2016}}}
+	body := serveGroups(t, dependencies, http.MethodGet, "/en/groups/lions/invites", "", false).Body.String()
 	if !strings.Contains(body, `<option value="player"`) || !strings.Contains(body, `<option value="parent"`) || strings.Contains(body, `<option value="coach"`) {
 		t.Fatal("coach must be offered only player and parent invites")
 	}
@@ -75,13 +75,13 @@ func TestInviteRoutesForbidPlayers(t *testing.T) {
 	dependencies, _, _ := groupTestDependencies(t, groupMemberAs(service.GroupRolePlayer))
 	invites := &invitesUseCaseStub{writeErr: service.ErrGroupForbidden}
 	dependencies.Invites = invites
-	if response := serveGroups(t, dependencies, http.MethodGet, "/en/groups/3/invites", "", false); response.Code != http.StatusForbidden || invites.calls != 0 {
+	if response := serveGroups(t, dependencies, http.MethodGet, "/en/groups/lions/invites", "", false); response.Code != http.StatusForbidden || invites.calls != 0 {
 		t.Fatalf("player invites page = %d (calls %d), want 403 without loading", response.Code, invites.calls)
 	}
-	if response := serveGroups(t, dependencies, http.MethodPost, "/en/groups/3/invites", "role=player", false); response.Code != http.StatusForbidden {
+	if response := serveGroups(t, dependencies, http.MethodPost, "/en/groups/lions/invites", "role=player", false); response.Code != http.StatusForbidden {
 		t.Fatalf("player create = %d, want 403", response.Code)
 	}
-	if response := serveGroups(t, dependencies, http.MethodPost, "/en/groups/3/invites/5/revoke", "", true); response.Code != http.StatusUnprocessableEntity {
+	if response := serveGroups(t, dependencies, http.MethodPost, "/en/groups/lions/invites/5/revoke", "", true); response.Code != http.StatusUnprocessableEntity {
 		t.Fatalf("player HTMX revoke = %d, want 422", response.Code)
 	}
 }
@@ -90,15 +90,15 @@ func TestInviteRevoke(t *testing.T) {
 	dependencies, _, _ := groupTestDependencies(t, groupMemberAs(service.GroupRoleAdmin))
 	invites := &invitesUseCaseStub{}
 	dependencies.Invites = invites
-	response := serveGroups(t, dependencies, http.MethodPost, "/en/groups/3/invites/5/revoke", "", true)
+	response := serveGroups(t, dependencies, http.MethodPost, "/en/groups/lions/invites/5/revoke", "", true)
 	if response.Code != http.StatusOK || invites.lastRevoked != 5 || !strings.Contains(response.Body.String(), "Invite revoked.") {
 		t.Fatalf("revoke = %d (invite %d), want 200", response.Code, invites.lastRevoked)
 	}
 	invites.writeErr = service.ErrGroupInviteNotFound
-	if response := serveGroups(t, dependencies, http.MethodPost, "/en/groups/3/invites/6/revoke", "", false); response.Code != http.StatusNotFound {
+	if response := serveGroups(t, dependencies, http.MethodPost, "/en/groups/lions/invites/6/revoke", "", false); response.Code != http.StatusNotFound {
 		t.Fatalf("unknown invite revoke = %d, want 404", response.Code)
 	}
-	if response := serveGroups(t, dependencies, http.MethodPost, "/en/groups/3/invites/abc/revoke", "", false); response.Code != http.StatusNotFound {
+	if response := serveGroups(t, dependencies, http.MethodPost, "/en/groups/lions/invites/abc/revoke", "", false); response.Code != http.StatusNotFound {
 		t.Fatalf("malformed invite revoke = %d, want 404", response.Code)
 	}
 }

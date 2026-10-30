@@ -45,7 +45,7 @@ async function createTeam(page: Page, groupURL: string, name: string, from: numb
   await page.locator("#team-new-birth-year-from").fill(String(from));
   await page.locator("#team-new-birth-year-to").fill(String(to));
   await page.getByRole("button", { name: "Create a team" }).click();
-  await page.waitForURL(/\/en\/groups\/\d+\/teams\/\d+$/);
+  await page.waitForURL(/\/en\/groups\/[a-z0-9-]+\/teams\/[a-z0-9-]+$/);
 }
 
 test.describe("coach board", () => {
@@ -64,7 +64,7 @@ test.describe("coach board", () => {
     await page.goto(`${appURL}/en/groups`);
     await page.locator("#group-new-name").fill(uniqueName("Club"));
     await page.locator("#group-new-name").locator("xpath=ancestor::form").getByRole("button").click();
-    await page.waitForURL(/\/en\/groups\/\d+$/);
+    await page.waitForURL(/\/en\/groups\/(?!join$)[a-z0-9-]+$/);
     const groupURL = page.url();
 
     // Lions are 9-10 and Tigers 11-12 in the season.
@@ -79,7 +79,7 @@ test.describe("coach board", () => {
     await page.locator("#season-new-part1-starts-on").fill(dateFromToday(-30));
     await page.locator("#season-new-part1-ends-on").fill(dateFromToday(300));
     await page.getByRole("button", { name: "Add a season" }).click();
-    await page.waitForURL(/\/en\/groups\/\d+\/seasons\/\d+$/);
+    await page.waitForURL(/\/en\/groups\/[a-z0-9-]+\/seasons\/\d+$/);
     const seasonURL = page.url();
 
     // The coach joins and is qualified for ages 9-10.

@@ -92,6 +92,7 @@
           <div class="list-col-grow">
             <div>{{.Label}}</div>
             {{if .Email}}<div class="text-sm opacity-70">{{.Email}}</div>{{end}}
+            {{if .Parents}}<div class="text-sm opacity-70" data-testid="roster-parents">{{$.ParentsLabel}} {{.Parents}}</div>{{end}}
             {{if .ParentOf}}<div class="text-sm opacity-70" data-testid="roster-parent-of">{{$.ParentOfLabel}} {{.ParentOf}}</div>{{end}}
           </div>
           {{if and $.CanManage (not .Linked)}}
@@ -109,9 +110,31 @@
   {{end}}
 {{end}}
 
+{{/* Submenu of a team page; the Roster tab is the team page itself. Further
+     tabs (such as invites) are added in team_tabs.go and need no markup. */}}
+{{define "team-tabs"}}
+  {{with .TeamTabs}}
+    <nav aria-label="{{.Name}}">
+      <div role="tablist" class="tabs tabs-box" data-testid="team-tabs">
+        {{range .Tabs}}<a role="tab" class="tab{{if .Current}} tab-active{{end}}" href="{{.URL}}" data-team-tab="{{.ID}}"{{if .Current}} aria-selected="true" aria-current="page"{{end}}>{{.Label}}</a>{{end}}
+      </div>
+    </nav>
+  {{end}}
+{{end}}
+
+{{/* Back link and name above the tabs of the Events and Calendar tabs. */}}
+{{define "team-tab-head"}}
+  {{with .TeamTabs}}
+    <p><a class="link" href="{{.TeamsURL}}">{{$.L.teams_back}}</a></p>
+    <h2 class="text-xl font-semibold" data-testid="team-tab-name">{{.Name}}</h2>
+  {{end}}
+  {{template "team-tabs" .}}
+{{end}}
+
 {{define "group-team"}}
   {{with .Group}}{{$L := .L}}{{with .Team}}
     <p><a class="link" href="{{.TeamsURL}}">{{$L.teams_back}}</a></p>
+    {{template "team-tabs" $.Group}}
     <section class="card card-border bg-base-100 shadow-sm" aria-labelledby="team-heading">
       <div class="card-body">
         <h2 id="team-heading" class="card-title">{{.Name}}{{if .Archived}} <span class="badge badge-warning badge-soft">{{$L.teams_archived_badge}}</span>{{end}}</h2>

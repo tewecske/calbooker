@@ -264,6 +264,13 @@ func (h *groupHandler) eventPathRequest(writer http.ResponseWriter, request *htt
 }
 
 func (h *groupHandler) loadEvents(writer http.ResponseWriter, request *http.Request, current groupRequest, group service.Group, form FormData, view *GroupDetailView) bool {
+	return h.loadEventList(writer, request, current, group, 0, form, view)
+}
+
+// loadEventList fills the event list. A positive teamID fixes the list to
+// that team (the team page's Events tab): no team filter, links under the
+// team, and a create form that preselects the team.
+func (h *groupHandler) loadEventList(writer http.ResponseWriter, request *http.Request, current groupRequest, group service.Group, teamID int64, form FormData, view *GroupDetailView) bool {
 	if h.dependencies.Events == nil {
 		h.renderError(writer, request, http.StatusInternalServerError)
 		return false
@@ -271,6 +278,9 @@ func (h *groupHandler) loadEvents(writer http.ResponseWriter, request *http.Requ
 	ctx := request.Context()
 	language := current.language
 	base := h.groupPath(language, group.Slug, "/events")
+	if teamID > 0 {
+		base = h.teamPath(current, teamID, "/events")
+	}
 	list := &EventsView{TimeZone: group.TimeZone, UpcomingURL: base, PastURL: base + "?when=past", FilterURL: base}
 	values := request.URL.Query()
 	list.Past = request.Method == http.MethodGet && values.Get("when") == "past"
@@ -278,9 +288,11 @@ func (h *groupHandler) loadEvents(writer http.ResponseWriter, request *http.Requ
 	if list.Past {
 		query = service.EventQuery{To: time.Now(), Descending: true, Limit: pastEventsLimit}
 	}
-	if teamID, err := strconv.ParseInt(strings.TrimSpace(values.Get("team")), 10, 64); err == nil && teamID > 0 && request.Method == http.MethodGet {
+	if teamID > 0 {
 		query.TeamID = teamID
-		list.SelectedTeam = strconv.FormatInt(teamID, 10)
+	} else if filterID, err := strconv.ParseInt(strings.TrimSpace(values.Get("team")), 10, 64); err == nil && filterID > 0 && request.Method == http.MethodGet {
+		query.TeamID = filterID
+		list.SelectedTeam = strconv.FormatInt(filterID, 10)
 	}
 	events, err := h.dependencies.Events.List(ctx, current.access, query)
 	if err != nil {
@@ -290,7 +302,7 @@ func (h *groupHandler) loadEvents(writer http.ResponseWriter, request *http.Requ
 	for _, event := range events {
 		list.Rows = append(list.Rows, h.eventRow(language, group.Slug, group.TimeZone, event))
 	}
-	if h.dependencies.Teams != nil {
+	if h.dependencies.Teams != nil && teamID == 0 {
 		teams, err := h.dependencies.Teams.List(ctx, current.access)
 		if err != nil {
 			h.renderLoadError(writer, request, language, err)
@@ -307,7 +319,15 @@ func (h *groupHandler) loadEvents(writer http.ResponseWriter, request *http.Requ
 			h.renderEventLoadError(writer, request, language, err)
 			return false
 		}
-		list.CreateForm = h.eventFormView(language, "event-new", base, options, nil, form)
+		if teamID == 0 || slices.ContainsFunc(options.Teams, func(team service.Team) bool { return team.ID == teamID }) {
+			list.CreateForm = h.eventFormView(language, "event-new", base, options, nil, form)
+			if teamID > 0 && !form.Submitted {
+				preselected := strconv.FormatInt(teamID, 10)
+				for index := range list.CreateForm.Teams {
+					list.CreateForm.Teams[index].Checked = list.CreateForm.Teams[index].Value == preselected
+				}
+			}
+		}
 	}
 	view.Events = list
 	return true

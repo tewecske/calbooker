@@ -355,6 +355,16 @@ get `service.ErrGroupNotFound`, which handlers render as 404.
   re-render the event page (HTMX: the fragment with out-of-band alerts;
   refusals 422).
 
+## Team page tabs
+
+- `/{language}/groups/{group}/teams/{team}` (Roster), `.../events` and
+  `.../calendar` (`internal/adapter/http/team_tabs.go`, `templates/teams.html`
+  `team-tabs`). Events and Calendar reuse `loadEventList` and
+  `loadCalendarScope` with the team fixed, so visibility is the same
+  `GroupAccess` rules; `POST .../teams/{team}/events` creates an event through
+  the normal event use case and redirects to the event page. Every tab resolves
+  the team with `TeamService.BySlug` first (invisible team: 404).
+
 ## Calendar
 
 - `/{language}/groups/{group}/calendar?week=YYYY-MM-DD&team=&resource=&kind=`

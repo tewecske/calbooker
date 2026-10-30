@@ -119,6 +119,8 @@
       {{if eq .Section "members"}}{{template "group-members" $}}{{end}}
       {{if eq .Section "teams"}}{{template "group-teams" $}}{{end}}
       {{if eq .Section "team"}}{{template "group-team" $}}{{end}}
+      {{if eq .Section "team-events"}}{{template "team-tab-head" .}}{{template "group-events" $}}{{end}}
+      {{if eq .Section "team-calendar"}}{{template "team-tab-head" .}}{{template "group-calendar" $}}{{end}}
       {{if eq .Section "invites"}}{{template "group-invites" $}}{{end}}
       {{if eq .Section "children"}}{{template "group-children" $}}{{end}}
       {{if eq .Section "resources"}}{{template "group-resources" $}}{{end}}

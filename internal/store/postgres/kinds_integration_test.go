@@ -195,7 +195,7 @@ func TestKindRepositoryLifecycle(t *testing.T) {
 	if err := kinds.DeleteKind(ctx, service.KindScopeEvent, group.ID, second.ID, second.Version); err != nil {
 		t.Fatalf("DeleteKind() error = %v", err)
 	}
-	if err := kinds.DeleteKind(ctx, service.KindScopeEvent, group.ID, second.ID, second.Version); !errors.Is(err, service.ErrKindNotFound) {
+	if err := kinds.DeleteKind(ctx, service.KindScopeEvent, group.ID, second.ID, second.Version); !errors.Is(err, service.ErrRecordNotFound) {
 		t.Fatalf("DeleteKind(again) error = %v, want not found", err)
 	}
 

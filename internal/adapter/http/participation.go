@@ -72,8 +72,8 @@ type ParticipantChoiceView struct {
 // each event page.
 func registerParticipationRoutes(mux *http.ServeMux, groups *groupHandler) {
 	for _, prefix := range localizedPrefixes() {
-		mux.HandleFunc("POST "+prefix+"/groups/{id}/events/{eventID}/participation", groups.respondToEvent)
-		mux.HandleFunc("POST "+prefix+"/groups/{id}/events/{eventID}/attendance", groups.recordAttendance)
+		mux.HandleFunc("POST "+prefix+"/groups/{group}/events/{eventID}/participation", groups.respondToEvent)
+		mux.HandleFunc("POST "+prefix+"/groups/{group}/events/{eventID}/attendance", groups.recordAttendance)
 	}
 }
 

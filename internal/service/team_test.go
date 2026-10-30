@@ -19,6 +19,7 @@ type teamRepositoryStub struct {
 	expectedVersion int64
 	created         Team
 	rosterAdds      []string
+	takenSlugs      map[string]bool
 	rosterRemoves   []string
 }
 
@@ -46,6 +47,27 @@ func (r *teamRepositoryStub) FindTeam(_ context.Context, groupID, teamID int64) 
 		return Team{}, ErrTeamNotFound
 	}
 	return team, nil
+}
+
+func (r *teamRepositoryStub) FindTeamBySlug(_ context.Context, groupID int64, slug string) (Team, error) {
+	for _, team := range r.teams {
+		if team.GroupID == groupID && team.Slug == slug {
+			return team, nil
+		}
+	}
+	return Team{}, ErrTeamNotFound
+}
+
+func (r *teamRepositoryStub) TeamSlugTaken(_ context.Context, groupID int64, slug string, exceptID int64) (bool, error) {
+	if r.takenSlugs[slug] {
+		return true, nil
+	}
+	for _, team := range r.teams {
+		if team.GroupID == groupID && team.Slug == slug && team.ID != exceptID {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 func (r *teamRepositoryStub) ListTeams(context.Context, int64) ([]TeamSummary, error) {

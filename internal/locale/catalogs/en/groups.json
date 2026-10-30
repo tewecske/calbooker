@@ -72,6 +72,10 @@
     "groups.error.last_admin": {"text": "A group must keep at least one administrator."},
     "groups.error.role_needs_account": {"text": "Administrators, managers, and coaches need a signed-in account, not a guest."},
     "groups.error.invalid_role": {"text": "Choose a valid role."},
-    "groups.error.member_not_found": {"text": "That member is no longer in this group."}
+    "groups.error.member_not_found": {"text": "That member is no longer in this group."},
+    "groups.slug": {"text": "Link name"},
+    "groups.slug_help": {"text": "Used in the group's links. Lowercase letters, digits, and hyphens; changing it changes the group's web address."},
+    "groups.error.invalid_slug": {"text": "Use lowercase letters, digits, and single hyphens, up to 64 characters. Numbers alone and words like \"new\" or \"settings\" are not allowed."},
+    "groups.error.slug_taken": {"text": "Another group already uses that link name."}
   }
 }

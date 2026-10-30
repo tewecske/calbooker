@@ -81,7 +81,7 @@ type StatisticsPlayerRowView struct {
 // registerStatisticsRoutes registers each group's statistics page.
 func registerStatisticsRoutes(mux *http.ServeMux, groups *groupHandler) {
 	for _, prefix := range localizedPrefixes() {
-		mux.HandleFunc("GET "+prefix+"/groups/{id}/statistics", groups.statistics)
+		mux.HandleFunc("GET "+prefix+"/groups/{group}/statistics", groups.statistics)
 	}
 }
 
@@ -130,8 +130,8 @@ func parseStatisticsQuery(request *http.Request) service.StatisticsQuery {
 	return query
 }
 
-func (h *groupHandler) statisticsURL(language locale.Code, groupID int64, values url.Values) string {
-	target := h.groupPath(language, groupID, "/statistics")
+func (h *groupHandler) statisticsURL(language locale.Code, groupSlug string, values url.Values) string {
+	target := h.groupPath(language, groupSlug, "/statistics")
 	if encoded := values.Encode(); encoded != "" {
 		target += "?" + encoded
 	}
@@ -152,7 +152,7 @@ func (h *groupHandler) loadStatistics(writer http.ResponseWriter, request *http.
 	}
 	period := report.Period
 	stats := &StatisticsView{
-		ActionURL: h.groupPath(language, groupID, "/statistics"),
+		ActionURL: h.groupPath(language, current.slug, "/statistics"),
 		Period:    period.Kind,
 		HasPeriod: report.HasPeriod,
 		TimeZone:  report.TimeZone,
@@ -162,7 +162,7 @@ func (h *groupHandler) loadStatistics(writer http.ResponseWriter, request *http.
 		stats.Tabs = append(stats.Tabs, StatisticsTabView{
 			Kind:    kind,
 			Label:   h.t(language, "statistics.period_"+kind),
-			URL:     h.statisticsURL(language, groupID, url.Values{"period": {kind}}),
+			URL:     h.statisticsURL(language, current.slug, url.Values{"period": {kind}}),
 			Current: kind == period.Kind,
 		})
 	}
@@ -174,8 +174,8 @@ func (h *groupHandler) loadStatistics(writer http.ResponseWriter, request *http.
 		if period.Kind == service.StatisticsPeriodMonth {
 			stats.Heading = period.StartsOn.Format("2006-01")
 		}
-		stats.PreviousURL = h.statisticsURL(language, groupID, url.Values{"period": {period.Kind}, "date": {service.FormatSeasonDate(period.Previous)}})
-		stats.NextURL = h.statisticsURL(language, groupID, url.Values{"period": {period.Kind}, "date": {service.FormatSeasonDate(period.Next)}})
+		stats.PreviousURL = h.statisticsURL(language, current.slug, url.Values{"period": {period.Kind}, "date": {service.FormatSeasonDate(period.Previous)}})
+		stats.NextURL = h.statisticsURL(language, current.slug, url.Values{"period": {period.Kind}, "date": {service.FormatSeasonDate(period.Next)}})
 	default:
 		stats.Heading = period.Name
 	}
@@ -206,7 +206,7 @@ func (h *groupHandler) loadStatistics(writer http.ResponseWriter, request *http.
 	stats.Intro = h.t(language, intro)
 	for _, team := range report.Teams {
 		stats.Teams = append(stats.Teams, StatisticsTeamRowView{
-			ID: team.TeamID, Name: team.Name, URL: h.groupPath(language, groupID, "/teams/"+strconv.FormatInt(team.TeamID, 10)),
+			ID: team.TeamID, Name: team.Name, URL: h.teamPath(current, team.TeamID, ""),
 			Players: team.Players, Events: team.Events, SignedUp: team.SignedUp, Attended: team.Attended, Rate: rateLabel(team.Rate()),
 		})
 	}

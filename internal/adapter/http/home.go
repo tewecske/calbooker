@@ -2,7 +2,6 @@ package httpadapter
 
 import (
 	"net/http"
-	"strconv"
 
 	"github.com/tewecske/calbooker/internal/locale"
 	"github.com/tewecske/calbooker/internal/service"
@@ -66,7 +65,7 @@ func homeView(renderer *PageRenderer, dependencies Dependencies, request *http.R
 		return view
 	}
 	for _, summary := range summaries {
-		path, err := locale.Path(language, "/groups/"+strconv.FormatInt(summary.Group.ID, 10))
+		path, err := locale.Path(language, "/groups/"+summary.Group.Slug)
 		if err != nil {
 			continue
 		}

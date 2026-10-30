@@ -122,7 +122,7 @@ func TestOptimisticLockOutcomesForGroupEditors(t *testing.T) {
 			name: "group settings",
 			run: func(writeErr error) error {
 				groups := &groupRepositoryStub{group: Group{ID: 5, Name: "Old", NameNorm: "old", TimeZone: "UTC", Version: 1}, updateErr: writeErr}
-				_, err := newService(groups, newMembershipStub()).UpdateSettings(context.Background(), adminActor(), 1, "Renamed", "UTC")
+				_, err := newService(groups, newMembershipStub()).UpdateSettings(context.Background(), adminActor(), 1, "Renamed", "", "UTC")
 				return err
 			},
 			missing: ErrGroupNotFound,

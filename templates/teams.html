@@ -4,6 +4,14 @@
     <input id="{{.Prefix}}-name" class="input w-full" name="name" required maxlength="64" value="{{.Name}}" aria-describedby="{{.Prefix}}-name-error">
     {{with .NameError}}<p id="{{$.Prefix}}-name-error" class="text-sm text-error" role="alert">{{.}}</p>{{end}}
   </fieldset>
+  {{if .ShowSlug}}
+  <fieldset class="fieldset">
+    <label class="fieldset-legend" for="{{.Prefix}}-slug">{{.L.teams_slug}}</label>
+    <input id="{{.Prefix}}-slug" class="input w-full" name="slug" required maxlength="64" pattern="[a-z0-9]+(-[a-z0-9]+)*" value="{{.Slug}}" aria-describedby="{{.Prefix}}-slug-help {{.Prefix}}-slug-error">
+    <p id="{{.Prefix}}-slug-help" class="label">{{.L.teams_slug_help}}</p>
+    {{with .SlugError}}<p id="{{$.Prefix}}-slug-error" class="text-sm text-error" role="alert">{{.}}</p>{{end}}
+  </fieldset>
+  {{end}}
   <div class="grid gap-4 sm:grid-cols-2">
     <fieldset class="fieldset">
       <label class="fieldset-legend" for="{{.Prefix}}-birth-year-from">{{.L.teams_birth_year_from}}</label>

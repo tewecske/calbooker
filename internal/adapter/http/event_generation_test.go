@@ -71,7 +71,7 @@ func eventGenerationDependencies(t *testing.T, access *service.GroupAccess) (Dep
 	return dependencies, stub
 }
 
-const eventGenerationPath = "/en/groups/3/event-generation"
+const eventGenerationPath = "/en/groups/lions/event-generation"
 
 func TestEventGenerationPageByRole(t *testing.T) {
 	tests := []struct {
@@ -105,8 +105,8 @@ func TestEventGenerationPageByRole(t *testing.T) {
 			}
 			for _, want := range []string{
 				"Generate events from the plan", `data-testid="event-generation-result"`, `data-action="create"`, "Will be created", "Lions",
-				"Tuesday 2026-10-27 16:00–17:30", "Europe/Budapest", `data-testid="event-generation-kept-item"`, `href="/en/groups/3/events/77"`,
-				"edited or cancelled by hand", `action="/en/groups/3/event-generation"`, `name="week" value="2026-10-26"`, `name="weeks" value="2"`,
+				"Tuesday 2026-10-27 16:00–17:30", "Europe/Budapest", `data-testid="event-generation-kept-item"`, `href="/en/groups/lions/events/77"`,
+				"edited or cancelled by hand", `action="/en/groups/lions/event-generation"`, `name="week" value="2026-10-26"`, `name="weeks" value="2"`,
 				`name="part" value="12"`, `data-section="training-plan"`,
 			} {
 				if !strings.Contains(body, want) {
@@ -201,12 +201,12 @@ func TestEventGenerationRefusals(t *testing.T) {
 func TestTrainingPlanLinksToEventGeneration(t *testing.T) {
 	for role, wantLink := range map[string]bool{service.GroupRoleAdmin: true, service.GroupRoleCoach: false} {
 		dependencies, _ := trainingPlanDependencies(t, groupMemberAs(role))
-		response := serveGroups(t, dependencies, http.MethodGet, "/en/groups/3/training-plan?part=12", "", false)
+		response := serveGroups(t, dependencies, http.MethodGet, "/en/groups/lions/training-plan?part=12", "", false)
 		body := response.Body.String()
 		if strings.Contains(body, `data-testid="training-plan-generate-link"`) != wantLink {
 			t.Errorf("%s: generate link shown = %v, want %v", role, !wantLink, wantLink)
 		}
-		if wantLink && !strings.Contains(body, `href="/en/groups/3/event-generation?part=12"`) {
+		if wantLink && !strings.Contains(body, `href="/en/groups/lions/event-generation?part=12"`) {
 			t.Error("generate link does not point at the part")
 		}
 	}

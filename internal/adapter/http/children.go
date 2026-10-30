@@ -64,12 +64,12 @@ type GuardianRowView struct {
 // and guardian links.
 func registerChildRoutes(mux *http.ServeMux, groups *groupHandler) {
 	for _, prefix := range localizedPrefixes() {
-		mux.HandleFunc("GET "+prefix+"/groups/{id}/children", groups.children)
-		mux.HandleFunc("POST "+prefix+"/groups/{id}/children", groups.createProfile)
-		mux.HandleFunc("POST "+prefix+"/groups/{id}/children/{childID}", groups.updateProfile)
-		mux.HandleFunc("POST "+prefix+"/groups/{id}/children/{childID}/delete", groups.deleteProfile)
-		mux.HandleFunc("POST "+prefix+"/groups/{id}/guardians/add", groups.addGuardian)
-		mux.HandleFunc("POST "+prefix+"/groups/{id}/guardians/remove", groups.removeGuardian)
+		mux.HandleFunc("GET "+prefix+"/groups/{group}/children", groups.children)
+		mux.HandleFunc("POST "+prefix+"/groups/{group}/children", groups.createProfile)
+		mux.HandleFunc("POST "+prefix+"/groups/{group}/children/{childID}", groups.updateProfile)
+		mux.HandleFunc("POST "+prefix+"/groups/{group}/children/{childID}/delete", groups.deleteProfile)
+		mux.HandleFunc("POST "+prefix+"/groups/{group}/guardians/add", groups.addGuardian)
+		mux.HandleFunc("POST "+prefix+"/groups/{group}/guardians/remove", groups.removeGuardian)
 	}
 }
 
@@ -232,9 +232,9 @@ func (h *groupHandler) loadChildren(writer http.ResponseWriter, request *http.Re
 	children := &ChildrenView{
 		CanCreate: access.CanCreateProfile(),
 		IsStaff:   access.CanManageGuardians(),
-		CreateURL: h.groupPath(language, groupID, "/children"),
-		LinkURL:   h.groupPath(language, groupID, "/guardians/add"),
-		UnlinkURL: h.groupPath(language, groupID, "/guardians/remove"),
+		CreateURL: h.groupPath(language, current.slug, "/children"),
+		LinkURL:   h.groupPath(language, current.slug, "/guardians/add"),
+		UnlinkURL: h.groupPath(language, current.slug, "/guardians/remove"),
 		Name:      form.Value("display_name"),
 		BirthYear: form.Value("birth_year"),
 		NameError: form.Error("display_name"),
@@ -266,7 +266,7 @@ func (h *groupHandler) loadChildren(writer http.ResponseWriter, request *http.Re
 		}
 	}
 	for _, child := range overview.Children {
-		base := h.groupPath(language, groupID, "/children/"+strconv.FormatInt(child.Person.UserID, 10))
+		base := h.groupPath(language, current.slug, "/children/"+strconv.FormatInt(child.Person.UserID, 10))
 		row := ChildRowView{
 			UserID:    child.Person.UserID,
 			Label:     h.memberLabel(language, child.Person.UserID, child.Person.DisplayName, child.Person.Username, nil),

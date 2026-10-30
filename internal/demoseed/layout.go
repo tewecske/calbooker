@@ -33,7 +33,9 @@ type Member struct {
 
 // TeamPlan is one team with its roster and coaching staff.
 type TeamPlan struct {
-	Name          string
+	Name string
+	// Slug is the team's URL slug within its group (u10, u13, u12).
+	Slug          string
 	BirthYearFrom int
 	BirthYearTo   int
 	// CoachMinAge and CoachMaxAge are the qualification of the team's coaches.
@@ -99,7 +101,7 @@ func bigGroup(name, slug string, teamNames [2]string) GroupPlan {
 	add(RoleParent, 10)
 
 	for t := range 2 {
-		team := TeamPlan{Name: teamNames[t]}
+		team := TeamPlan{Name: teamNames[t], Slug: [2]string{"u10", "u13"}[t]}
 		if t == 0 {
 			team.BirthYearFrom, team.BirthYearTo, team.CoachMinAge, team.CoachMaxAge = 2016, 2017, 6, 12
 		} else {
@@ -125,7 +127,7 @@ func fuzyGroup() GroupPlan {
 		Member{Email: Email(slug, "", 0), Name: name + " Admin", Roles: []string{RoleAdmin}},
 		Member{Email: Email(slug, RoleManager, 1), Name: displayName(name, RoleManager, 1), Roles: []string{RoleManager, RoleCoach}},
 	)
-	team := TeamPlan{Name: "Fuzy U12", BirthYearFrom: 2014, BirthYearTo: 2015, CoachMinAge: 8, CoachMaxAge: 14}
+	team := TeamPlan{Name: "Fuzy U12", Slug: "u12", BirthYearFrom: 2014, BirthYearTo: 2015, CoachMinAge: 8, CoachMaxAge: 14}
 	for n := 1; n <= 10; n++ {
 		g.Members = append(g.Members, Member{Email: Email(slug, RolePlayer, n), Name: displayName(name, RolePlayer, n), Roles: []string{RolePlayer}})
 		team.Players = append(team.Players, Email(slug, RolePlayer, n))

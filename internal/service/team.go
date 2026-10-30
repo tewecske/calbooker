@@ -45,9 +45,11 @@ var (
 // Team is a birth-year range plus a name within a group. It persists across
 // seasons; archived teams are kept for history.
 type Team struct {
-	ID            int64
-	GroupID       int64
-	Name          string
+	ID      int64
+	GroupID int64
+	Name    string
+	// Slug addresses the team in URLs; unique within the group.
+	Slug          string
 	BirthYearFrom int
 	BirthYearTo   int
 	Description   *string
@@ -70,7 +72,10 @@ type TeamSummary struct {
 
 // TeamInput is the editable part of a team.
 type TeamInput struct {
-	Name          string
+	Name string
+	// Slug is the edited URL slug. Empty keeps the current slug on update
+	// and derives one from the name on create.
+	Slug          string
 	BirthYearFrom int
 	BirthYearTo   int
 	Description   string
@@ -107,6 +112,11 @@ type TeamRepository interface {
 	CreateTeam(context.Context, Team) (Team, error)
 	// FindTeam returns ErrTeamNotFound for a team outside the group.
 	FindTeam(ctx context.Context, groupID, teamID int64) (Team, error)
+	// FindTeamBySlug returns ErrTeamNotFound for an unknown slug.
+	FindTeamBySlug(ctx context.Context, groupID int64, slug string) (Team, error)
+	// TeamSlugTaken reports whether a team of the group other than exceptID
+	// uses slug.
+	TeamSlugTaken(ctx context.Context, groupID int64, slug string, exceptID int64) (bool, error)
 	ListTeams(ctx context.Context, groupID int64) ([]TeamSummary, error)
 	// UpdateTeam writes name, birth years, description, and archive state at
 	// the expected revision; stale writes classify through ClassifyStaleWrite.
@@ -183,8 +193,21 @@ func (s *TeamService) Create(ctx context.Context, actor GroupActor, input TeamIn
 	}
 	team.GroupID = actor.Access.GroupID()
 	team.CreatedAt = s.now().Unix()
-	created, err := s.teams.CreateTeam(ctx, team)
+	var created Team
+	for attempt := 0; ; attempt++ {
+		if team.Slug, err = s.newSlug(ctx, team, input.Slug); err != nil {
+			return Team{}, err
+		}
+		created, err = s.teams.CreateTeam(ctx, team)
+		if errors.Is(err, ErrSlugTaken) && input.Slug == "" && attempt < slugCreateAttempts {
+			continue
+		}
+		break
+	}
 	if err != nil {
+		if errors.Is(err, ErrSlugTaken) {
+			return Team{}, err
+		}
 		return Team{}, fmt.Errorf("create team: %w", err)
 	}
 	s.record(ctx, actor, AuditActionTeamCreated, created, "")
@@ -245,6 +268,11 @@ func (s *TeamService) Update(ctx context.Context, actor GroupActor, teamID, expe
 		return Team{}, err
 	}
 	team.Name, team.BirthYearFrom, team.BirthYearTo, team.Description = changed.Name, changed.BirthYearFrom, changed.BirthYearTo, changed.Description
+	if strings.TrimSpace(input.Slug) != "" {
+		if team.Slug, err = s.checkSlug(ctx, team, input.Slug); err != nil {
+			return Team{}, err
+		}
+	}
 	updated, err := s.update(ctx, team, expectedVersion)
 	if err != nil {
 		return Team{}, err
@@ -353,11 +381,103 @@ func (s *TeamService) findEditable(ctx context.Context, actor GroupActor, teamID
 	return s.teams.FindTeam(ctx, actor.Access.GroupID(), teamID)
 }
 
+// newSlug validates the slug typed for a new team, or derives a free one
+// from its name.
+func (s *TeamService) newSlug(ctx context.Context, team Team, typed string) (string, error) {
+	if strings.TrimSpace(typed) != "" {
+		return s.checkSlug(ctx, team, typed)
+	}
+	slug, err := uniqueSlug(team.Name, "team", func(candidate string) (bool, error) {
+		return s.teams.TeamSlugTaken(ctx, team.GroupID, candidate, 0)
+	})
+	if err != nil {
+		return "", fmt.Errorf("find team slug: %w", err)
+	}
+	return slug, nil
+}
+
+// checkSlug validates a typed slug and refuses one another team of the group
+// uses.
+func (s *TeamService) checkSlug(ctx context.Context, team Team, typed string) (string, error) {
+	slug, err := normalizeSlugInput(typed)
+	if err != nil {
+		return "", err
+	}
+	taken, err := s.teams.TeamSlugTaken(ctx, team.GroupID, slug, team.ID)
+	if err != nil {
+		return "", fmt.Errorf("check team slug: %w", err)
+	}
+	if taken {
+		return "", ErrSlugTaken
+	}
+	return slug, nil
+}
+
+// BySlug returns a team of the group the account may see. Unknown slugs and
+// teams the account may not see both answer ErrTeamNotFound.
+func (s *TeamService) BySlug(ctx context.Context, access *GroupAccess, slug string) (Team, error) {
+	if err := s.validate(ctx); err != nil {
+		return Team{}, err
+	}
+	if !access.CanView() {
+		return Team{}, ErrGroupNotFound
+	}
+	if ValidateSlug(slug) != nil {
+		return Team{}, ErrTeamNotFound
+	}
+	team, err := s.teams.FindTeamBySlug(ctx, access.GroupID(), slug)
+	if err != nil {
+		return Team{}, err
+	}
+	if !access.CanViewTeam(team.ID) {
+		return Team{}, ErrTeamNotFound
+	}
+	return team, nil
+}
+
+// ByID returns a team of the group the account may see; it backs the
+// redirect from the old numeric team URLs.
+func (s *TeamService) ByID(ctx context.Context, access *GroupAccess, teamID int64) (Team, error) {
+	if err := s.validate(ctx); err != nil {
+		return Team{}, err
+	}
+	if !access.CanView() {
+		return Team{}, ErrGroupNotFound
+	}
+	if teamID <= 0 || !access.CanViewTeam(teamID) {
+		return Team{}, ErrTeamNotFound
+	}
+	return s.teams.FindTeam(ctx, access.GroupID(), teamID)
+}
+
+// Slugs returns the URL slug of every team of the group by team ID, for
+// building links to teams known only by ID. Slugs are not secret, but
+// callers only use the ones of teams they already show.
+func (s *TeamService) Slugs(ctx context.Context, access *GroupAccess) (map[int64]string, error) {
+	if err := s.validate(ctx); err != nil {
+		return nil, err
+	}
+	if !access.CanView() {
+		return nil, ErrGroupNotFound
+	}
+	teams, err := s.teams.ListTeams(ctx, access.GroupID())
+	if err != nil {
+		return nil, fmt.Errorf("list team slugs: %w", err)
+	}
+	slugs := make(map[int64]string, len(teams))
+	for _, summary := range teams {
+		slugs[summary.Team.ID] = summary.Team.Slug
+	}
+	return slugs, nil
+}
+
 func (s *TeamService) update(ctx context.Context, team Team, expectedVersion int64) (Team, error) {
 	updated, err := s.teams.UpdateTeam(ctx, team, expectedVersion)
 	switch {
 	case err == nil:
 		return updated, nil
+	case errors.Is(err, ErrSlugTaken):
+		return Team{}, err
 	case errors.Is(err, ErrRecordNotFound), errors.Is(err, ErrTeamNotFound):
 		// A team that vanished is not-found, never a conflict.
 		return Team{}, ErrTeamNotFound
@@ -378,7 +498,7 @@ func (s *TeamService) authorize(ctx context.Context, actor GroupActor, allowed b
 func (s *TeamService) record(ctx context.Context, actor GroupActor, action string, team Team, extra string) {
 	detail := "team " + strconv.FormatInt(team.ID, 10) + ": " + team.Name
 	if action == AuditActionTeamCreated || action == AuditActionTeamUpdated {
-		detail += "; birth years " + strconv.Itoa(team.BirthYearFrom) + "-" + strconv.Itoa(team.BirthYearTo)
+		detail += "; slug " + team.Slug + "; birth years " + strconv.Itoa(team.BirthYearFrom) + "-" + strconv.Itoa(team.BirthYearTo)
 	}
 	if extra != "" {
 		detail += "; " + extra

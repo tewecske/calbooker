@@ -24,7 +24,7 @@ test.describe("members links and A/B weeks", () => {
     await page.goto(`${appURL}/en/groups`);
     await page.locator("#group-new-name").fill(uniqueName("Club"));
     await page.locator("#group-new-name").locator("xpath=ancestor::form").getByRole("button").click();
-    await page.waitForURL(/\/en\/groups\/\d+$/);
+    await page.waitForURL(/\/en\/groups\/(?!join$)[a-z0-9-]+$/);
     const groupURL = page.url();
 
     await page.goto(`${groupURL}/teams`);
@@ -32,7 +32,7 @@ test.describe("members links and A/B weeks", () => {
     await page.locator("#team-new-birth-year-from").fill("2015");
     await page.locator("#team-new-birth-year-to").fill("2016");
     await page.getByRole("button", { name: "Create a team" }).click();
-    await page.waitForURL(/\/en\/groups\/\d+\/teams\/\d+$/);
+    await page.waitForURL(/\/en\/groups\/[a-z0-9-]+\/teams\/[a-z0-9-]+$/);
     const teamURL = page.url();
 
     // A guest joins as a player, a signed-in account as a parent.
@@ -101,7 +101,7 @@ test.describe("members links and A/B weeks", () => {
     await page.goto(`${appURL}/en/groups`);
     await page.locator("#group-new-name").fill(uniqueName("Club"));
     await page.locator("#group-new-name").locator("xpath=ancestor::form").getByRole("button").click();
-    await page.waitForURL(/\/en\/groups\/\d+$/);
+    await page.waitForURL(/\/en\/groups\/(?!join$)[a-z0-9-]+$/);
     const groupURL = page.url();
 
     // A season whose only part does not alternate.
@@ -113,7 +113,7 @@ test.describe("members links and A/B weeks", () => {
     await page.locator("#season-new-part1-starts-on").fill(dateFromToday(-30));
     await page.locator("#season-new-part1-ends-on").fill(dateFromToday(300));
     await page.getByRole("button", { name: "Add a season" }).click();
-    await page.waitForURL(/\/en\/groups\/\d+\/seasons\/\d+$/);
+    await page.waitForURL(/\/en\/groups\/[a-z0-9-]+\/seasons\/\d+$/);
     const seasonURL = page.url();
 
     // The slot plan page: no week tabs until the switch is on.

@@ -157,15 +157,15 @@ func (s availabilitySelection) query() string {
 // availability routes.
 func registerCoachRoutes(mux *http.ServeMux, groups *groupHandler) {
 	for _, prefix := range localizedPrefixes() {
-		mux.HandleFunc("GET "+prefix+"/groups/{id}/coaches", groups.coaches)
-		mux.HandleFunc("POST "+prefix+"/groups/{id}/coaches/{coachID}/qualification", groups.setQualification)
-		mux.HandleFunc("POST "+prefix+"/groups/{id}/coaches/{coachID}/qualification/clear", groups.clearQualification)
-		mux.HandleFunc("GET "+prefix+"/groups/{id}/coaches/availability", groups.availabilityOverview)
-		mux.HandleFunc("GET "+prefix+"/groups/{id}/coaches/{coachID}/availability", groups.availability)
-		mux.HandleFunc("POST "+prefix+"/groups/{id}/coaches/{coachID}/availability/create", groups.createAvailability)
-		mux.HandleFunc("POST "+prefix+"/groups/{id}/coaches/{coachID}/availability/move", groups.moveAvailability)
-		mux.HandleFunc("POST "+prefix+"/groups/{id}/coaches/{coachID}/availability/delete", groups.deleteAvailability)
-		mux.HandleFunc("POST "+prefix+"/groups/{id}/coaches/{coachID}/availability/copy", groups.copyAvailability)
+		mux.HandleFunc("GET "+prefix+"/groups/{group}/coaches", groups.coaches)
+		mux.HandleFunc("POST "+prefix+"/groups/{group}/coaches/{coachID}/qualification", groups.setQualification)
+		mux.HandleFunc("POST "+prefix+"/groups/{group}/coaches/{coachID}/qualification/clear", groups.clearQualification)
+		mux.HandleFunc("GET "+prefix+"/groups/{group}/coaches/availability", groups.availabilityOverview)
+		mux.HandleFunc("GET "+prefix+"/groups/{group}/coaches/{coachID}/availability", groups.availability)
+		mux.HandleFunc("POST "+prefix+"/groups/{group}/coaches/{coachID}/availability/create", groups.createAvailability)
+		mux.HandleFunc("POST "+prefix+"/groups/{group}/coaches/{coachID}/availability/move", groups.moveAvailability)
+		mux.HandleFunc("POST "+prefix+"/groups/{group}/coaches/{coachID}/availability/delete", groups.deleteAvailability)
+		mux.HandleFunc("POST "+prefix+"/groups/{group}/coaches/{coachID}/availability/copy", groups.copyAvailability)
 	}
 }
 
@@ -258,7 +258,7 @@ func (h *groupHandler) changeAvailability(writer http.ResponseWriter, request *h
 		return
 	}
 	selection.week = availabilityWeek(partView.Part, selection.week)
-	config := h.availabilityGridConfig(current.language, current.access.GroupID(), coachID, selection, partView.Part, true, csrfToken(request))
+	config := h.availabilityGridConfig(current.language, current.slug, coachID, selection, partView.Part, true, csrfToken(request))
 	change, err := ParseWeekGridChange(request, config, move)
 	if err != nil {
 		h.respondAvailabilityChange(writer, request, current, coachID, selection, "coaches.availability.error.invalid", err)
@@ -339,7 +339,7 @@ func (h *groupHandler) respondAvailabilityChange(writer http.ResponseWriter, req
 	alert.Message = h.t(current.language, message)
 	if !IsHTMX(request) {
 		if failure == nil {
-			h.redirectLocalized(writer, request, current.language, "/groups/"+strconv.FormatInt(current.access.GroupID(), 10)+"/coaches/"+strconv.FormatInt(coachID, 10)+"/availability?"+selection.query())
+			h.redirectLocalized(writer, request, current.language, "/groups/"+current.slug+"/coaches/"+strconv.FormatInt(coachID, 10)+"/availability?"+selection.query())
 			return
 		}
 		h.renderSection(writer, request, current, groupSectionAvailability, coachID, FormData{}, []Alert{alert}, status)
@@ -476,10 +476,10 @@ func (h *groupHandler) loadCoaches(writer http.ResponseWriter, request *http.Req
 	}
 	list := &CoachesView{CanManage: current.access.CanManageQualifications()}
 	if current.access.CanViewAllAvailability() {
-		list.OverviewURL = h.groupPath(language, groupID, "/coaches/availability")
+		list.OverviewURL = h.groupPath(language, current.slug, "/coaches/availability")
 	}
 	for _, coach := range coaches {
-		base := h.groupPath(language, groupID, "/coaches/"+strconv.FormatInt(coach.UserID, 10))
+		base := h.groupPath(language, current.slug, "/coaches/"+strconv.FormatInt(coach.UserID, 10))
 		row := CoachRowView{
 			UserID:          coach.UserID,
 			Label:           h.memberLabel(language, coach.UserID, coach.DisplayName, coach.Username, coach.Email),
@@ -516,7 +516,7 @@ func (h *groupHandler) loadCoaches(writer http.ResponseWriter, request *http.Req
 				continue
 			}
 			ages := service.TeamAgeRange(team, season)
-			row := TeamAgeView{ID: team.ID, Name: team.Name, URL: h.groupPath(language, groupID, "/teams/"+strconv.FormatInt(team.ID, 10)), AgeLabel: h.ageLabel(language, ages)}
+			row := TeamAgeView{ID: team.ID, Name: team.Name, URL: h.groupPath(language, current.slug, "/teams/"+team.Slug), AgeLabel: h.ageLabel(language, ages)}
 			if list.CanManage {
 				for _, coach := range coaches {
 					if coach.Qualification != nil && coach.Qualification.Covers(ages) {
@@ -538,12 +538,12 @@ func (h *groupHandler) loadAvailability(writer http.ResponseWriter, request *htt
 	selection := parseAvailabilitySelection(request)
 	page := &AvailabilityView{
 		CoachID: coachID,
-		BackURL: h.groupPath(language, groupID, "/coaches"),
+		BackURL: h.groupPath(language, current.slug, "/coaches"),
 	}
 	if current.access.CanViewAllAvailability() {
-		page.OverviewURL = h.groupPath(language, groupID, "/coaches/availability")
+		page.OverviewURL = h.groupPath(language, current.slug, "/coaches/availability")
 	}
-	base := h.groupPath(language, groupID, "/coaches/"+strconv.FormatInt(coachID, 10)+"/availability")
+	base := h.groupPath(language, current.slug, "/coaches/"+strconv.FormatInt(coachID, 10)+"/availability")
 	page.PickerURL = base
 	if !h.availabilityParts(writer, request, current, &selection, page) {
 		return false
@@ -590,7 +590,7 @@ func (h *groupHandler) loadAvailability(writer http.ResponseWriter, request *htt
 	page.WeekTabs = h.availabilityWeekTabs(language, base, selection, part)
 	page.DeleteURL = base + "/delete?" + selection.query()
 	editable := current.access.CanEditAvailability(coachID)
-	config := h.availabilityGridConfig(language, groupID, coachID, selection, part, editable, csrfToken(request))
+	config := h.availabilityGridConfig(language, current.slug, coachID, selection, part, editable, csrfToken(request))
 	items := h.availabilityItems(language, availability, availability.Windows, selection.week, editable, "", WeekGridPrimary)
 	grid, err := BuildWeekGrid(config, items, h.renderer.WeekGridTranslator(language))
 	if err != nil {
@@ -629,11 +629,11 @@ func (h *groupHandler) loadAvailabilityOverview(writer http.ResponseWriter, requ
 	ctx := request.Context()
 	language := current.language
 	selection := parseAvailabilitySelection(request)
-	base := h.groupPath(language, groupID, "/coaches/availability")
+	base := h.groupPath(language, current.slug, "/coaches/availability")
 	page := &AvailabilityView{
 		Overview:  true,
 		Heading:   h.t(language, "coaches.availability.overview_heading"),
-		BackURL:   h.groupPath(language, groupID, "/coaches"),
+		BackURL:   h.groupPath(language, current.slug, "/coaches"),
 		PickerURL: base,
 	}
 	if !h.availabilityParts(writer, request, current, &selection, page) {
@@ -666,12 +666,12 @@ func (h *groupHandler) loadAvailabilityOverview(writer http.ResponseWriter, requ
 		items = append(items, coachItems...)
 		page.Legend = append(page.Legend, AvailabilityLegendView{
 			Label:      label,
-			URL:        h.groupPath(language, groupID, "/coaches/"+strconv.FormatInt(coach.UserID, 10)+"/availability?"+selection.query()),
+			URL:        h.groupPath(language, current.slug, "/coaches/"+strconv.FormatInt(coach.UserID, 10)+"/availability?"+selection.query()),
 			BadgeClass: "badge-" + string(variant),
 			Windows:    len(coachItems),
 		})
 	}
-	config := h.availabilityGridConfig(language, groupID, 0, selection, part, false, "")
+	config := h.availabilityGridConfig(language, current.slug, 0, selection, part, false, "")
 	config.ID = "availability-overview-grid"
 	grid, err := BuildWeekGrid(config, items, h.renderer.WeekGridTranslator(language))
 	if err != nil {
@@ -741,7 +741,7 @@ func (h *groupHandler) availabilityWeekTabs(language locale.Code, base string, s
 // availabilityGridConfig is the grid of a part and week tab. The grid's own
 // week is "A" or "B" on those tabs of an alternating part and empty
 // otherwise; the tab travels in the change URLs.
-func (h *groupHandler) availabilityGridConfig(language locale.Code, groupID, coachID int64, selection availabilitySelection, part service.SeasonPart, editable bool, csrf string) WeekGridConfig {
+func (h *groupHandler) availabilityGridConfig(language locale.Code, groupSlug string, coachID int64, selection availabilitySelection, part service.SeasonPart, editable bool, csrf string) WeekGridConfig {
 	config := WeekGridConfig{
 		ID:              availabilityGridID,
 		StartMinute:     availabilityGridStart,
@@ -754,7 +754,7 @@ func (h *groupHandler) availabilityGridConfig(language locale.Code, groupID, coa
 		config.Week = selection.week
 	}
 	if editable && coachID > 0 {
-		base := h.groupPath(language, groupID, "/coaches/"+strconv.FormatInt(coachID, 10)+"/availability")
+		base := h.groupPath(language, groupSlug, "/coaches/"+strconv.FormatInt(coachID, 10)+"/availability")
 		target := selection
 		target.partID = part.ID
 		config.MoveURL = base + "/move?" + target.query()

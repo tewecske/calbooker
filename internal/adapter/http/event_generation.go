@@ -80,8 +80,8 @@ type GenerationItemView struct {
 // page.
 func registerEventGenerationRoutes(mux *http.ServeMux, groups *groupHandler) {
 	for _, prefix := range localizedPrefixes() {
-		mux.HandleFunc("GET "+prefix+"/groups/{id}/event-generation", groups.eventGeneration)
-		mux.HandleFunc("POST "+prefix+"/groups/{id}/event-generation", groups.generateEvents)
+		mux.HandleFunc("GET "+prefix+"/groups/{group}/event-generation", groups.eventGeneration)
+		mux.HandleFunc("POST "+prefix+"/groups/{group}/event-generation", groups.generateEvents)
 	}
 }
 
@@ -125,8 +125,8 @@ func (q eventGenerationQuery) request() service.GenerationRequest {
 	return service.GenerationRequest{PartID: q.part, Week: service.ParseSeasonDate(q.week), Weeks: q.weeks}
 }
 
-func (h *groupHandler) eventGenerationURL(language locale.Code, groupID int64) string {
-	return h.groupPath(language, groupID, "/event-generation")
+func (h *groupHandler) eventGenerationURL(language locale.Code, groupSlug string) string {
+	return h.groupPath(language, groupSlug, "/event-generation")
 }
 
 func (h *groupHandler) eventGeneration(writer http.ResponseWriter, request *http.Request) {
@@ -222,14 +222,13 @@ func (h *groupHandler) respondEventGeneration(writer http.ResponseWriter, reques
 
 func (h *groupHandler) eventGenerationView(request *http.Request, current groupRequest, query eventGenerationQuery, options service.GenerationOptions, preview *service.GenerationPreview, done bool) *EventGenerationView {
 	language := current.language
-	groupID := current.access.GroupID()
 	view := &EventGenerationView{
 		L:          h.labels[language],
 		CSRFToken:  csrfToken(request),
-		SeasonsURL: h.groupPath(language, groupID, "/seasons"),
-		PlanURL:    h.groupPath(language, groupID, "/training-plan"),
-		PickerURL:  h.eventGenerationURL(language, groupID),
-		ActionURL:  h.eventGenerationURL(language, groupID),
+		SeasonsURL: h.groupPath(language, current.slug, "/seasons"),
+		PlanURL:    h.groupPath(language, current.slug, "/training-plan"),
+		PickerURL:  h.eventGenerationURL(language, current.slug),
+		ActionURL:  h.eventGenerationURL(language, current.slug),
 		WeekCount:  query.weeks,
 	}
 	if !options.Found {
@@ -296,7 +295,7 @@ func (h *groupHandler) eventGenerationView(request *http.Request, current groupR
 			line.Reason = h.t(language, "event_generation.reason."+item.Reason)
 		}
 		if item.Action == service.GenerationKeep {
-			line.URL = h.groupPath(language, groupID, "/events/"+strconv.FormatInt(item.EventID, 10))
+			line.URL = h.groupPath(language, current.slug, "/events/"+strconv.FormatInt(item.EventID, 10))
 			view.Kept = append(view.Kept, line)
 			continue
 		}

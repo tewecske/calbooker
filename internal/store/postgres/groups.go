@@ -27,7 +27,7 @@ func NewGroupRepository(db *sql.DB) (*GroupRepository, error) {
 
 var _ service.GroupRepository = (*GroupRepository)(nil)
 
-const groupColumns = `id, name, name_norm, time_zone, created_by, created_at, version`
+const groupColumns = `id, name, slug, name_norm, time_zone, created_by, created_at, version`
 
 const groupSelect = `SELECT ` + groupColumns + ` FROM groups`
 
@@ -52,10 +52,32 @@ func (r *GroupRepository) FindGroupByID(ctx context.Context, id int64) (service.
 	return findGroup(db.QueryRowContext(ctx, groupSelect+" WHERE id = $1", id))
 }
 
+// FindGroupBySlug returns one group by its URL slug.
+func (r *GroupRepository) FindGroupBySlug(ctx context.Context, slug string) (service.Group, error) {
+	db, err := r.database(ctx)
+	if err != nil {
+		return service.Group{}, err
+	}
+	return findGroup(db.QueryRowContext(ctx, groupSelect+" WHERE slug = $1", slug))
+}
+
+// GroupSlugTaken reports whether a group other than exceptID uses slug.
+func (r *GroupRepository) GroupSlugTaken(ctx context.Context, slug string, exceptID int64) (bool, error) {
+	db, err := r.database(ctx)
+	if err != nil {
+		return false, err
+	}
+	var taken bool
+	if err := db.QueryRowContext(ctx, "SELECT EXISTS (SELECT 1 FROM groups WHERE slug = $1 AND id <> $2)", slug, exceptID).Scan(&taken); err != nil {
+		return false, mapGroupError(err)
+	}
+	return taken, nil
+}
+
 // groupSummarySelect lists groups with member counts and the account's roles
 // ($1). The join decides whether non-member groups are included.
 const groupSummarySelect = `
-	SELECT g.id, g.name, g.name_norm, g.time_zone, g.created_by, g.created_at, g.version,
+	SELECT g.id, g.name, g.slug, g.name_norm, g.time_zone, g.created_by, g.created_at, g.version,
 		(SELECT count(*) FROM group_members counted WHERE counted.group_id = g.id),
 		(SELECT string_agg(r.role, ',') FROM group_member_roles r WHERE r.group_id = g.id AND r.user_id = $1)
 	FROM groups g`
@@ -101,7 +123,7 @@ func (r *GroupRepository) listSummaries(ctx context.Context, query string, userI
 			memberCount int64
 		)
 		if err := rows.Scan(
-			&summary.Group.ID, &summary.Group.Name, &summary.Group.NameNorm, &summary.Group.TimeZone,
+			&summary.Group.ID, &summary.Group.Name, &summary.Group.Slug, &summary.Group.NameNorm, &summary.Group.TimeZone,
 			&createdBy, &summary.Group.CreatedAt, &summary.Group.Version, &memberCount, &roles,
 		); err != nil {
 			return nil, mapGroupError(err)
@@ -125,10 +147,10 @@ func (r *GroupRepository) UpdateGroup(ctx context.Context, group service.Group, 
 	}
 	updated, scanErr := findGroup(db.QueryRowContext(ctx, `
 		UPDATE groups
-		SET name = $1, name_norm = $2, time_zone = $3, version = version + 1
-		WHERE id = $4 AND version = $5
+		SET name = $1, slug = $2, name_norm = $3, time_zone = $4, version = version + 1
+		WHERE id = $5 AND version = $6
 		RETURNING `+groupColumns,
-		group.Name, group.NameNorm, group.TimeZone, group.ID, expectedVersion))
+		group.Name, group.Slug, group.NameNorm, group.TimeZone, group.ID, expectedVersion))
 	if scanErr == nil {
 		return updated, nil
 	}
@@ -483,11 +505,13 @@ func createGroup(ctx context.Context, executor groupExecutor, group service.Grou
 	if group.TimeZone == "" {
 		group.TimeZone = service.DefaultGroupTimeZone
 	}
+	// Callers that skip the service and give no slug get "group-<id>".
 	return findGroup(executor.QueryRowContext(ctx, `
-		INSERT INTO groups (name, name_norm, time_zone, created_by, created_at, version)
-		VALUES ($1, $2, $3, $4, $5, $6)
+		WITH next AS (SELECT nextval(pg_get_serial_sequence('groups', 'id')) AS id)
+		INSERT INTO groups (id, name, slug, name_norm, time_zone, created_by, created_at, version)
+		SELECT next.id, $1::varchar, COALESCE(NULLIF($2::varchar, ''), 'group-' || next.id), $3::varchar, $4::varchar, $5::bigint, $6::bigint, $7::bigint FROM next
 		RETURNING `+groupColumns,
-		group.Name, group.NameNorm, group.TimeZone, group.CreatedBy, group.CreatedAt, group.Version))
+		group.Name, group.Slug, group.NameNorm, group.TimeZone, group.CreatedBy, group.CreatedAt, group.Version))
 }
 
 func findGroup(row rowScanner) (service.Group, error) {
@@ -495,7 +519,7 @@ func findGroup(row rowScanner) (service.Group, error) {
 		group     service.Group
 		createdBy sql.NullInt64
 	)
-	if err := row.Scan(&group.ID, &group.Name, &group.NameNorm, &group.TimeZone, &createdBy, &group.CreatedAt, &group.Version); err != nil {
+	if err := row.Scan(&group.ID, &group.Name, &group.Slug, &group.NameNorm, &group.TimeZone, &createdBy, &group.CreatedAt, &group.Version); err != nil {
 		return service.Group{}, mapGroupError(err)
 	}
 	if group.ID <= 0 || group.Version < 0 || group.Name == "" || group.NameNorm == "" || group.TimeZone == "" {
@@ -657,6 +681,8 @@ func mapGroupError(err error) error {
 		switch pgErr.ConstraintName {
 		case "group_members_group_user_unique":
 			return service.ErrMembershipExists
+		case "groups_slug_unique":
+			return service.ErrSlugTaken
 		}
 		return ErrConflict
 	}

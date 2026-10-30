@@ -43,15 +43,15 @@ func statisticsDependencies(t *testing.T, access *service.GroupAccess) (Dependen
 
 func TestStatisticsPage(t *testing.T) {
 	dependencies, stub := statisticsDependencies(t, groupMemberAs(service.GroupRoleCoach))
-	response := serveGroups(t, dependencies, http.MethodGet, "/en/groups/3/statistics?period=month&date=2026-11-15", "", false)
+	response := serveGroups(t, dependencies, http.MethodGet, "/en/groups/lions/statistics?period=month&date=2026-11-15", "", false)
 	if response.Code != http.StatusOK {
 		t.Fatalf("status = %d", response.Code)
 	}
 	body := response.Body.String()
 	for _, want := range []string{
-		`id="group-statistics-heading"`, `data-section="statistics" aria-current="page"`, `data-testid="statistics-teams"`, `href="/en/groups/3/teams/4"`,
+		`id="group-statistics-heading"`, `data-section="statistics" aria-current="page"`, `data-testid="statistics-teams"`, `href="/en/groups/lions/teams/t4"`,
 		"Anna Player", ">2026-11<", "2026-11-01 – 2026-11-30", "Europe/Budapest", ">50%<", ">67%<",
-		`href="/en/groups/3/statistics?date=2026-10-01&amp;period=month"`, `data-testid="statistics-tab-week"`,
+		`href="/en/groups/lions/statistics?date=2026-10-01&amp;period=month"`, `data-testid="statistics-tab-week"`,
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("statistics page missing %q", want)
@@ -64,7 +64,7 @@ func TestStatisticsPage(t *testing.T) {
 
 func TestStatisticsQueryFallsBack(t *testing.T) {
 	dependencies, stub := statisticsDependencies(t, groupMemberAs(service.GroupRoleAdmin))
-	response := serveGroups(t, dependencies, http.MethodGet, "/en/groups/3/statistics?period=decade&date=nonsense&season=-3&part=x", "", false)
+	response := serveGroups(t, dependencies, http.MethodGet, "/en/groups/lions/statistics?period=decade&date=nonsense&season=-3&part=x", "", false)
 	if response.Code != http.StatusOK {
 		t.Fatalf("status = %d", response.Code)
 	}
@@ -76,7 +76,7 @@ func TestStatisticsQueryFallsBack(t *testing.T) {
 func TestStatisticsOwnNumbersHideTeams(t *testing.T) {
 	dependencies, stub := statisticsDependencies(t, groupMemberAs(service.GroupRolePlayer))
 	stub.report.ShowTeams, stub.report.Teams = false, nil
-	body := serveGroups(t, dependencies, http.MethodGet, "/en/groups/3/statistics", "", false).Body.String()
+	body := serveGroups(t, dependencies, http.MethodGet, "/en/groups/lions/statistics", "", false).Body.String()
 	if strings.Contains(body, `data-testid="statistics-teams"`) || !strings.Contains(body, "Your own numbers") || !strings.Contains(body, `data-testid="statistics-players"`) {
 		t.Fatal("a player sees team rows or misses their own table")
 	}
@@ -85,7 +85,7 @@ func TestStatisticsOwnNumbersHideTeams(t *testing.T) {
 func TestStatisticsNoSeasonPeriod(t *testing.T) {
 	dependencies, stub := statisticsDependencies(t, groupMemberAs(service.GroupRoleAdmin))
 	stub.report = service.StatisticsReport{Period: service.StatisticsPeriod{Kind: service.StatisticsPeriodSeason}, TimeZone: "Europe/Budapest", ShowTeams: true}
-	body := serveGroups(t, dependencies, http.MethodGet, "/en/groups/3/statistics?period=season", "", false).Body.String()
+	body := serveGroups(t, dependencies, http.MethodGet, "/en/groups/lions/statistics?period=season", "", false).Body.String()
 	if !strings.Contains(body, `data-testid="statistics-no-seasons"`) || strings.Contains(body, `data-testid="statistics-teams"`) {
 		t.Fatal("empty season period page is wrong")
 	}
@@ -94,7 +94,7 @@ func TestStatisticsNoSeasonPeriod(t *testing.T) {
 func TestStatisticsOutsiderGetsNotFound(t *testing.T) {
 	dependencies, stub := statisticsDependencies(t, nil)
 	dependencies.GroupAccess = &groupAccessStub{err: service.ErrGroupNotFound}
-	for _, target := range []string{"/en/groups/3/statistics", "/hu/groups/3/statistics?period=week"} {
+	for _, target := range []string{"/en/groups/lions/statistics", "/hu/groups/lions/statistics?period=week"} {
 		response := serveGroups(t, dependencies, http.MethodGet, target, "", false)
 		if response.Code != http.StatusNotFound || strings.Contains(response.Body.String(), "Lions Club") {
 			t.Errorf("GET %s = %d, want 404 without the group name", target, response.Code)
@@ -108,7 +108,7 @@ func TestStatisticsOutsiderGetsNotFound(t *testing.T) {
 func TestStatisticsServiceNotFoundIs404(t *testing.T) {
 	dependencies, stub := statisticsDependencies(t, groupMemberAs(service.GroupRolePlayer))
 	stub.err = service.ErrGroupNotFound
-	if response := serveGroups(t, dependencies, http.MethodGet, "/en/groups/3/statistics", "", false); response.Code != http.StatusNotFound {
+	if response := serveGroups(t, dependencies, http.MethodGet, "/en/groups/lions/statistics", "", false); response.Code != http.StatusNotFound {
 		t.Fatalf("status = %d, want 404", response.Code)
 	}
 }

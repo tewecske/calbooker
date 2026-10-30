@@ -83,11 +83,11 @@ type ResourceFormView struct {
 // registerResourceRoutes registers each group's resource list and pages.
 func registerResourceRoutes(mux *http.ServeMux, groups *groupHandler) {
 	for _, prefix := range localizedPrefixes() {
-		mux.HandleFunc("GET "+prefix+"/groups/{id}/resources", groups.resources)
-		mux.HandleFunc("POST "+prefix+"/groups/{id}/resources", groups.createResource)
-		mux.HandleFunc("GET "+prefix+"/groups/{id}/resources/{resourceID}", groups.resource)
-		mux.HandleFunc("POST "+prefix+"/groups/{id}/resources/{resourceID}", groups.updateResource)
-		mux.HandleFunc("POST "+prefix+"/groups/{id}/resources/{resourceID}/archive", groups.archiveResource)
+		mux.HandleFunc("GET "+prefix+"/groups/{group}/resources", groups.resources)
+		mux.HandleFunc("POST "+prefix+"/groups/{group}/resources", groups.createResource)
+		mux.HandleFunc("GET "+prefix+"/groups/{group}/resources/{resourceID}", groups.resource)
+		mux.HandleFunc("POST "+prefix+"/groups/{group}/resources/{resourceID}", groups.updateResource)
+		mux.HandleFunc("POST "+prefix+"/groups/{group}/resources/{resourceID}/archive", groups.archiveResource)
 	}
 }
 
@@ -210,10 +210,10 @@ func (h *groupHandler) loadResources(writer http.ResponseWriter, request *http.R
 		Archived: ResourceTableView{L: labels, TestID: "resources-archived"},
 	}
 	if current.access.CanManageResources() {
-		list.CreateForm = h.resourceFormView(current.language, "resource-new", h.groupPath(current.language, groupID, "/resources"), nil, form)
+		list.CreateForm = h.resourceFormView(current.language, "resource-new", h.groupPath(current.language, current.slug, "/resources"), nil, form)
 	}
 	for _, resource := range resources {
-		row := h.resourceRow(current.language, groupID, resource)
+		row := h.resourceRow(current.language, current.slug, resource)
 		if resource.Archived() {
 			list.Archived.Rows = append(list.Archived.Rows, row)
 		} else {
@@ -234,13 +234,13 @@ func (h *groupHandler) loadResource(writer http.ResponseWriter, request *http.Re
 		h.renderResourceLoadError(writer, request, current.language, err)
 		return false
 	}
-	row := h.resourceRow(current.language, groupID, resource)
+	row := h.resourceRow(current.language, current.slug, resource)
 	detail := &ResourceDetailView{
 		ResourceRowView: row,
 		Archived:        resource.Archived(),
 		Version:         resource.Version,
 		CanEdit:         current.access.CanManageResources(),
-		ListURL:         h.groupPath(current.language, groupID, "/resources"),
+		ListURL:         h.groupPath(current.language, current.slug, "/resources"),
 		ArchiveURL:      row.URL + "/archive",
 	}
 	if detail.CanEdit {
@@ -261,13 +261,13 @@ func (h *groupHandler) renderResourceLoadError(writer http.ResponseWriter, reque
 	}
 }
 
-func (h *groupHandler) resourceRow(language locale.Code, groupID int64, resource service.Resource) ResourceRowView {
+func (h *groupHandler) resourceRow(language locale.Code, groupSlug string, resource service.Resource) ResourceRowView {
 	row := ResourceRowView{
 		ID:        resource.ID,
 		Name:      resource.Name,
 		Kind:      resource.Kind,
 		KindLabel: h.t(language, "resources.kind."+resource.Kind),
-		URL:       h.groupPath(language, groupID, "/resources/"+strconv.FormatInt(resource.ID, 10)),
+		URL:       h.groupPath(language, groupSlug, "/resources/"+strconv.FormatInt(resource.ID, 10)),
 	}
 	if resource.Description != nil {
 		row.Description = *resource.Description

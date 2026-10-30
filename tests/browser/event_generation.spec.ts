@@ -29,7 +29,7 @@ test.describe("event generation", () => {
     await page.goto(`${appURL}/en/groups`);
     await page.locator("#group-new-name").fill(uniqueName("Club"));
     await page.locator("#group-new-name").locator("xpath=ancestor::form").getByRole("button").click();
-    await page.waitForURL(/\/en\/groups\/\d+$/);
+    await page.waitForURL(/\/en\/groups\/(?!join$)[a-z0-9-]+$/);
     const groupURL = page.url();
 
     for (const name of [lions, tigers]) {
@@ -38,7 +38,7 @@ test.describe("event generation", () => {
       await page.locator("#team-new-birth-year-from").fill("2015");
       await page.locator("#team-new-birth-year-to").fill("2016");
       await page.getByRole("button", { name: "Create a team" }).click();
-      await page.waitForURL(/\/en\/groups\/\d+\/teams\/\d+$/);
+      await page.waitForURL(/\/en\/groups\/[a-z0-9-]+\/teams\/[a-z0-9-]+$/);
     }
     await page.goto(`${groupURL}/resources`);
     await page.locator("#resource-new-name").fill(field);
@@ -52,7 +52,7 @@ test.describe("event generation", () => {
     await page.locator("#season-new-part1-starts-on").fill(dateFromToday(-30));
     await page.locator("#season-new-part1-ends-on").fill(dateFromToday(300));
     await page.getByRole("button", { name: "Add a season" }).click();
-    await page.waitForURL(/\/en\/groups\/\d+\/seasons\/\d+$/);
+    await page.waitForURL(/\/en\/groups\/[a-z0-9-]+\/seasons\/\d+$/);
 
     // The plan: Lions on Tuesday, Tigers on Thursday, both at 16:00-17:30.
     await page.goto(`${groupURL}/training-plan`);
@@ -98,7 +98,7 @@ test.describe("event generation", () => {
     await expect(rows.filter({ hasText: lions })).toHaveCount(1);
     await expect(rows.filter({ hasText: tigers })).toHaveCount(1);
     await rows.filter({ hasText: lions }).getByRole("link").first().click();
-    await page.waitForURL(/\/en\/groups\/\d+\/events\/\d+$/);
+    await page.waitForURL(/\/en\/groups\/[a-z0-9-]+\/events\/\d+$/);
     await expect(page.getByTestId("event-signup")).toHaveText("Players sign up");
     const edited = `${lions} (moved)`;
     await page.locator("#event-edit-title").fill(edited);
@@ -114,7 +114,7 @@ test.describe("event generation", () => {
     const kept = page.getByTestId("event-generation-kept-item");
     await expect(kept).toHaveCount(1);
     await expect(kept).toContainText(lions);
-    await expect(kept.getByRole("link")).toHaveAttribute("href", /\/en\/groups\/\d+\/events\/\d+$/);
+    await expect(kept.getByRole("link")).toHaveAttribute("href", /\/en\/groups\/[a-z0-9-]+\/events\/\d+$/);
     await expect(kept).toContainText("edited or cancelled by hand");
     await expect(page.getByTestId("event-generation-confirm")).toHaveCount(0);
 

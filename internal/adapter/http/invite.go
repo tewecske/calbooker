@@ -64,9 +64,9 @@ type InviteRowView struct {
 // registerInviteRoutes registers each group's invite page and its writes.
 func registerInviteRoutes(mux *http.ServeMux, groups *groupHandler) {
 	for _, prefix := range localizedPrefixes() {
-		mux.HandleFunc("GET "+prefix+"/groups/{id}/invites", groups.invites)
-		mux.HandleFunc("POST "+prefix+"/groups/{id}/invites", groups.createInvite)
-		mux.HandleFunc("POST "+prefix+"/groups/{id}/invites/{inviteID}/revoke", groups.revokeInvite)
+		mux.HandleFunc("GET "+prefix+"/groups/{group}/invites", groups.invites)
+		mux.HandleFunc("POST "+prefix+"/groups/{group}/invites", groups.createInvite)
+		mux.HandleFunc("POST "+prefix+"/groups/{group}/invites/{inviteID}/revoke", groups.revokeInvite)
 	}
 }
 
@@ -157,7 +157,7 @@ func (h *groupHandler) loadInvites(writer http.ResponseWriter, request *http.Req
 	}
 	language := current.language
 	invites := &InvitesView{
-		CreateURL:   h.groupPath(language, group.ID, "/invites"),
+		CreateURL:   h.groupPath(language, group.Slug, "/invites"),
 		AllowNoTeam: access.CanCreateInvite(service.GroupRolePlayer, 0),
 		MaxUses:     form.Value("max_uses"),
 		Error:       form.Error("role"),
@@ -209,7 +209,7 @@ func (h *groupHandler) loadInvites(writer http.ResponseWriter, request *http.Req
 			Status:      string(status),
 			StatusLabel: h.t(language, "invites.status."+string(status)),
 			Active:      status == service.InviteActive,
-			RevokeURL:   h.groupPath(language, group.ID, "/invites/"+strconv.FormatInt(invite.ID, 10)+"/revoke"),
+			RevokeURL:   h.groupPath(language, group.Slug, "/invites/"+strconv.FormatInt(invite.ID, 10)+"/revoke"),
 		}
 		if listing.TeamName != nil {
 			row.TeamName = *listing.TeamName

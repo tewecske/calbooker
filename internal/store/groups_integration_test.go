@@ -26,8 +26,8 @@ func TestGroupsAndMembershipsSchema(t *testing.T) {
 		t.Fatalf("insert user: %v", err)
 	}
 	if err := harness.DB.QueryRowContext(ctx, `
-		INSERT INTO groups (name, name_norm, created_by, created_at)
-		VALUES ('Example Group', 'example group', $1, 100)
+		INSERT INTO groups (name, slug, name_norm, created_by, created_at)
+		VALUES ('Example Group', 'example-group', 'example group', $1, 100)
 		RETURNING id
 	`, userID).Scan(&groupID); err != nil {
 		t.Fatalf("insert group: %v", err)

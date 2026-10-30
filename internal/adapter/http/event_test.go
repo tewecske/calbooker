@@ -109,7 +109,7 @@ func eventFixture() service.Event {
 func eventDependencies(t *testing.T, access *service.GroupAccess) (Dependencies, *eventsUseCaseStub) {
 	t.Helper()
 	dependencies, _, teams := groupTestDependencies(t, access)
-	teams.summaries = []service.TeamSummary{{Team: service.Team{ID: 4, GroupID: 3, Name: "Lions"}}}
+	teams.summaries = []service.TeamSummary{{Team: service.Team{ID: 4, Slug: "t4", GroupID: 3, Name: "Lions"}}}
 	event := eventFixture()
 	head := "Hanna Head"
 	court := service.Resource{ID: 31, GroupID: 3, Name: "Court 1", Kind: service.ResourceKindCourt}
@@ -161,12 +161,12 @@ func TestEventsListByRole(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			dependencies, events := eventDependencies(t, test.access)
-			response := serveGroups(t, dependencies, http.MethodGet, "/en/groups/3/events?team=4", "", false)
+			response := serveGroups(t, dependencies, http.MethodGet, "/en/groups/lions/events?team=4", "", false)
 			if response.Code != http.StatusOK {
 				t.Fatalf("status = %d", response.Code)
 			}
 			body := response.Body.String()
-			for _, want := range []string{`id="group-events-heading"`, `data-event-id="5"`, "Autumn cup", "2026-11-07 09:00 – 16:00", "Championship", "City stadium", "Lions", `data-section="events" aria-current="page"`, `href="/en/groups/3/events/5"`, "Europe/Budapest", `<option value="4" selected>Lions</option>`} {
+			for _, want := range []string{`id="group-events-heading"`, `data-event-id="5"`, "Autumn cup", "2026-11-07 09:00 – 16:00", "Championship", "City stadium", "Lions", `data-section="events" aria-current="page"`, `href="/en/groups/lions/events/5"`, "Europe/Budapest", `<option value="4" selected>Lions</option>`} {
 				if !strings.Contains(body, want) {
 					t.Errorf("events page missing %q", want)
 				}
@@ -180,12 +180,12 @@ func TestEventsListByRole(t *testing.T) {
 		})
 	}
 	dependencies, events := eventDependencies(t, playerOfTeam(4))
-	body := serveGroups(t, dependencies, http.MethodGet, "/en/groups/3/events?when=past", "", false).Body.String()
+	body := serveGroups(t, dependencies, http.MethodGet, "/en/groups/lions/events?when=past", "", false).Body.String()
 	if !strings.Contains(body, "Past events") || events.lastQuery.To.IsZero() || !events.lastQuery.Descending || events.lastQuery.Limit != pastEventsLimit {
 		t.Fatalf("past list query = %+v", events.lastQuery)
 	}
 	events.list = nil
-	if body := serveGroups(t, dependencies, http.MethodGet, "/hu/groups/3/events", "", false).Body.String(); !strings.Contains(body, `data-testid="events-empty"`) || !strings.Contains(body, "Közelgő események") {
+	if body := serveGroups(t, dependencies, http.MethodGet, "/hu/groups/lions/events", "", false).Body.String(); !strings.Contains(body, `data-testid="events-empty"`) || !strings.Contains(body, "Közelgő események") {
 		t.Fatal("empty Hungarian list missing its notice")
 	}
 }
@@ -193,7 +193,7 @@ func TestEventsListByRole(t *testing.T) {
 func TestEventsNavigationForEveryMember(t *testing.T) {
 	for _, access := range []*service.GroupAccess{groupMemberAs(), playerOfTeam(4), groupMemberAs(service.GroupRoleParent), groupMemberAs(service.GroupRoleAdmin)} {
 		dependencies, _ := eventDependencies(t, access)
-		if body := serveGroups(t, dependencies, http.MethodGet, "/en/groups/3", "", false).Body.String(); !strings.Contains(body, `data-section="events"`) {
+		if body := serveGroups(t, dependencies, http.MethodGet, "/en/groups/lions", "", false).Body.String(); !strings.Contains(body, `data-section="events"`) {
 			t.Errorf("roles %v: events tab missing", access.Roles())
 		}
 	}
@@ -203,13 +203,13 @@ func TestEventRoutesOutsiderGetsNotFound(t *testing.T) {
 	dependencies, events := eventDependencies(t, nil)
 	dependencies.GroupAccess = &groupAccessStub{err: service.ErrGroupNotFound}
 	for _, test := range []struct{ method, target string }{
-		{http.MethodGet, "/en/groups/3/events"},
-		{http.MethodPost, "/en/groups/3/events"},
-		{http.MethodGet, "/en/groups/3/events/5"},
-		{http.MethodPost, "/en/groups/3/events/5"},
-		{http.MethodPost, "/en/groups/3/events/5/cancel"},
-		{http.MethodPost, "/en/groups/3/events/5/delete"},
-		{http.MethodGet, "/hu/groups/3/events/5"},
+		{http.MethodGet, "/en/groups/lions/events"},
+		{http.MethodPost, "/en/groups/lions/events"},
+		{http.MethodGet, "/en/groups/lions/events/5"},
+		{http.MethodPost, "/en/groups/lions/events/5"},
+		{http.MethodPost, "/en/groups/lions/events/5/cancel"},
+		{http.MethodPost, "/en/groups/lions/events/5/delete"},
+		{http.MethodGet, "/hu/groups/lions/events/5"},
 	} {
 		response := serveGroups(t, dependencies, test.method, test.target, "version=1&title=X&team_id=4", false)
 		if response.Code != http.StatusNotFound || strings.Contains(response.Body.String(), "Lions Club") {
@@ -235,7 +235,7 @@ func TestEventDetailByRole(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			dependencies, _ := eventDependencies(t, test.access)
-			response := serveGroups(t, dependencies, http.MethodGet, "/en/groups/3/events/5", "", false)
+			response := serveGroups(t, dependencies, http.MethodGet, "/en/groups/lions/events/5", "", false)
 			if response.Code != http.StatusOK {
 				t.Fatalf("status = %d", response.Code)
 			}
@@ -266,10 +266,10 @@ func TestEventDetailByRole(t *testing.T) {
 	}
 	dependencies, events := eventDependencies(t, playerOfTeam(7))
 	events.detailErr = service.ErrEventNotFound
-	if response := serveGroups(t, dependencies, http.MethodGet, "/en/groups/3/events/5", "", false); response.Code != http.StatusNotFound || strings.Contains(response.Body.String(), "Autumn cup") {
+	if response := serveGroups(t, dependencies, http.MethodGet, "/en/groups/lions/events/5", "", false); response.Code != http.StatusNotFound || strings.Contains(response.Body.String(), "Autumn cup") {
 		t.Fatalf("hidden event = %d, want 404", response.Code)
 	}
-	if response := serveGroups(t, dependencies, http.MethodGet, "/en/groups/3/events/abc", "", false); response.Code != http.StatusNotFound {
+	if response := serveGroups(t, dependencies, http.MethodGet, "/en/groups/lions/events/abc", "", false); response.Code != http.StatusNotFound {
 		t.Fatalf("bad event id = %d, want 404", response.Code)
 	}
 }
@@ -280,8 +280,8 @@ const eventFormBody = "kind=championship&title=Autumn+cup&starts_at=2026-11-07T0
 
 func TestEventCreate(t *testing.T) {
 	dependencies, events := eventDependencies(t, coachOfTeam(4, 5))
-	created := serveGroups(t, dependencies, http.MethodPost, "/en/groups/3/events", eventFormBody, false)
-	if created.Code != http.StatusSeeOther || created.Header().Get("Location") != "/en/groups/3/events/99" {
+	created := serveGroups(t, dependencies, http.MethodPost, "/en/groups/lions/events", eventFormBody, false)
+	if created.Code != http.StatusSeeOther || created.Header().Get("Location") != "/en/groups/lions/events/99" {
 		t.Fatalf("create = %d %q, want 303 to the new event", created.Code, created.Header().Get("Location"))
 	}
 	input := events.lastInput
@@ -291,11 +291,11 @@ func TestEventCreate(t *testing.T) {
 		service.FormatEventLocalTime(input.SignupDeadline) != "2026-11-06T20:00" || !slices.Equal(input.CoachUserIDs, []int64{9}) {
 		t.Fatalf("input = %+v", input)
 	}
-	if htmx := serveGroups(t, dependencies, http.MethodPost, "/en/groups/3/events", eventFormBody, true); htmx.Code != http.StatusOK || htmx.Header().Get("HX-Redirect") != "/en/groups/3/events/99" {
+	if htmx := serveGroups(t, dependencies, http.MethodPost, "/en/groups/lions/events", eventFormBody, true); htmx.Code != http.StatusOK || htmx.Header().Get("HX-Redirect") != "/en/groups/lions/events/99" {
 		t.Fatalf("HTMX create = %d %q", htmx.Code, htmx.Header().Get("HX-Redirect"))
 	}
 	// Garbage numbers and times are passed on as invalid, not as empty.
-	serveGroups(t, dependencies, http.MethodPost, "/en/groups/3/events", "resource_id=x&max_participants=many&signup_deadline=soon&team_id=abc&starts_at=later", true)
+	serveGroups(t, dependencies, http.MethodPost, "/en/groups/lions/events", "resource_id=x&max_participants=many&signup_deadline=soon&team_id=abc&starts_at=later", true)
 	if bad := events.lastInput; bad.ResourceID != -1 || bad.MaxParticipants != -1 || bad.SignupDeadline.IsZero() || !slices.Equal(bad.TeamIDs, []int64{-1}) || !bad.StartsAt.IsZero() {
 		t.Fatalf("garbage input = %+v", bad)
 	}
@@ -317,7 +317,7 @@ func TestEventCreate(t *testing.T) {
 		{service.ErrEventCoachRoleMissing, "coach role", `id="event-new-coaches-error"`},
 	} {
 		events.writeErr = test.err
-		response := serveGroups(t, dependencies, http.MethodPost, "/en/groups/3/events", eventFormBody, true)
+		response := serveGroups(t, dependencies, http.MethodPost, "/en/groups/lions/events", eventFormBody, true)
 		body := response.Body.String()
 		if response.Code != http.StatusUnprocessableEntity || !strings.Contains(body, test.text) || !strings.Contains(body, test.field) {
 			t.Errorf("error %v = %d, want 422 with %q on %s", test.err, response.Code, test.text, test.field)
@@ -331,47 +331,47 @@ func TestEventCreate(t *testing.T) {
 func TestEventCreateForbidden(t *testing.T) {
 	dependencies, events := eventDependencies(t, coachOfTeam(5))
 	events.writeErr = service.ErrGroupForbidden
-	if response := serveGroups(t, dependencies, http.MethodPost, "/en/groups/3/events", eventFormBody, false); response.Code != http.StatusForbidden {
+	if response := serveGroups(t, dependencies, http.MethodPost, "/en/groups/lions/events", eventFormBody, false); response.Code != http.StatusForbidden {
 		t.Fatalf("coach of another team create = %d, want 403", response.Code)
 	}
-	if response := serveGroups(t, dependencies, http.MethodPost, "/en/groups/3/events", eventFormBody, true); response.Code != http.StatusUnprocessableEntity || !strings.Contains(response.Body.String(), `id="alerts"`) {
+	if response := serveGroups(t, dependencies, http.MethodPost, "/en/groups/lions/events", eventFormBody, true); response.Code != http.StatusUnprocessableEntity || !strings.Contains(response.Body.String(), `id="alerts"`) {
 		t.Fatalf("HTMX forbidden create = %d, want 422 with alerts", response.Code)
 	}
 }
 
 func TestEventUpdateCancelDelete(t *testing.T) {
 	dependencies, events := eventDependencies(t, coachOfTeam(4))
-	response := serveGroups(t, dependencies, http.MethodPost, "/en/groups/3/events/5", eventFormBody+"&version=2", true)
+	response := serveGroups(t, dependencies, http.MethodPost, "/en/groups/lions/events/5", eventFormBody+"&version=2", true)
 	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), "Event saved.") || events.lastID != 5 || events.lastVersion != 2 {
 		t.Fatalf("update = %d, id %d version %d", response.Code, events.lastID, events.lastVersion)
 	}
-	if response := serveGroups(t, dependencies, http.MethodPost, "/en/groups/3/events/5", eventFormBody, true); response.Code != http.StatusUnprocessableEntity || events.writes != 1 {
+	if response := serveGroups(t, dependencies, http.MethodPost, "/en/groups/lions/events/5", eventFormBody, true); response.Code != http.StatusUnprocessableEntity || events.writes != 1 {
 		t.Fatalf("update without version = %d, writes %d", response.Code, events.writes)
 	}
 	events.writeErr = service.ErrOptimisticLockConflict
-	if response := serveGroups(t, dependencies, http.MethodPost, "/en/groups/3/events/5", eventFormBody+"&version=1", false); response.Code != http.StatusConflict {
+	if response := serveGroups(t, dependencies, http.MethodPost, "/en/groups/lions/events/5", eventFormBody+"&version=1", false); response.Code != http.StatusConflict {
 		t.Fatalf("stale update = %d, want 409", response.Code)
 	}
 	events.writeErr = service.ErrEventNotFound
-	if response := serveGroups(t, dependencies, http.MethodPost, "/en/groups/3/events/5", eventFormBody+"&version=2", false); response.Code != http.StatusNotFound {
+	if response := serveGroups(t, dependencies, http.MethodPost, "/en/groups/lions/events/5", eventFormBody+"&version=2", false); response.Code != http.StatusNotFound {
 		t.Fatalf("vanished update = %d, want 404", response.Code)
 	}
 	events.writeErr = nil
 
-	response = serveGroups(t, dependencies, http.MethodPost, "/en/groups/3/events/5/cancel", "version=2&cancelled=true", true)
+	response = serveGroups(t, dependencies, http.MethodPost, "/en/groups/lions/events/5/cancel", "version=2&cancelled=true", true)
 	if response.Code != http.StatusOK || !events.lastCancel || !strings.Contains(response.Body.String(), "Event cancelled.") {
 		t.Fatalf("cancel = %d %v", response.Code, events.lastCancel)
 	}
-	response = serveGroups(t, dependencies, http.MethodPost, "/en/groups/3/events/5/cancel", "version=3&cancelled=false", true)
+	response = serveGroups(t, dependencies, http.MethodPost, "/en/groups/lions/events/5/cancel", "version=3&cancelled=false", true)
 	if response.Code != http.StatusOK || events.lastCancel || !strings.Contains(response.Body.String(), "Event reinstated.") {
 		t.Fatalf("restore = %d %v", response.Code, events.lastCancel)
 	}
-	deleted := serveGroups(t, dependencies, http.MethodPost, "/en/groups/3/events/5/delete", "version=3", false)
-	if deleted.Code != http.StatusSeeOther || deleted.Header().Get("Location") != "/en/groups/3/events" || events.lastVersion != 3 {
+	deleted := serveGroups(t, dependencies, http.MethodPost, "/en/groups/lions/events/5/delete", "version=3", false)
+	if deleted.Code != http.StatusSeeOther || deleted.Header().Get("Location") != "/en/groups/lions/events" || events.lastVersion != 3 {
 		t.Fatalf("delete = %d %q", deleted.Code, deleted.Header().Get("Location"))
 	}
 	events.writeErr = service.ErrGroupForbidden
-	if response := serveGroups(t, dependencies, http.MethodPost, "/en/groups/3/events/5/delete", "version=3", false); response.Code != http.StatusForbidden {
+	if response := serveGroups(t, dependencies, http.MethodPost, "/en/groups/lions/events/5/delete", "version=3", false); response.Code != http.StatusForbidden {
 		t.Fatalf("forbidden delete = %d, want 403", response.Code)
 	}
 }
@@ -381,10 +381,10 @@ func TestEventCancelledShown(t *testing.T) {
 	cancelledAt := int64(1)
 	events.list[0].CancelledAt = &cancelledAt
 	events.detail.Event.CancelledAt = &cancelledAt
-	if body := serveGroups(t, dependencies, http.MethodGet, "/en/groups/3/events", "", false).Body.String(); !strings.Contains(body, `data-event-id="5" data-event-cancelled="true"`) {
+	if body := serveGroups(t, dependencies, http.MethodGet, "/en/groups/lions/events", "", false).Body.String(); !strings.Contains(body, `data-event-id="5" data-event-cancelled="true"`) {
 		t.Fatal("cancelled event not marked in the list")
 	}
-	if body := serveGroups(t, dependencies, http.MethodGet, "/en/groups/3/events/5", "", false).Body.String(); !strings.Contains(body, `data-testid="event-cancelled-badge"`) {
+	if body := serveGroups(t, dependencies, http.MethodGet, "/en/groups/lions/events/5", "", false).Body.String(); !strings.Contains(body, `data-testid="event-cancelled-badge"`) {
 		t.Fatal("cancelled event not marked on its page")
 	}
 }

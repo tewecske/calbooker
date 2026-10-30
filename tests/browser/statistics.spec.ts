@@ -24,7 +24,7 @@ async function createEvent(page: Page, groupURL: string, team: string, title: st
   await page.getByTestId("event-new-teams").getByLabel(team).check();
   await page.locator("#event-new-location").fill("Clubhouse");
   await page.getByRole("button", { name: "Add an event" }).click();
-  await page.waitForURL(/\/en\/groups\/\d+\/events\/\d+$/);
+  await page.waitForURL(/\/en\/groups\/[a-z0-9-]+\/events\/\d+$/);
   return page.url();
 }
 
@@ -41,7 +41,7 @@ test.describe("statistics", () => {
     await page.goto(`${appURL}/en/groups`);
     await page.locator("#group-new-name").fill(uniqueName("Club"));
     await page.locator("#group-new-name").locator("xpath=ancestor::form").getByRole("button").click();
-    await page.waitForURL(/\/en\/groups\/\d+$/);
+    await page.waitForURL(/\/en\/groups\/(?!join$)[a-z0-9-]+$/);
     const groupURL = page.url();
 
     await page.goto(`${groupURL}/teams`);
@@ -49,7 +49,7 @@ test.describe("statistics", () => {
     await page.locator("#team-new-birth-year-from").fill("2015");
     await page.locator("#team-new-birth-year-to").fill("2016");
     await page.getByRole("button", { name: "Create a team" }).click();
-    await page.waitForURL(/\/en\/groups\/\d+\/teams\/\d+$/);
+    await page.waitForURL(/\/en\/groups\/[a-z0-9-]+\/teams\/[a-z0-9-]+$/);
     const teamURL = page.url();
 
     // A season around today, so the coach assignment counts now.
@@ -61,7 +61,7 @@ test.describe("statistics", () => {
     await page.locator("#season-new-part1-starts-on").fill(dateFromToday(-30));
     await page.locator("#season-new-part1-ends-on").fill(dateFromToday(300));
     await page.getByRole("button", { name: "Add a season" }).click();
-    await page.waitForURL(/\/en\/groups\/\d+\/seasons\/\d+$/);
+    await page.waitForURL(/\/en\/groups\/[a-z0-9-]+\/seasons\/\d+$/);
 
     const coach = await poolUser(browser, "coach");
     const coachCode = await createInvite(page, groupURL, { role: "coach" });
@@ -77,7 +77,7 @@ test.describe("statistics", () => {
     const playerCode = await createInvite(page, groupURL, { role: "player", team: lions });
     const player = await becomeGuest(browser);
     await joinWithCode(player.page, appURL, playerCode);
-    await player.page.waitForURL(/\/en\/groups\/\d+\/teams\/\d+$/);
+    await player.page.waitForURL(/\/en\/groups\/[a-z0-9-]+\/teams\/[a-z0-9-]+$/);
     const parentCode = await createInvite(page, groupURL, { role: "parent" });
     const parent = await becomeGuest(browser);
     await joinWithCode(parent.page, appURL, parentCode);

@@ -57,8 +57,8 @@ func trainingPlanFixture() service.TrainingBoard {
 	season := service.Season{ID: 2, GroupID: 3, Name: "2026/27", StartsOn: service.ParseSeasonDate("2026-08-01"), EndsOn: service.ParseSeasonDate("2027-06-30")}
 	part := service.SeasonPart{ID: 12, GroupID: 3, SeasonID: 2, Position: 1, Name: "Whole", StartsOn: season.StartsOn, EndsOn: season.EndsOn}
 	season.Parts = []service.SeasonPart{part}
-	lions := service.Team{ID: 4, GroupID: 3, Name: "Lions", BirthYearFrom: 2016, BirthYearTo: 2017}
-	tigers := service.Team{ID: 5, GroupID: 3, Name: "Tigers", BirthYearFrom: 2014, BirthYearTo: 2015}
+	lions := service.Team{ID: 4, Slug: "t4", GroupID: 3, Name: "Lions", BirthYearFrom: 2016, BirthYearTo: 2017}
+	tigers := service.Team{ID: 5, Slug: "t5", GroupID: 3, Name: "Tigers", BirthYearFrom: 2014, BirthYearTo: 2015}
 	slot := service.PlanSlot{ID: 8, GroupID: 3, SeasonPartID: 12, ResourceID: 1, Week: service.SeasonWeekAll, Weekday: 2, StartMinute: 960, EndMinute: 1080}
 	saved := service.PlanTraining{ID: 20, GroupID: 3, SeasonPartID: 12, TeamID: 4, ResourceID: 1, PlanSlotID: 8, Week: service.SeasonWeekAll, Weekday: 2, StartMinute: 960, EndMinute: 1050}
 	return service.TrainingBoard{
@@ -101,7 +101,7 @@ func serveTrainingPlanSwap(t *testing.T, dependencies Dependencies, target, form
 	return response
 }
 
-const trainingDraftPath = "/en/groups/3/training-plan/draft?part=12"
+const trainingDraftPath = "/en/groups/lions/training-plan/draft?part=12"
 
 func TestTrainingPlanPageByRole(t *testing.T) {
 	tests := []struct {
@@ -120,7 +120,7 @@ func TestTrainingPlanPageByRole(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			dependencies, board := trainingPlanDependencies(t, test.access)
-			response := serveGroups(t, dependencies, http.MethodGet, "/en/groups/3/training-plan?part=12", "", false)
+			response := serveGroups(t, dependencies, http.MethodGet, "/en/groups/lions/training-plan?part=12", "", false)
 			if response.Code != test.wantStatus {
 				t.Fatalf("status = %d, want %d", response.Code, test.wantStatus)
 			}
@@ -141,7 +141,7 @@ func TestTrainingPlanPageByRole(t *testing.T) {
 			}
 			editing := []string{
 				`name="revision" value="rev1"`, `name="t" value="20:4:1:all:2:960:1050:"`, `data-testid="training-plan-suggest"`,
-				`formaction="/en/groups/3/training-plan/draft?part=12"`, `data-tp-pool`, `name="add_team"`, `data-move-url=`,
+				`formaction="/en/groups/lions/training-plan/draft?part=12"`, `data-tp-pool`, `name="add_team"`, `data-move-url=`,
 				"Anna is not available at this time.", "Suggestions start from: 2025/26", `aria-label="Remove the training of Lions"`,
 			}
 			for _, want := range editing {
@@ -163,7 +163,7 @@ func TestTrainingPlanPageByRole(t *testing.T) {
 func TestTrainingPlanOutsidersAndBadPaths(t *testing.T) {
 	dependencies, board := trainingPlanDependencies(t, groupMemberAs(service.GroupRoleAdmin))
 	dependencies.GroupAccess = &groupAccessStub{err: service.ErrGroupNotFound}
-	for _, target := range []string{"/en/groups/3/training-plan", "/en/groups/3/training-plan/draft"} {
+	for _, target := range []string{"/en/groups/lions/training-plan", "/en/groups/lions/training-plan/draft"} {
 		for _, method := range []string{http.MethodGet, http.MethodPost} {
 			if method == http.MethodGet && strings.HasSuffix(target, "/draft") {
 				continue
@@ -178,7 +178,7 @@ func TestTrainingPlanOutsidersAndBadPaths(t *testing.T) {
 	}
 	dependencies, board = trainingPlanDependencies(t, groupMemberAs(service.GroupRoleAdmin))
 	board.boardErr = service.ErrSeasonNotFound
-	if response := serveGroups(t, dependencies, http.MethodGet, "/en/groups/3/training-plan?part=99", "", false); response.Code != http.StatusNotFound {
+	if response := serveGroups(t, dependencies, http.MethodGet, "/en/groups/lions/training-plan?part=99", "", false); response.Code != http.StatusNotFound {
 		t.Errorf("unknown part status = %d", response.Code)
 	}
 }
@@ -271,7 +271,7 @@ func TestTrainingPlanSave(t *testing.T) {
 	dependencies, board := trainingPlanDependencies(t, groupMemberAs(service.GroupRoleAdmin))
 	board.changes = service.TrainingChanges{Added: 1, Moved: 2, Removed: 3}
 	form := "revision=rev1&t=20:4:1:all:2:960:1050:&t=0:5:1:all:3:960:1050:s"
-	target := "/en/groups/3/training-plan?part=12"
+	target := "/en/groups/lions/training-plan?part=12"
 	response := serveTrainingPlanSwap(t, dependencies, target, form)
 	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), "Training plan saved: 1 added, 2 moved, 3 removed.") {
 		t.Fatalf("save status = %d", response.Code)
@@ -288,10 +288,10 @@ func TestTrainingPlanSave(t *testing.T) {
 	}
 
 	plain := serveGroups(t, dependencies, http.MethodPost, target, form, false)
-	if plain.Code != http.StatusSeeOther || plain.Header().Get("Location") != "/en/groups/3/training-plan?part=12" {
+	if plain.Code != http.StatusSeeOther || plain.Header().Get("Location") != "/en/groups/lions/training-plan?part=12" {
 		t.Fatalf("plain save = %d %q", plain.Code, plain.Header().Get("Location"))
 	}
-	if response = serveTrainingPlanSwap(t, dependencies, "/en/groups/3/training-plan", form); response.Code != http.StatusNotFound {
+	if response = serveTrainingPlanSwap(t, dependencies, "/en/groups/lions/training-plan", form); response.Code != http.StatusNotFound {
 		t.Fatalf("save without a part status = %d, want 404", response.Code)
 	}
 

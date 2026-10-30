@@ -241,7 +241,7 @@ Refinements made in #9 (open for the owner to confirm):
 
 Refinements made in #10 (open for the owner to confirm):
 
-- The calendar is a group page (`/groups/{id}/calendar`) with a tab for
+- The calendar is a group page (`/groups/{group}/calendar`) with a tab for
   every member; it shows exactly the events the Events tab shows, one
   Monday-based week at a time in the group's time zone, cancelled events
   included (faded, struck through, with a badge).
@@ -292,7 +292,7 @@ Refinements made in #12 (open for the owner to confirm):
 
 Refinements made in #11 (open for the owner to confirm):
 
-- The statistics page is `/{language}/groups/{id}/statistics`. A period is a
+- The statistics page is `/{language}/groups/{group}/statistics`. A period is a
   week (Monday to Sunday), a calendar month, a season part, or a season, in
   the group's time zone; weeks and months work without seasons.
 - Only events that are not cancelled and have already ended count. A team's
@@ -382,7 +382,7 @@ Refinements made in #38 (open for the owner to confirm):
   them). A parent's row lists the linked players, each an unlink button, and
   a "Link to player" select of the player members not yet linked; a player's
   row lists the linked parents. It reuses the Children routes
-  (`/groups/{id}/guardians/add|remove`) and their service, authorization,
+  (`/groups/{group}/guardians/add|remove`) and their service, authorization,
   audit and messages; a hidden `return=members` makes the write render the
   Members page again (errors included) instead of the Children page. Child
   profiles appear on Members as players, so a parent can be linked to a
@@ -390,7 +390,7 @@ Refinements made in #38 (open for the owner to confirm):
 - The A/B flag stays on `season_parts.alternating_weeks` (week 1 of the part
   is A). Staff switch it with one button on the slot plan page and on the
   training plan board, for the selected part: `POST
-  /groups/{id}/seasons/{seasonID}/parts/{partID}/alternating` with the
+  /groups/{group}/seasons/{seasonID}/parts/{partID}/alternating` with the
   season's `version`. It is a season edit (`SeasonService.SetPartAlternating`
   rebuilds the season input with one flag changed and goes through
   `Update`): `CanManageSeasons` (admins, managers, site administrators;
@@ -409,6 +409,25 @@ Refinements made in #38 (open for the owner to confirm):
   the checkbox because those parts have no plan page yet.
 
 
+Refinements made in #42 (open for the owner to confirm):
+
+- Group and team pages use names in the URL: `/groups/bvsc/teams/u10`. A
+  group has a `slug` (unique site-wide) and a team has one (unique within its
+  group). The slug comes from the name: lowercase, accents folded to ASCII
+  (`Füzy` becomes `fuzy`), hyphens, and a numeric suffix on a clash (`club`,
+  `club-2`). A name that gives nothing usable, only digits, or a reserved word
+  (`new`, `edit`, `settings`, `members`, `teams`, ...) gets a `group-` or
+  `team-` prefix.
+- Staff edit the slug: admins and managers on the group settings page, and on
+  the team page. Validation: lowercase letters, digits and single hyphens, up
+  to 64 characters, not only digits, not reserved, not taken. Renaming a group
+  or team does not change its slug; changing a slug changes the web address, so
+  the page continues at the new URL. A new team gets a derived slug (no field on
+  the create form).
+- The old numeric URLs keep working for GET as permanent redirects (after the
+  access check); POSTs to old URLs are 404. Other lanes build links with the
+  slug.
+
 ## Data model
 
 All tables carry `group_id` (directly or through their parent) so every query
@@ -419,11 +438,11 @@ writes. Times are `timestamptz`; plan times are minutes after local midnight
 
 ```
 users (+ kind: 'account' | 'guest' | 'profile')    profiles never sign in, are not deleted by guest retention
-groups (+ time_zone)
+groups (+ slug, time_zone)
 group_members (group_id, user_id)
 group_member_roles (group_id, user_id, role)        several rows per member
 group_invites (group_id, code, role, team_id?, expires_at?, max_uses?, uses, created_by, revoked_at?)
-teams (group_id, name, birth_year_from, birth_year_to, description?, archived_at?)
+teams (group_id, name, slug, birth_year_from, birth_year_to, description?, archived_at?)
 team_members (team_id, user_id, role: player | parent)
 child_profiles (user_id, group_id, birth_year, created_by, version)   the users row has kind 'profile'
 guardians (group_id, parent_user_id, child_user_id)  parent needs the parent role; linked parents are derived onto rosters

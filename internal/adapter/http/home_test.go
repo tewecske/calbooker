@@ -15,7 +15,7 @@ func TestSignedInHomeListsGroupsAndShortcuts(t *testing.T) {
 		t.Run(path, func(t *testing.T) {
 			dependencies := newHTTPTestDependencies(t)
 			dependencies.Groups = &groupsUseCaseStub{summaries: []service.GroupSummary{
-				{Group: service.Group{ID: 3, Name: "Lions Club"}, MemberCount: 2},
+				{Group: service.Group{ID: 3, Slug: "lions", Name: "Lions Club"}, MemberCount: 2},
 			}}
 			request := httptest.NewRequest(http.MethodGet, path, nil)
 			request.AddCookie(&http.Cookie{Name: middleware.DefaultSessionCookieName, Value: "opaque-session"})
@@ -24,7 +24,7 @@ func TestSignedInHomeListsGroupsAndShortcuts(t *testing.T) {
 
 			body := response.Body.String()
 			for _, want := range []string{
-				`href="/en/groups/3"`, "Lions Club",
+				`href="/en/groups/lions"`, "Lions Club",
 				`href="/en/groups#groups-create-heading"`, `href="/en/groups#groups-join-heading"`,
 				`id="mobile-menu"`,
 			} {

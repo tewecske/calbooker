@@ -29,11 +29,11 @@ func TestPlanPageShowsAlternatingSwitchToStaffOnly(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			dependencies, _ := planDependencies(t, test.access)
-			body := serveGroups(t, dependencies, http.MethodGet, "/en/groups/3/plan?part=22", "", false).Body.String()
+			body := serveGroups(t, dependencies, http.MethodGet, "/en/groups/lions/plan?part=22", "", false).Body.String()
 			if got := strings.Contains(body, `data-testid="plan-alternating-form"`); got != test.want {
 				t.Fatalf("switch shown = %v, want %v", got, test.want)
 			}
-			if test.want && !strings.Contains(body, "/en/groups/3/seasons/2/parts/22/alternating") {
+			if test.want && !strings.Contains(body, "/en/groups/lions/seasons/2/parts/22/alternating") {
 				t.Error("switch does not post to the part route")
 			}
 		})
@@ -44,7 +44,7 @@ func TestSetPartAlternatingFromPlanPage(t *testing.T) {
 	dependencies, plan := planDependencies(t, groupMemberAs(service.GroupRoleManager))
 	seasons := &seasonsUseCaseStub{found: plan.board.Season}
 	dependencies.Seasons = seasons
-	target := "/en/groups/3/seasons/2/parts/22/alternating"
+	target := "/en/groups/lions/seasons/2/parts/22/alternating"
 
 	saved := serveGroups(t, dependencies, http.MethodPost, target, "version=4&alternating=false&return=plan", true)
 	if saved.Code != http.StatusOK || !strings.Contains(saved.Body.String(), "A/B weeks saved.") {
@@ -84,7 +84,7 @@ func TestSetPartAlternatingFromPlanPage(t *testing.T) {
 }
 
 func TestSetPartAlternatingRefusesNonStaff(t *testing.T) {
-	target := "/en/groups/3/seasons/2/parts/22/alternating"
+	target := "/en/groups/lions/seasons/2/parts/22/alternating"
 	for name, access := range map[string]*service.GroupAccess{
 		"coach":  groupMemberAs(service.GroupRoleCoach),
 		"player": groupMemberAs(service.GroupRolePlayer),
@@ -109,7 +109,7 @@ func TestSetPartAlternatingOutsiderGetsNotFound(t *testing.T) {
 	dependencies.GroupAccess = &groupAccessStub{err: service.ErrGroupNotFound}
 	seasons := &seasonsUseCaseStub{}
 	dependencies.Seasons = seasons
-	response := serveGroups(t, dependencies, http.MethodPost, "/en/groups/3/seasons/2/parts/22/alternating", "version=4&alternating=false", false)
+	response := serveGroups(t, dependencies, http.MethodPost, "/en/groups/lions/seasons/2/parts/22/alternating", "version=4&alternating=false", false)
 	if response.Code != http.StatusNotFound || strings.Contains(response.Body.String(), "Lions Club") {
 		t.Fatalf("status = %d, want 404 without the group name", response.Code)
 	}
@@ -122,11 +122,11 @@ func TestSetPartAlternatingFromTrainingPlan(t *testing.T) {
 	dependencies, board := trainingPlanDependencies(t, groupMemberAs(service.GroupRoleManager))
 	seasons := &seasonsUseCaseStub{found: board.board.Season}
 	dependencies.Seasons = seasons
-	page := serveGroups(t, dependencies, http.MethodGet, "/en/groups/3/training-plan?part=12", "", false).Body.String()
-	if !strings.Contains(page, `data-testid="training-plan-alternating-form"`) || !strings.Contains(page, "/en/groups/3/seasons/2/parts/12/alternating") {
+	page := serveGroups(t, dependencies, http.MethodGet, "/en/groups/lions/training-plan?part=12", "", false).Body.String()
+	if !strings.Contains(page, `data-testid="training-plan-alternating-form"`) || !strings.Contains(page, "/en/groups/lions/seasons/2/parts/12/alternating") {
 		t.Fatal("training plan board lacks the A/B switch")
 	}
-	response := serveTrainingPlanSwap(t, dependencies, "/en/groups/3/seasons/2/parts/12/alternating", "version=3&alternating=true&return=training-plan")
+	response := serveTrainingPlanSwap(t, dependencies, "/en/groups/lions/seasons/2/parts/12/alternating", "version=3&alternating=true&return=training-plan")
 	if response.Code != http.StatusOK || response.Header().Get("HX-Retarget") != "#training-plan-board" || !strings.Contains(response.Body.String(), "A/B weeks saved.") {
 		t.Fatalf("save = %d retarget %q", response.Code, response.Header().Get("HX-Retarget"))
 	}
@@ -137,15 +137,15 @@ func TestSetPartAlternatingFromTrainingPlan(t *testing.T) {
 	coach, _ := trainingPlanDependencies(t, groupMemberAs(service.GroupRoleCoach))
 	coachSeasons := &seasonsUseCaseStub{found: board.board.Season}
 	coach.Seasons = coachSeasons
-	if response := serveGroups(t, coach, http.MethodPost, "/en/groups/3/seasons/2/parts/12/alternating", "version=3&alternating=true&return=training-plan", false); response.Code != http.StatusForbidden || coachSeasons.writes != 0 {
+	if response := serveGroups(t, coach, http.MethodPost, "/en/groups/lions/seasons/2/parts/12/alternating", "version=3&alternating=true&return=training-plan", false); response.Code != http.StatusForbidden || coachSeasons.writes != 0 {
 		t.Fatalf("coach change = %d (%d writes), want 403", response.Code, coachSeasons.writes)
 	}
 }
 
 func TestSeasonFormShowsAlternatingReadOnlyForStoredParts(t *testing.T) {
 	dependencies, _, _ := seasonDependencies(t, groupMemberAs(service.GroupRoleAdmin))
-	body := serveGroups(t, dependencies, http.MethodGet, "/en/groups/3/seasons/1", "", false).Body.String()
-	if !strings.Contains(body, `-part2-alternating-readonly"`) || !strings.Contains(body, "/en/groups/3/plan?part=12") {
+	body := serveGroups(t, dependencies, http.MethodGet, "/en/groups/lions/seasons/1", "", false).Body.String()
+	if !strings.Contains(body, `-part2-alternating-readonly"`) || !strings.Contains(body, "/en/groups/lions/plan?part=12") {
 		t.Fatal("stored part lacks the read-only A/B value with a plan link")
 	}
 	if strings.Contains(body, `-part2-alternating" class="checkbox"`) {

@@ -144,7 +144,7 @@ func coachDependencies(t *testing.T, access *service.GroupAccess) (Dependencies,
 		previous: true,
 	}
 	dependencies.Coaches = coaches
-	teams.summaries = []service.TeamSummary{{Team: service.Team{ID: 4, GroupID: 3, Name: "Lions", BirthYearFrom: 2015, BirthYearTo: 2016}}}
+	teams.summaries = []service.TeamSummary{{Team: service.Team{ID: 4, Slug: "t4", GroupID: 3, Name: "Lions", BirthYearFrom: 2015, BirthYearTo: 2016}}}
 	return dependencies, coaches, teams
 }
 
@@ -164,7 +164,7 @@ func TestCoachesPageByRole(t *testing.T) {
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			dependencies, coaches, _ := coachDependencies(t, test.access)
-			response := serveGroups(t, dependencies, http.MethodGet, "/en/groups/3/coaches", "", false)
+			response := serveGroups(t, dependencies, http.MethodGet, "/en/groups/lions/coaches", "", false)
 			if response.Code != test.wantStatus {
 				t.Fatalf("status = %d, want %d", response.Code, test.wantStatus)
 			}
@@ -175,7 +175,7 @@ func TestCoachesPageByRole(t *testing.T) {
 				}
 				return
 			}
-			for _, want := range []string{`id="group-coaches-heading"`, "Carla Coach", "9–12 years", `data-section="coaches" aria-current="page"`, "Ages in the season 2026/27.", `<td data-testid="team-age">10–11 years</td>`, `href="/en/groups/3/coaches/7/availability"`} {
+			for _, want := range []string{`id="group-coaches-heading"`, "Carla Coach", "9–12 years", `data-section="coaches" aria-current="page"`, "Ages in the season 2026/27.", `<td data-testid="team-age">10–11 years</td>`, `href="/en/groups/lions/coaches/7/availability"`} {
 				if !strings.Contains(body, want) {
 					t.Errorf("coaches page missing %q", want)
 				}
@@ -203,7 +203,7 @@ func TestCoachesNavigationFollowsAccess(t *testing.T) {
 		{groupMemberAs(service.GroupRoleParent), false},
 	} {
 		dependencies, _, _ := coachDependencies(t, test.access)
-		body := serveGroups(t, dependencies, http.MethodGet, "/en/groups/3", "", false).Body.String()
+		body := serveGroups(t, dependencies, http.MethodGet, "/en/groups/lions", "", false).Body.String()
 		if strings.Contains(body, `data-section="coaches"`) != test.want {
 			t.Errorf("roles %v: coaches tab shown = %v, want %v", test.access.Roles(), !test.want, test.want)
 		}
@@ -214,16 +214,16 @@ func TestCoachRoutesOutsiderGetsNotFound(t *testing.T) {
 	dependencies, coaches, _ := coachDependencies(t, nil)
 	dependencies.GroupAccess = &groupAccessStub{err: service.ErrGroupNotFound}
 	for _, test := range []struct{ method, target string }{
-		{http.MethodGet, "/en/groups/3/coaches"},
-		{http.MethodPost, "/en/groups/3/coaches/7/qualification"},
-		{http.MethodPost, "/en/groups/3/coaches/7/qualification/clear"},
-		{http.MethodGet, "/en/groups/3/coaches/availability"},
-		{http.MethodGet, "/en/groups/3/coaches/7/availability"},
-		{http.MethodPost, "/en/groups/3/coaches/7/availability/create?part=11&week=all"},
-		{http.MethodPost, "/en/groups/3/coaches/7/availability/move?part=11&week=all"},
-		{http.MethodPost, "/en/groups/3/coaches/7/availability/delete?part=11&week=all"},
-		{http.MethodPost, "/en/groups/3/coaches/7/availability/copy?part=11&week=all"},
-		{http.MethodGet, "/hu/groups/3/coaches"},
+		{http.MethodGet, "/en/groups/lions/coaches"},
+		{http.MethodPost, "/en/groups/lions/coaches/7/qualification"},
+		{http.MethodPost, "/en/groups/lions/coaches/7/qualification/clear"},
+		{http.MethodGet, "/en/groups/lions/coaches/availability"},
+		{http.MethodGet, "/en/groups/lions/coaches/7/availability"},
+		{http.MethodPost, "/en/groups/lions/coaches/7/availability/create?part=11&week=all"},
+		{http.MethodPost, "/en/groups/lions/coaches/7/availability/move?part=11&week=all"},
+		{http.MethodPost, "/en/groups/lions/coaches/7/availability/delete?part=11&week=all"},
+		{http.MethodPost, "/en/groups/lions/coaches/7/availability/copy?part=11&week=all"},
+		{http.MethodGet, "/hu/groups/lions/coaches"},
 	} {
 		response := serveGroups(t, dependencies, test.method, test.target, "min_age=1&max_age=2&weekday=1&start=600&end=660&week=&item=31&window=31", false)
 		if response.Code != http.StatusNotFound || strings.Contains(response.Body.String(), "Lions Club") {
@@ -237,37 +237,37 @@ func TestCoachRoutesOutsiderGetsNotFound(t *testing.T) {
 
 func TestCoachQualificationWrites(t *testing.T) {
 	dependencies, coaches, _ := coachDependencies(t, groupMemberAs(service.GroupRoleAdmin))
-	response := serveGroups(t, dependencies, http.MethodPost, "/en/groups/3/coaches/8/qualification", "min_age=10&max_age=14", true)
+	response := serveGroups(t, dependencies, http.MethodPost, "/en/groups/lions/coaches/8/qualification", "min_age=10&max_age=14", true)
 	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), "Qualification saved.") || coaches.lastCoach != 8 || coaches.lastMinAge != 10 || coaches.lastMaxAge != 14 {
 		t.Fatalf("set = %d, stub %+v", response.Code, coaches)
 	}
 	// Unreadable ages never reach the use case and keep the input.
 	writes := coaches.writes
-	response = serveGroups(t, dependencies, http.MethodPost, "/en/groups/3/coaches/8/qualification", "min_age=ten&max_age=14", true)
+	response = serveGroups(t, dependencies, http.MethodPost, "/en/groups/lions/coaches/8/qualification", "min_age=ten&max_age=14", true)
 	body := response.Body.String()
 	if response.Code != http.StatusUnprocessableEntity || coaches.writes != writes || !strings.Contains(body, "Enter whole ages from 0 to 99") || !strings.Contains(body, `id="coach-8-error"`) || !strings.Contains(body, `value="ten"`) {
 		t.Fatalf("invalid ages = %d", response.Code)
 	}
 	coaches.writeErr = service.ErrInvalidQualification
-	if response := serveGroups(t, dependencies, http.MethodPost, "/en/groups/3/coaches/8/qualification", "min_age=14&max_age=10", false); response.Code != http.StatusUnprocessableEntity {
+	if response := serveGroups(t, dependencies, http.MethodPost, "/en/groups/lions/coaches/8/qualification", "min_age=14&max_age=10", false); response.Code != http.StatusUnprocessableEntity {
 		t.Fatalf("refused ages = %d, want 422", response.Code)
 	}
 	coaches.writeErr = service.ErrCoachNotFound
-	if response := serveGroups(t, dependencies, http.MethodPost, "/en/groups/3/coaches/9/qualification", "min_age=10&max_age=14", true); response.Code != http.StatusNotFound {
+	if response := serveGroups(t, dependencies, http.MethodPost, "/en/groups/lions/coaches/9/qualification", "min_age=10&max_age=14", true); response.Code != http.StatusNotFound {
 		t.Fatalf("not a coach = %d, want 404", response.Code)
 	}
 	coaches.writeErr = nil
-	if response := serveGroups(t, dependencies, http.MethodPost, "/en/groups/3/coaches/8/qualification/clear", "", true); response.Code != http.StatusOK || coaches.lastCleared != 8 || !strings.Contains(response.Body.String(), "Qualification cleared.") {
+	if response := serveGroups(t, dependencies, http.MethodPost, "/en/groups/lions/coaches/8/qualification/clear", "", true); response.Code != http.StatusOK || coaches.lastCleared != 8 || !strings.Contains(response.Body.String(), "Qualification cleared.") {
 		t.Fatalf("clear = %d", response.Code)
 	}
 
 	coach, coachStub, _ := coachDependencies(t, groupMemberAs(service.GroupRoleCoach))
 	coachStub.writeErr = service.ErrGroupForbidden
-	if response := serveGroups(t, coach, http.MethodPost, "/en/groups/3/coaches/7/qualification", "min_age=1&max_age=99", false); response.Code != http.StatusForbidden {
+	if response := serveGroups(t, coach, http.MethodPost, "/en/groups/lions/coaches/7/qualification", "min_age=1&max_age=99", false); response.Code != http.StatusForbidden {
 		t.Fatalf("coach set own qualification = %d, want 403", response.Code)
 	}
 	player, playerStub, _ := coachDependencies(t, groupMemberAs(service.GroupRolePlayer))
-	if response := serveGroups(t, player, http.MethodPost, "/en/groups/3/coaches/7/qualification", "min_age=1&max_age=99", false); response.Code != http.StatusForbidden || playerStub.writes != 0 {
+	if response := serveGroups(t, player, http.MethodPost, "/en/groups/lions/coaches/7/qualification", "min_age=1&max_age=99", false); response.Code != http.StatusForbidden || playerStub.writes != 0 {
 		t.Fatalf("player set qualification = %d, want 403", response.Code)
 	}
 }
@@ -280,14 +280,14 @@ func TestAvailabilityPageByRole(t *testing.T) {
 		wantStatus int
 		heading    string
 	}{
-		{name: "coach themself", access: groupMemberAs(service.GroupRoleCoach), target: "/en/groups/3/coaches/7/availability", wantStatus: http.StatusOK, heading: "My availability"},
-		{name: "another coach", access: groupMemberAs(service.GroupRoleCoach), target: "/en/groups/3/coaches/8/availability", wantStatus: http.StatusForbidden},
-		{name: "admin", access: groupMemberAs(service.GroupRoleAdmin), target: "/en/groups/3/coaches/8/availability", wantStatus: http.StatusOK, heading: "Availability of Otto Other"},
-		{name: "manager", access: groupMemberAs(service.GroupRoleManager), target: "/en/groups/3/coaches/8/availability", wantStatus: http.StatusOK, heading: "Availability of Otto Other"},
-		{name: "site administrator", access: groupAccessAs(service.GroupAccessGrants{SiteAdmin: true}), target: "/en/groups/3/coaches/8/availability", wantStatus: http.StatusOK, heading: "Availability of Otto Other"},
-		{name: "player", access: groupMemberAs(service.GroupRolePlayer), target: "/en/groups/3/coaches/7/availability", wantStatus: http.StatusForbidden},
-		{name: "admin, not a coach", access: groupMemberAs(service.GroupRoleAdmin), target: "/en/groups/3/coaches/9/availability", wantStatus: http.StatusNotFound},
-		{name: "unknown part", access: groupMemberAs(service.GroupRoleAdmin), target: "/en/groups/3/coaches/7/availability?part=999", wantStatus: http.StatusNotFound},
+		{name: "coach themself", access: groupMemberAs(service.GroupRoleCoach), target: "/en/groups/lions/coaches/7/availability", wantStatus: http.StatusOK, heading: "My availability"},
+		{name: "another coach", access: groupMemberAs(service.GroupRoleCoach), target: "/en/groups/lions/coaches/8/availability", wantStatus: http.StatusForbidden},
+		{name: "admin", access: groupMemberAs(service.GroupRoleAdmin), target: "/en/groups/lions/coaches/8/availability", wantStatus: http.StatusOK, heading: "Availability of Otto Other"},
+		{name: "manager", access: groupMemberAs(service.GroupRoleManager), target: "/en/groups/lions/coaches/8/availability", wantStatus: http.StatusOK, heading: "Availability of Otto Other"},
+		{name: "site administrator", access: groupAccessAs(service.GroupAccessGrants{SiteAdmin: true}), target: "/en/groups/lions/coaches/8/availability", wantStatus: http.StatusOK, heading: "Availability of Otto Other"},
+		{name: "player", access: groupMemberAs(service.GroupRolePlayer), target: "/en/groups/lions/coaches/7/availability", wantStatus: http.StatusForbidden},
+		{name: "admin, not a coach", access: groupMemberAs(service.GroupRoleAdmin), target: "/en/groups/lions/coaches/9/availability", wantStatus: http.StatusNotFound},
+		{name: "unknown part", access: groupMemberAs(service.GroupRoleAdmin), target: "/en/groups/lions/coaches/7/availability?part=999", wantStatus: http.StatusNotFound},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			dependencies, _, _ := coachDependencies(t, test.access)
@@ -306,8 +306,8 @@ func TestAvailabilityPageByRole(t *testing.T) {
 			for _, want := range []string{
 				test.heading,
 				`id="availability-grid"`,
-				`data-move-url="/en/groups/3/coaches/` + coach + `/availability/move?part=11&amp;week=all"`,
-				`data-create-url="/en/groups/3/coaches/` + coach + `/availability/create?part=11&amp;week=all"`,
+				`data-move-url="/en/groups/lions/coaches/` + coach + `/availability/move?part=11&amp;week=all"`,
+				`data-create-url="/en/groups/lions/coaches/` + coach + `/availability/create?part=11&amp;week=all"`,
 				`data-wg-item="` + own + `"`,
 				`<option value="11" selected>2026/27 · Autumn</option>`,
 				`data-testid="availability-no-previous"`,
@@ -336,8 +336,8 @@ func TestAvailabilityAlternatingWeeks(t *testing.T) {
 		{ID: 52, CoachUserID: 7, SeasonPartID: 12, Week: service.SeasonWeekA, Weekday: 2, StartMinute: 600, EndMinute: 700},
 		{ID: 53, CoachUserID: 7, SeasonPartID: 12, Week: service.SeasonWeekB, Weekday: 3, StartMinute: 600, EndMinute: 700},
 	}
-	body := serveGroups(t, dependencies, http.MethodGet, "/en/groups/3/coaches/7/availability?part=12", "", false).Body.String()
-	for _, want := range []string{`data-testid="availability-weeks"`, `href="/en/groups/3/coaches/7/availability?part=12&amp;week=B"`, `data-week="A"`, `data-wg-item="52" data-weekday="2"`, "Every week", `action="/en/groups/3/coaches/7/availability/copy?part=12&amp;week=A"`, "Replaces the windows of this part with those of 2026/27 · Autumn."} {
+	body := serveGroups(t, dependencies, http.MethodGet, "/en/groups/lions/coaches/7/availability?part=12", "", false).Body.String()
+	for _, want := range []string{`data-testid="availability-weeks"`, `href="/en/groups/lions/coaches/7/availability?part=12&amp;week=B"`, `data-week="A"`, `data-wg-item="52" data-weekday="2"`, "Every week", `action="/en/groups/lions/coaches/7/availability/copy?part=12&amp;week=A"`, "Replaces the windows of this part with those of 2026/27 · Autumn."} {
 		if !strings.Contains(body, want) {
 			t.Errorf("week A page missing %q", want)
 		}
@@ -349,25 +349,25 @@ func TestAvailabilityAlternatingWeeks(t *testing.T) {
 	if !strings.Contains(body, `data-wg-item="51" data-weekday="1" data-start="600" data-end="700" data-resource="">`) {
 		t.Error("every-week window on the A tab must not be draggable")
 	}
-	all := serveGroups(t, dependencies, http.MethodGet, "/en/groups/3/coaches/7/availability?part=12&week=all", "", false).Body.String()
+	all := serveGroups(t, dependencies, http.MethodGet, "/en/groups/lions/coaches/7/availability?part=12&week=all", "", false).Body.String()
 	if !strings.Contains(all, `data-wg-item="51" data-weekday="1" data-start="600" data-end="700" data-resource="" data-wg-draggable`) || strings.Contains(all, `data-wg-item="52"`) || !strings.Contains(all, `data-week=""`) {
 		t.Error("every-week tab shows the wrong windows")
 	}
 
 	// A change on the B tab stores a week B window; the grid's week must match.
-	response := serveGroups(t, dependencies, http.MethodPost, "/en/groups/3/coaches/7/availability/create?part=12&week=B", "weekday=5&start=600&end=720&week=B", true)
+	response := serveGroups(t, dependencies, http.MethodPost, "/en/groups/lions/coaches/7/availability/create?part=12&week=B", "weekday=5&start=600&end=720&week=B", true)
 	if response.Code != http.StatusOK || coaches.lastInput != (service.AvailabilityInput{Week: service.SeasonWeekB, Weekday: 5, StartMinute: 600, EndMinute: 720}) || coaches.lastPart != 12 {
 		t.Fatalf("week B create = %d, input %+v", response.Code, coaches.lastInput)
 	}
 	writes := coaches.writes
-	if response := serveGroups(t, dependencies, http.MethodPost, "/en/groups/3/coaches/7/availability/create?part=12&week=B", "weekday=5&start=600&end=720&week=A", true); response.Code != http.StatusUnprocessableEntity || coaches.writes != writes {
+	if response := serveGroups(t, dependencies, http.MethodPost, "/en/groups/lions/coaches/7/availability/create?part=12&week=B", "weekday=5&start=600&end=720&week=A", true); response.Code != http.StatusUnprocessableEntity || coaches.writes != writes {
 		t.Fatalf("mismatched week = %d, want 422 without a write", response.Code)
 	}
 }
 
 func TestAvailabilityGridChanges(t *testing.T) {
 	dependencies, coaches, _ := coachDependencies(t, groupMemberAs(service.GroupRoleCoach))
-	response := serveGroups(t, dependencies, http.MethodPost, "/en/groups/3/coaches/7/availability/create?part=11&week=all", "weekday=2&start=965&end=1085&week=", true)
+	response := serveGroups(t, dependencies, http.MethodPost, "/en/groups/lions/coaches/7/availability/create?part=11&week=all", "weekday=2&start=965&end=1085&week=", true)
 	body := response.Body.String()
 	if response.Code != http.StatusOK || coaches.lastAction != "add" || coaches.lastInput != (service.AvailabilityInput{Week: service.SeasonWeekAll, Weekday: 2, StartMinute: 960, EndMinute: 1080}) {
 		t.Fatalf("create = %d, input %+v", response.Code, coaches.lastInput)
@@ -375,19 +375,19 @@ func TestAvailabilityGridChanges(t *testing.T) {
 	if !strings.HasPrefix(strings.TrimSpace(body), `<div id="alerts"`) || !strings.Contains(body, "hx-swap-oob") || !strings.Contains(body, "Availability added.") || !strings.Contains(body, `id="availability-grid"`) || strings.Contains(body, `id="page-content"`) {
 		t.Fatal("HTMX change must answer with the alerts and the grid only")
 	}
-	plain := serveGroups(t, dependencies, http.MethodPost, "/en/groups/3/coaches/7/availability/create?part=11&week=all", "weekday=2&start=960&end=1080&week=", false)
-	if plain.Code != http.StatusSeeOther || plain.Header().Get("Location") != "/en/groups/3/coaches/7/availability?part=11&week=all" {
+	plain := serveGroups(t, dependencies, http.MethodPost, "/en/groups/lions/coaches/7/availability/create?part=11&week=all", "weekday=2&start=960&end=1080&week=", false)
+	if plain.Code != http.StatusSeeOther || plain.Header().Get("Location") != "/en/groups/lions/coaches/7/availability?part=11&week=all" {
 		t.Fatalf("plain create = %d %q", plain.Code, plain.Header().Get("Location"))
 	}
 
-	response = serveGroups(t, dependencies, http.MethodPost, "/en/groups/3/coaches/7/availability/move?part=11&week=all", "item=31&weekday=4&start=1020&end=1140&week=", true)
+	response = serveGroups(t, dependencies, http.MethodPost, "/en/groups/lions/coaches/7/availability/move?part=11&week=all", "item=31&weekday=4&start=1020&end=1140&week=", true)
 	if response.Code != http.StatusOK || coaches.lastAction != "move" || coaches.lastWindow != 31 || coaches.lastInput.Weekday != 4 || !strings.Contains(response.Body.String(), "Availability updated.") {
 		t.Fatalf("move = %d, window %d input %+v", response.Code, coaches.lastWindow, coaches.lastInput)
 	}
 
 	writes := coaches.writes
 	for _, form := range []string{"item=31&weekday=9&start=1020&end=1140&week=", "item=31&weekday=4&start=1020&end=1000&week=", "weekday=4&start=1020&end=1140&week="} {
-		response := serveGroups(t, dependencies, http.MethodPost, "/en/groups/3/coaches/7/availability/move?part=11&week=all", form, true)
+		response := serveGroups(t, dependencies, http.MethodPost, "/en/groups/lions/coaches/7/availability/move?part=11&week=all", form, true)
 		if response.Code != http.StatusUnprocessableEntity || !strings.Contains(response.Body.String(), "That change does not fit the grid.") || !strings.Contains(response.Body.String(), `id="availability-grid"`) {
 			t.Errorf("invalid move %q = %d, want 422 with the grid", form, response.Code)
 		}
@@ -402,53 +402,53 @@ func TestAvailabilityGridChanges(t *testing.T) {
 		service.ErrAvailabilityWeek:           "need a part with alternating weeks",
 	} {
 		coaches.writeErr = err
-		response := serveGroups(t, dependencies, http.MethodPost, "/en/groups/3/coaches/7/availability/move?part=11&week=all", "item=31&weekday=4&start=1020&end=1140&week=", true)
+		response := serveGroups(t, dependencies, http.MethodPost, "/en/groups/lions/coaches/7/availability/move?part=11&week=all", "item=31&weekday=4&start=1020&end=1140&week=", true)
 		if response.Code != http.StatusUnprocessableEntity || !strings.Contains(response.Body.String(), text) {
 			t.Errorf("%v = %d, want 422 with %q", err, response.Code, text)
 		}
 	}
 	coaches.writeErr = service.ErrCoachNotFound
-	if response := serveGroups(t, dependencies, http.MethodPost, "/en/groups/3/coaches/7/availability/create?part=11&week=all", "weekday=2&start=960&end=1080&week=", true); response.Code != http.StatusNotFound {
+	if response := serveGroups(t, dependencies, http.MethodPost, "/en/groups/lions/coaches/7/availability/create?part=11&week=all", "weekday=2&start=960&end=1080&week=", true); response.Code != http.StatusNotFound {
 		t.Fatalf("coach role gone = %d, want 404", response.Code)
 	}
 	coaches.writeErr = nil
-	if response := serveGroups(t, dependencies, http.MethodPost, "/en/groups/3/coaches/7/availability/create?week=all", "weekday=2&start=960&end=1080&week=", true); response.Code != http.StatusNotFound {
+	if response := serveGroups(t, dependencies, http.MethodPost, "/en/groups/lions/coaches/7/availability/create?week=all", "weekday=2&start=960&end=1080&week=", true); response.Code != http.StatusNotFound {
 		t.Fatalf("missing part = %d, want 404", response.Code)
 	}
 
 	// Another coach's grid is refused before any change.
 	coaches.viewErr = service.ErrGroupForbidden
 	writes = coaches.writes
-	if response := serveGroups(t, dependencies, http.MethodPost, "/en/groups/3/coaches/8/availability/create?part=11&week=all", "weekday=2&start=960&end=1080&week=", false); response.Code != http.StatusForbidden || coaches.writes != writes {
+	if response := serveGroups(t, dependencies, http.MethodPost, "/en/groups/lions/coaches/8/availability/create?part=11&week=all", "weekday=2&start=960&end=1080&week=", false); response.Code != http.StatusForbidden || coaches.writes != writes {
 		t.Fatalf("other coach change = %d, want 403", response.Code)
 	}
 }
 
 func TestAvailabilityDeleteAndCopy(t *testing.T) {
 	dependencies, coaches, _ := coachDependencies(t, groupMemberAs(service.GroupRoleAdmin))
-	response := serveGroups(t, dependencies, http.MethodPost, "/en/groups/3/coaches/7/availability/delete?part=11&week=all", "window=31", true)
+	response := serveGroups(t, dependencies, http.MethodPost, "/en/groups/lions/coaches/7/availability/delete?part=11&week=all", "window=31", true)
 	if response.Code != http.StatusOK || coaches.lastAction != "delete" || coaches.lastWindow != 31 || coaches.lastPart != 11 || !strings.Contains(response.Body.String(), "Availability removed.") {
 		t.Fatalf("delete = %d, stub %+v", response.Code, coaches)
 	}
 	coaches.writeErr = service.ErrAvailabilityNotFound
-	if response := serveGroups(t, dependencies, http.MethodPost, "/en/groups/3/coaches/7/availability/delete?part=11&week=all", "window=99", false); response.Code != http.StatusNotFound || !strings.Contains(response.Body.String(), "That window no longer exists.") {
+	if response := serveGroups(t, dependencies, http.MethodPost, "/en/groups/lions/coaches/7/availability/delete?part=11&week=all", "window=99", false); response.Code != http.StatusNotFound || !strings.Contains(response.Body.String(), "That window no longer exists.") {
 		t.Fatalf("stale delete = %d", response.Code)
 	}
 	coaches.writeErr = nil
-	response = serveGroups(t, dependencies, http.MethodPost, "/en/groups/3/coaches/7/availability/copy?part=12&week=A", "", true)
+	response = serveGroups(t, dependencies, http.MethodPost, "/en/groups/lions/coaches/7/availability/copy?part=12&week=A", "", true)
 	if response.Code != http.StatusOK || coaches.lastAction != "copy" || coaches.lastPart != 12 || !strings.Contains(response.Body.String(), "Availability copied from the previous part.") {
 		t.Fatalf("copy = %d", response.Code)
 	}
 	for err, text := range map[error]string{service.ErrNothingToCopy: "nothing changed", service.ErrNoPreviousSeasonPart: "nothing to copy"} {
 		coaches.writeErr = err
-		response := serveGroups(t, dependencies, http.MethodPost, "/en/groups/3/coaches/7/availability/copy?part=12&week=A", "", true)
+		response := serveGroups(t, dependencies, http.MethodPost, "/en/groups/lions/coaches/7/availability/copy?part=12&week=A", "", true)
 		if response.Code != http.StatusUnprocessableEntity || !strings.Contains(response.Body.String(), text) {
 			t.Errorf("%v = %d, want 422 with %q", err, response.Code, text)
 		}
 	}
 	coaches.writeErr = nil
 	coaches.previous = false
-	body := serveGroups(t, dependencies, http.MethodGet, "/en/groups/3/coaches/7/availability", "", false).Body.String()
+	body := serveGroups(t, dependencies, http.MethodGet, "/en/groups/lions/coaches/7/availability", "", false).Body.String()
 	if !strings.Contains(body, `data-testid="availability-no-previous"`) || strings.Contains(body, `data-testid="availability-copy"`) {
 		t.Error("first part must not offer a copy")
 	}
@@ -467,7 +467,7 @@ func TestAvailabilityOverview(t *testing.T) {
 		{"player", groupMemberAs(service.GroupRolePlayer), http.StatusForbidden},
 	} {
 		dependencies, coaches, _ := coachDependencies(t, test.access)
-		response := serveGroups(t, dependencies, http.MethodGet, "/en/groups/3/coaches/availability", "", false)
+		response := serveGroups(t, dependencies, http.MethodGet, "/en/groups/lions/coaches/availability", "", false)
 		if response.Code != test.want {
 			t.Errorf("%s: status = %d, want %d", test.name, response.Code, test.want)
 			continue
@@ -479,7 +479,7 @@ func TestAvailabilityOverview(t *testing.T) {
 			}
 			continue
 		}
-		for _, want := range []string{"Availability of all coaches", `id="availability-overview-grid"`, `data-wg-item="31"`, `data-wg-item="41"`, "Otto Other", `data-testid="availability-legend"`, `href="/en/groups/3/coaches/8/availability?part=11&amp;week=all"`, "badge-secondary"} {
+		for _, want := range []string{"Availability of all coaches", `id="availability-overview-grid"`, `data-wg-item="31"`, `data-wg-item="41"`, "Otto Other", `data-testid="availability-legend"`, `href="/en/groups/lions/coaches/8/availability?part=11&amp;week=all"`, "badge-secondary"} {
 			if !strings.Contains(body, want) {
 				t.Errorf("%s: overview missing %q", test.name, want)
 			}
@@ -493,12 +493,12 @@ func TestAvailabilityOverview(t *testing.T) {
 func TestAvailabilityWithoutSeasons(t *testing.T) {
 	dependencies, coaches, _ := coachDependencies(t, groupMemberAs(service.GroupRoleCoach))
 	coaches.parts = service.AvailabilityParts{}
-	response := serveGroups(t, dependencies, http.MethodGet, "/en/groups/3/coaches/7/availability", "", false)
+	response := serveGroups(t, dependencies, http.MethodGet, "/en/groups/lions/coaches/7/availability", "", false)
 	body := response.Body.String()
 	if response.Code != http.StatusOK || !strings.Contains(body, `data-testid="availability-no-parts"`) || strings.Contains(body, `id="availability-grid"`) {
 		t.Fatalf("no seasons = %d", response.Code)
 	}
-	page := serveGroups(t, dependencies, http.MethodGet, "/en/groups/3/coaches", "", false).Body.String()
+	page := serveGroups(t, dependencies, http.MethodGet, "/en/groups/lions/coaches", "", false).Body.String()
 	if !strings.Contains(page, `data-testid="coaches-ages-none"`) {
 		t.Error("coaches page without seasons must explain the missing ages")
 	}

@@ -53,7 +53,9 @@ func InsertUser(ctx context.Context, db RowQuerier, user User) (int64, error) {
 
 // Group contains explicit values for every groups column.
 type Group struct {
-	Name      string
+	Name string
+	// Slug is the URL slug; empty gets "group-<id>".
+	Slug      string
 	NameNorm  string
 	TimeZone  string
 	CreatedBy *int64
@@ -76,10 +78,12 @@ func NewGroup(createdBy int64) Group {
 func InsertGroup(ctx context.Context, db RowQuerier, group Group) (int64, error) {
 	var id int64
 	err := db.QueryRowContext(ctx, `
-		INSERT INTO groups (name, name_norm, time_zone, created_by, created_at, version)
-		VALUES ($1, $2, COALESCE(NULLIF($3, ''), 'Europe/Budapest'), $4, $5, $6)
+		WITH next AS (SELECT nextval(pg_get_serial_sequence('groups', 'id')) AS id)
+		INSERT INTO groups (id, name, slug, name_norm, time_zone, created_by, created_at, version)
+		SELECT next.id, $1::varchar, COALESCE(NULLIF($2::varchar, ''), 'group-' || next.id), $3::varchar,
+			COALESCE(NULLIF($4::varchar, ''), 'Europe/Budapest'), $5::bigint, $6::bigint, $7::bigint FROM next
 		RETURNING id
-	`, group.Name, group.NameNorm, group.TimeZone, group.CreatedBy, group.CreatedAt, group.Version).Scan(&id)
+	`, group.Name, group.Slug, group.NameNorm, group.TimeZone, group.CreatedBy, group.CreatedAt, group.Version).Scan(&id)
 	return id, err
 }
 

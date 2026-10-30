@@ -126,9 +126,11 @@ func TestGroupServiceUpdateSettings(t *testing.T) {
 		actor    GroupActor
 		version  int64
 		groupNm  string
+		slug     string
 		zone     string
 		writeErr error
 		wantErr  error
+		wantSlug string
 	}{
 		{name: "admin saves name and time zone", actor: adminActor(), version: 1, groupNm: "Renamed", zone: "Europe/Vienna"},
 		{name: "manager saves", actor: actorWith(memberWith(GroupRoleManager)), version: 1, groupNm: "Renamed", zone: "UTC"},
@@ -138,13 +140,18 @@ func TestGroupServiceUpdateSettings(t *testing.T) {
 		{name: "invalid name", actor: adminActor(), version: 1, groupNm: " ", zone: "UTC", wantErr: ErrInvalidGroupName},
 		{name: "negative revision", actor: adminActor(), version: -1, groupNm: "Renamed", zone: "UTC", wantErr: ErrInvalidGroup},
 		{name: "stale revision", actor: adminActor(), version: 1, groupNm: "Renamed", zone: "UTC", writeErr: ErrOptimisticLockConflict, wantErr: ErrOptimisticLockConflict},
+		{name: "new slug is saved", actor: adminActor(), version: 1, groupNm: "Renamed", slug: " New-Slug ", zone: "UTC", wantSlug: "new-slug"},
+		{name: "empty slug keeps the current one", actor: adminActor(), version: 1, groupNm: "Renamed", zone: "UTC", wantSlug: "old"},
+		{name: "reserved slug", actor: adminActor(), version: 1, groupNm: "Renamed", slug: "settings", zone: "UTC", wantErr: ErrInvalidSlug},
+		{name: "numeric slug", actor: adminActor(), version: 1, groupNm: "Renamed", slug: "123", zone: "UTC", wantErr: ErrInvalidSlug},
+		{name: "slug of another group", actor: adminActor(), version: 1, groupNm: "Renamed", slug: "lions", zone: "UTC", wantErr: ErrSlugTaken},
 		{name: "vanished group", actor: adminActor(), version: 1, groupNm: "Renamed", zone: "UTC", writeErr: ErrGroupNotFound, wantErr: ErrGroupNotFound},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			groups := &groupRepositoryStub{group: Group{ID: 5, Name: "Old", NameNorm: "old", TimeZone: "Europe/Budapest", Version: 1}, updateErr: test.writeErr}
+			groups := &groupRepositoryStub{group: Group{ID: 5, Name: "Old", Slug: "old", NameNorm: "old", TimeZone: "Europe/Budapest", Version: 1}, updateErr: test.writeErr, takenSlugs: map[string]bool{"lions": true}}
 			service, auditor := newTestGroupService(t, groups, newMembershipStub(), usersWith(User{ID: 7}))
-			updated, err := service.UpdateSettings(context.Background(), test.actor, test.version, test.groupNm, test.zone)
+			updated, err := service.UpdateSettings(context.Background(), test.actor, test.version, test.groupNm, test.slug, test.zone)
 			if test.wantErr != nil {
 				if !errors.Is(err, test.wantErr) {
 					t.Fatalf("UpdateSettings() error = %v, want %v", err, test.wantErr)
@@ -159,6 +166,9 @@ func TestGroupServiceUpdateSettings(t *testing.T) {
 			}
 			if updated.Name != test.groupNm || updated.TimeZone != test.zone || groups.expectedVersion != test.version {
 				t.Fatalf("updated = %+v (expected version %d)", updated, groups.expectedVersion)
+			}
+			if test.wantSlug != "" && updated.Slug != test.wantSlug {
+				t.Fatalf("slug = %q, want %q", updated.Slug, test.wantSlug)
 			}
 			if len(auditor.records) != 1 || auditor.records[0].Action != AuditActionGroupSettings || auditor.records[0].TargetID != "5" {
 				t.Fatalf("audit = %+v", auditor.records)
@@ -375,7 +385,7 @@ func TestGroupServiceRemoveMemberAndLeave(t *testing.T) {
 func TestGroupServiceSiteAdministratorActionsAreMarked(t *testing.T) {
 	groups := &groupRepositoryStub{group: Group{ID: 5, Version: 1}}
 	service, auditor := newTestGroupService(t, groups, newMembershipStub(), usersWith(User{ID: 7, IsAdmin: true}))
-	if _, err := service.UpdateSettings(context.Background(), actorWith(GroupAccessGrants{SiteAdmin: true}), 1, "Club", "UTC"); err != nil {
+	if _, err := service.UpdateSettings(context.Background(), actorWith(GroupAccessGrants{SiteAdmin: true}), 1, "Club", "", "UTC"); err != nil {
 		t.Fatalf("UpdateSettings() error = %v", err)
 	}
 	if len(auditor.records) != 1 || !strings.Contains(auditor.records[0].Detail, "site administrator") {
@@ -449,6 +459,7 @@ type groupRepositoryStub struct {
 	findErr         error
 	updateErr       error
 	expectedVersion int64
+	takenSlugs      map[string]bool
 }
 
 func (r *groupRepositoryStub) FindGroupByID(context.Context, int64) (Group, error) {
@@ -456,6 +467,20 @@ func (r *groupRepositoryStub) FindGroupByID(context.Context, int64) (Group, erro
 		return Group{}, r.findErr
 	}
 	return r.group, nil
+}
+
+func (r *groupRepositoryStub) FindGroupBySlug(_ context.Context, slug string) (Group, error) {
+	if r.findErr != nil {
+		return Group{}, r.findErr
+	}
+	if r.group.Slug != slug {
+		return Group{}, ErrGroupNotFound
+	}
+	return r.group, nil
+}
+
+func (r *groupRepositoryStub) GroupSlugTaken(_ context.Context, slug string, exceptID int64) (bool, error) {
+	return r.takenSlugs[slug] || (r.group.Slug == slug && r.group.ID != exceptID), nil
 }
 
 func (r *groupRepositoryStub) ListGroupsForUser(context.Context, int64) ([]GroupSummary, error) {
@@ -483,6 +508,7 @@ type groupMembershipRepositoryStub struct {
 	members        []GroupMember
 	createCalls    int
 	createErr      error
+	createErrs     []error
 	addErr         error
 	removeErr      error
 	deleteErr      error
@@ -499,6 +525,11 @@ func newMembershipStub() *groupMembershipRepositoryStub {
 func (r *groupMembershipRepositoryStub) CreateGroupWithAdmin(_ context.Context, group Group, userID int64) (Group, GroupMembership, error) {
 	r.createCalls++
 	r.adminUserID = userID
+	if len(r.createErrs) > 0 {
+		err := r.createErrs[0]
+		r.createErrs = r.createErrs[1:]
+		return Group{}, GroupMembership{}, err
+	}
 	if r.createErr != nil {
 		return Group{}, GroupMembership{}, r.createErr
 	}

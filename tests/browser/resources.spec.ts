@@ -21,7 +21,7 @@ test.describe("resources", () => {
     await page.goto(`${appURL}/en/groups`);
     await page.locator("#group-new-name").fill(clubName);
     await page.locator("#group-new-name").locator("xpath=ancestor::form").getByRole("button").click();
-    await page.waitForURL(/\/en\/groups\/\d+$/);
+    await page.waitForURL(/\/en\/groups\/(?!join$)[a-z0-9-]+$/);
     const groupURL = page.url();
 
     // Create a field with a team limit.
@@ -44,7 +44,7 @@ test.describe("resources", () => {
 
     // Edit it: rename, change the kind, and drop the limit.
     await row.getByRole("link", { name: fieldName }).click();
-    await page.waitForURL(/\/en\/groups\/\d+\/resources\/\d+$/);
+    await page.waitForURL(/\/en\/groups\/[a-z0-9-]+\/resources\/\d+$/);
     const resourceURL = page.url();
     await expect(page.locator("#resource-heading")).toHaveText(fieldName);
     await page.locator("#resource-edit-name").fill(renamed);

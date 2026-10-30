@@ -147,15 +147,15 @@ type TeamCoachSeasonView struct {
 // coach routes.
 func registerSeasonRoutes(mux *http.ServeMux, groups *groupHandler) {
 	for _, prefix := range localizedPrefixes() {
-		mux.HandleFunc("GET "+prefix+"/groups/{id}/seasons", groups.seasons)
-		mux.HandleFunc("POST "+prefix+"/groups/{id}/seasons", groups.createSeason)
-		mux.HandleFunc("GET "+prefix+"/groups/{id}/seasons/{seasonID}", groups.season)
-		mux.HandleFunc("POST "+prefix+"/groups/{id}/seasons/{seasonID}", groups.updateSeason)
-		mux.HandleFunc("POST "+prefix+"/groups/{id}/seasons/{seasonID}/delete", groups.deleteSeason)
-		mux.HandleFunc("POST "+prefix+"/groups/{id}/seasons/{seasonID}/parts/{partID}/alternating", groups.setPartAlternating)
-		mux.HandleFunc("POST "+prefix+"/groups/{id}/teams/{teamID}/coaches/add", groups.assignCoach)
-		mux.HandleFunc("POST "+prefix+"/groups/{id}/teams/{teamID}/coaches/head", groups.setHeadCoach)
-		mux.HandleFunc("POST "+prefix+"/groups/{id}/teams/{teamID}/coaches/remove", groups.removeCoach)
+		mux.HandleFunc("GET "+prefix+"/groups/{group}/seasons", groups.seasons)
+		mux.HandleFunc("POST "+prefix+"/groups/{group}/seasons", groups.createSeason)
+		mux.HandleFunc("GET "+prefix+"/groups/{group}/seasons/{seasonID}", groups.season)
+		mux.HandleFunc("POST "+prefix+"/groups/{group}/seasons/{seasonID}", groups.updateSeason)
+		mux.HandleFunc("POST "+prefix+"/groups/{group}/seasons/{seasonID}/delete", groups.deleteSeason)
+		mux.HandleFunc("POST "+prefix+"/groups/{group}/seasons/{seasonID}/parts/{partID}/alternating", groups.setPartAlternating)
+		mux.HandleFunc("POST "+prefix+"/groups/{group}/teams/{team}/coaches/add", groups.assignCoach)
+		mux.HandleFunc("POST "+prefix+"/groups/{group}/teams/{team}/coaches/head", groups.setHeadCoach)
+		mux.HandleFunc("POST "+prefix+"/groups/{group}/teams/{team}/coaches/remove", groups.removeCoach)
 	}
 }
 
@@ -179,7 +179,7 @@ func (h *groupHandler) createSeason(writer http.ResponseWriter, request *http.Re
 		h.renderWriteError(writer, request, current, groupSectionSeasons, 0, err, h.seasonFormErrors(current.language, form, err))
 		return
 	}
-	h.redirectLocalized(writer, request, current.language, "/groups/"+strconv.FormatInt(current.access.GroupID(), 10)+"/seasons/"+strconv.FormatInt(season.ID, 10))
+	h.redirectLocalized(writer, request, current.language, "/groups/"+current.slug+"/seasons/"+strconv.FormatInt(season.ID, 10))
 }
 
 func (h *groupHandler) season(writer http.ResponseWriter, request *http.Request) {
@@ -224,7 +224,7 @@ func (h *groupHandler) deleteSeason(writer http.ResponseWriter, request *http.Re
 		h.renderWriteError(writer, request, current, groupSectionSeason, seasonID, err, FormData{})
 		return
 	}
-	h.redirectLocalized(writer, request, current.language, "/groups/"+strconv.FormatInt(current.access.GroupID(), 10)+"/seasons")
+	h.redirectLocalized(writer, request, current.language, "/groups/"+current.slug+"/seasons")
 }
 
 func (h *groupHandler) assignCoach(writer http.ResponseWriter, request *http.Request) {
@@ -334,10 +334,10 @@ func (h *groupHandler) loadSeasons(writer http.ResponseWriter, request *http.Req
 	}
 	list := &SeasonsView{}
 	if current.access.CanManageSeasons() {
-		list.CreateForm = h.seasonFormView(current.language, "season-new", h.groupPath(current.language, groupID, "/seasons"), nil, form)
+		list.CreateForm = h.seasonFormView(current.language, current.slug, "season-new", h.groupPath(current.language, current.slug, "/seasons"), nil, form)
 	}
 	for _, season := range seasons {
-		list.Rows = append(list.Rows, h.seasonRow(current.language, groupID, season, currentID))
+		list.Rows = append(list.Rows, h.seasonRow(current.language, current.slug, season, currentID))
 	}
 	view.Seasons = list
 	return true
@@ -362,20 +362,20 @@ func (h *groupHandler) loadSeason(writer http.ResponseWriter, request *http.Requ
 	if !ok {
 		return false
 	}
-	row := h.seasonRow(current.language, groupID, season, currentID)
+	row := h.seasonRow(current.language, current.slug, season, currentID)
 	detail := &SeasonDetailView{
 		SeasonRowView: row,
 		Version:       season.Version,
 		CanEdit:       current.access.CanManageSeasons(),
-		ListURL:       h.groupPath(current.language, groupID, "/seasons"),
+		ListURL:       h.groupPath(current.language, current.slug, "/seasons"),
 		DeleteURL:     row.URL + "/delete",
 		CoachBoardURL: row.URL + "/coach-board",
 	}
 	if detail.CanEdit {
-		detail.EditForm = h.seasonFormView(current.language, "season-edit", row.URL, &season, form)
+		detail.EditForm = h.seasonFormView(current.language, current.slug, "season-edit", row.URL, &season, form)
 	}
 	for _, coach := range coaches {
-		detail.Coaches = append(detail.Coaches, h.seasonCoachRow(current.language, groupID, coach))
+		detail.Coaches = append(detail.Coaches, h.seasonCoachRow(current, coach))
 	}
 	view.Season = detail
 	return true
@@ -393,12 +393,12 @@ func (h *groupHandler) loadTeamCoaches(writer http.ResponseWriter, request *http
 		return false
 	}
 	language := current.language
-	base := h.groupPath(language, groupID, "/teams/"+strconv.FormatInt(teamID, 10)+"/coaches")
+	base := h.teamPath(current, teamID, "/coaches")
 	coaches := &TeamCoachesView{
 		L:          h.labels[language],
 		CSRFToken:  csrfToken(request),
 		CanManage:  current.access.CanManageSeasons(),
-		SeasonsURL: h.groupPath(language, groupID, "/seasons"),
+		SeasonsURL: h.groupPath(language, current.slug, "/seasons"),
 		AddURL:     base + "/add",
 		RemoveURL:  base + "/remove",
 		HeadURL:    base + "/head",
@@ -408,7 +408,7 @@ func (h *groupHandler) loadTeamCoaches(writer http.ResponseWriter, request *http
 	}
 	bySeason := make(map[int64][]SeasonCoachRowView)
 	for _, coach := range coaching.Coaches {
-		bySeason[coach.SeasonID] = append(bySeason[coach.SeasonID], h.seasonCoachRow(language, groupID, coach))
+		bySeason[coach.SeasonID] = append(bySeason[coach.SeasonID], h.seasonCoachRow(current, coach))
 	}
 	selected := coaching.CurrentSeasonID
 	if selected == 0 && len(coaching.Seasons) > 0 {
@@ -456,13 +456,13 @@ func (h *groupHandler) renderSeasonLoadError(writer http.ResponseWriter, request
 	}
 }
 
-func (h *groupHandler) seasonRow(language locale.Code, groupID int64, season service.Season, currentID int64) SeasonRowView {
+func (h *groupHandler) seasonRow(language locale.Code, groupSlug string, season service.Season, currentID int64) SeasonRowView {
 	row := SeasonRowView{
 		ID:       season.ID,
 		Name:     season.Name,
 		StartsOn: service.FormatSeasonDate(season.StartsOn),
 		EndsOn:   service.FormatSeasonDate(season.EndsOn),
-		URL:      h.groupPath(language, groupID, "/seasons/"+strconv.FormatInt(season.ID, 10)),
+		URL:      h.groupPath(language, groupSlug, "/seasons/"+strconv.FormatInt(season.ID, 10)),
 		Current:  season.ID == currentID,
 	}
 	for _, part := range season.Parts {
@@ -478,14 +478,14 @@ func (h *groupHandler) seasonRow(language locale.Code, groupID int64, season ser
 	return row
 }
 
-func (h *groupHandler) seasonCoachRow(language locale.Code, groupID int64, coach service.SeasonCoach) SeasonCoachRowView {
+func (h *groupHandler) seasonCoachRow(current groupRequest, coach service.SeasonCoach) SeasonCoachRowView {
 	row := SeasonCoachRowView{
 		SeasonID: coach.SeasonID,
 		TeamID:   coach.TeamID,
 		UserID:   coach.CoachUserID,
 		TeamName: coach.TeamName,
-		TeamURL:  h.groupPath(language, groupID, "/teams/"+strconv.FormatInt(coach.TeamID, 10)),
-		Label:    h.memberLabel(language, coach.CoachUserID, coach.DisplayName, coach.Username, coach.Email),
+		TeamURL:  h.teamPath(current, coach.TeamID, ""),
+		Label:    h.memberLabel(current.language, coach.CoachUserID, coach.DisplayName, coach.Username, coach.Email),
 		IsHead:   coach.IsHead,
 	}
 	if coach.Email != nil {
@@ -496,7 +496,7 @@ func (h *groupHandler) seasonCoachRow(language locale.Code, groupID int64, coach
 
 // seasonFormView fills the season form from submitted values after a
 // failed write, else from the stored season (nil for a new season).
-func (h *groupHandler) seasonFormView(language locale.Code, prefix, actionURL string, season *service.Season, form FormData) *SeasonFormView {
+func (h *groupHandler) seasonFormView(language locale.Code, groupSlug, prefix, actionURL string, season *service.Season, form FormData) *SeasonFormView {
 	labels := h.labels[language]
 	view := &SeasonFormView{L: labels, Prefix: prefix, ActionURL: actionURL}
 	view.Parts = []SeasonPartFormView{
@@ -510,7 +510,7 @@ func (h *groupHandler) seasonFormView(language locale.Code, prefix, actionURL st
 		view.EndsOn = form.Value("ends_on")
 		view.NameError = form.Error("name")
 		view.DatesError = form.Error("starts_on")
-		view.setPlanURLs(h, language, season)
+		view.setPlanURLs(h, language, groupSlug, season)
 		for index := range view.Parts {
 			key := "part" + strconv.Itoa(index+1) + "_"
 			view.Parts[index].Name = form.Value(key + "name")
@@ -524,7 +524,7 @@ func (h *groupHandler) seasonFormView(language locale.Code, prefix, actionURL st
 		view.Name = season.Name
 		view.StartsOn = service.FormatSeasonDate(season.StartsOn)
 		view.EndsOn = service.FormatSeasonDate(season.EndsOn)
-		view.setPlanURLs(h, language, season)
+		view.setPlanURLs(h, language, groupSlug, season)
 		for _, part := range season.Parts {
 			if part.Position < 1 || part.Position > len(view.Parts) {
 				continue
@@ -540,13 +540,13 @@ func (h *groupHandler) seasonFormView(language locale.Code, prefix, actionURL st
 }
 
 // setPlanURLs links the stored parts of a season to their plan page.
-func (view *SeasonFormView) setPlanURLs(h *groupHandler, language locale.Code, season *service.Season) {
+func (view *SeasonFormView) setPlanURLs(h *groupHandler, language locale.Code, groupSlug string, season *service.Season) {
 	if season == nil {
 		return
 	}
 	for _, part := range season.Parts {
 		if part.Position >= 1 && part.Position <= len(view.Parts) {
-			view.Parts[part.Position-1].PlanURL = h.groupPath(language, season.GroupID, "/plan") + planQuery{part: part.ID}.encode()
+			view.Parts[part.Position-1].PlanURL = h.groupPath(language, groupSlug, "/plan") + planQuery{part: part.ID}.encode()
 		}
 	}
 }

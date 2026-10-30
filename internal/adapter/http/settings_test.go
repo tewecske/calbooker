@@ -218,7 +218,10 @@ func authenticatedRequest(method, target string, _ int64, form string) *http.Req
 	}
 	segments := strings.Split(strings.Trim(strings.SplitN(target, "?", 2)[0], "/"), "/")
 	if len(segments) >= 3 && segments[1] == "groups" {
-		request.SetPathValue("id", segments[2])
+		request.SetPathValue("group", segments[2])
+		if len(segments) >= 5 && segments[3] == "teams" {
+			request.SetPathValue("team", segments[4])
+		}
 	}
 	if len(segments) >= 5 && segments[3] == "members" {
 		request.SetPathValue("memberID", segments[4])

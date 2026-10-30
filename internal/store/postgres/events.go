@@ -27,10 +27,11 @@ func NewEventRepository(db *sql.DB) (*EventRepository, error) {
 
 var _ service.EventRepository = (*EventRepository)(nil)
 
-const eventColumns = `e.id, e.group_id, e.kind, e.title, e.starts_at, e.ends_at, e.resource_id, r.name, e.location, e.signup_mode,
+const eventColumns = `e.id, e.group_id, e.kind_id, k.system_code, k.name_en, k.name_hu, e.title, e.starts_at, e.ends_at, e.resource_id, r.name, e.location, e.signup_mode,
 	e.max_participants, e.signup_deadline, e.cancelled_at, e.plan_training_id, e.generated_for_week, e.edited_at, e.created_at, e.version`
 
-const eventFrom = `FROM events e LEFT JOIN resources r ON r.group_id = e.group_id AND r.id = e.resource_id`
+const eventFrom = `FROM events e JOIN event_kinds k ON k.group_id = e.group_id AND k.id = e.kind_id
+	LEFT JOIN resources r ON r.group_id = e.group_id AND r.id = e.resource_id`
 
 // GroupTimeZone returns the group's IANA time zone.
 func (r *EventRepository) GroupTimeZone(ctx context.Context, groupID int64) (string, error) {
@@ -135,10 +136,10 @@ func (r *EventRepository) UpdateEvent(ctx context.Context, event service.Event, 
 	}
 	defer func() { _ = tx.Rollback() }()
 	result, err := tx.ExecContext(ctx, `
-		UPDATE events SET kind = $1, title = $2, starts_at = $3, ends_at = $4, resource_id = $5, location = $6, signup_mode = $7,
+		UPDATE events SET kind_id = $1, title = $2, starts_at = $3, ends_at = $4, resource_id = $5, location = $6, signup_mode = $7,
 			max_participants = $8, signup_deadline = $9, cancelled_at = $10, edited_at = $11, version = version + 1
 		WHERE group_id = $12 AND id = $13 AND version = $14
-	`, event.Kind, event.Title, event.StartsAt, event.EndsAt, event.ResourceID, event.Location, event.SignupMode,
+	`, event.KindID, event.Title, event.StartsAt, event.EndsAt, event.ResourceID, event.Location, event.SignupMode,
 		nullableLimit(event.MaxParticipants), nullableTime(event.SignupDeadline), event.CancelledAt, event.EditedAt,
 		event.GroupID, event.ID, expectedVersion)
 	if err != nil {
@@ -370,17 +371,18 @@ func scanEvent(row rowScanner) (service.Event, error) {
 	var (
 		event                                     service.Event
 		resourceID, cancelledAt, planID, editedAt sql.NullInt64
-		resourceName, location                    sql.NullString
+		resourceName, location, kindCode          sql.NullString
 		maxParticipants                           sql.NullInt32
 		deadline, generatedForWeek                sql.NullTime
 	)
-	if err := row.Scan(&event.ID, &event.GroupID, &event.Kind, &event.Title, &event.StartsAt, &event.EndsAt, &resourceID, &resourceName, &location,
+	if err := row.Scan(&event.ID, &event.GroupID, &event.KindID, &kindCode, &event.KindNameEN, &event.KindNameHU, &event.Title, &event.StartsAt, &event.EndsAt, &resourceID, &resourceName, &location,
 		&event.SignupMode, &maxParticipants, &deadline, &cancelledAt, &planID, &generatedForWeek, &editedAt, &event.CreatedAt, &event.Version); err != nil {
 		return service.Event{}, mapEventError(err)
 	}
 	if event.ID <= 0 || event.GroupID <= 0 || event.Version < 0 || event.Title == "" || !event.StartsAt.Before(event.EndsAt) {
 		return service.Event{}, ErrInvalidData
 	}
+	event.KindCode = kindCode.String
 	event.ResourceID = nullableInt64(resourceID)
 	event.ResourceName = nullableString(resourceName)
 	event.Location = nullableString(location)
@@ -446,6 +448,9 @@ func mapEventError(err error) error {
 	}
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) {
+		if pgErr.Code == "23502" && pgErr.ColumnName == "kind_id" {
+			return service.ErrInvalidEventKind
+		}
 		switch pgErr.ConstraintName {
 		case "events_group_id_fk":
 			return service.ErrGroupNotFound
@@ -457,7 +462,7 @@ func mapEventError(err error) error {
 			return service.ErrEventCoachRoleMissing
 		case "event_teams_event_fk", "event_coaches_event_fk":
 			return service.ErrEventNotFound
-		case "events_kind_allowed":
+		case "events_kind_fk":
 			return service.ErrInvalidEventKind
 		case "events_title_nonempty":
 			return service.ErrInvalidEventTitle
@@ -483,13 +488,14 @@ func mapEventError(err error) error {
 func insertEvent(ctx context.Context, tx queryer, event service.Event) (int64, error) {
 	var eventID int64
 	if err := tx.QueryRowContext(ctx, `
-		INSERT INTO events (group_id, kind, title, starts_at, ends_at, resource_id, location, signup_mode, max_participants,
+		INSERT INTO events (group_id, kind_id, title, starts_at, ends_at, resource_id, location, signup_mode, max_participants,
 			signup_deadline, cancelled_at, plan_training_id, generated_for_week, edited_at, created_at, version)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13::date, $14, $15, 0)
+		VALUES ($1, COALESCE(NULLIF($2::bigint, 0), (SELECT id FROM event_kinds WHERE group_id = $1 AND system_code = NULLIF($16::text, ''))),
+			$3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13::date, $14, $15, 0)
 		RETURNING id
-	`, event.GroupID, event.Kind, event.Title, event.StartsAt, event.EndsAt, event.ResourceID, event.Location, event.SignupMode,
+	`, event.GroupID, event.KindID, event.Title, event.StartsAt, event.EndsAt, event.ResourceID, event.Location, event.SignupMode,
 		nullableLimit(event.MaxParticipants), nullableTime(event.SignupDeadline), event.CancelledAt, event.PlanTrainingID,
-		nullableDate(event.GeneratedForWeek), event.EditedAt, event.CreatedAt).Scan(&eventID); err != nil {
+		nullableDate(event.GeneratedForWeek), event.EditedAt, event.CreatedAt, event.KindCode).Scan(&eventID); err != nil {
 		return 0, mapEventError(err)
 	}
 	if err := writeEventMembers(ctx, tx, event.GroupID, eventID, event); err != nil {

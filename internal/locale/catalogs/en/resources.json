@@ -5,12 +5,6 @@
     "resources.intro": {"text": "Fields, courts, halls, pools, and rooms the club books for trainings and events."},
     "resources.name": {"text": "Name"},
     "resources.kind": {"text": "Kind"},
-    "resources.kind.field": {"text": "Field"},
-    "resources.kind.court": {"text": "Court"},
-    "resources.kind.hall": {"text": "Sports hall"},
-    "resources.kind.pool": {"text": "Pool"},
-    "resources.kind.room": {"text": "Room"},
-    "resources.kind.other": {"text": "Other"},
     "resources.description": {"text": "Description"},
     "resources.description.help": {"text": "Optional, for example the address or which half of the field."},
     "resources.capacity": {"text": "Teams at once"},
@@ -36,6 +30,7 @@
     "resources.error.name_taken": {"text": "Another resource in use already has this name."},
     "resources.error.invalid_kind": {"text": "Choose a kind from the list."},
     "resources.error.invalid_description": {"text": "Enter a description up to 255 characters on one line."},
-    "resources.error.invalid_capacity": {"text": "Enter a whole number of teams from 1 to 99, or leave it empty."}
+    "resources.error.invalid_capacity": {"text": "Enter a whole number of teams from 1 to 99, or leave it empty."},
+    "resources.error.kind_archived": {"text": "This kind is archived. Pick another."}
   }
 }

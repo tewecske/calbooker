@@ -171,9 +171,9 @@ func planFixture() (*planSeasonsStub, *planResourcesStub) {
 	}
 	archivedAt := int64(1)
 	resources := []Resource{
-		{ID: 1, GroupID: 5, Name: "Court 1", Kind: ResourceKindCourt, MaxConcurrentTeams: intPtr(2)},
-		{ID: 2, GroupID: 5, Name: "Court 2", Kind: ResourceKindCourt},
-		{ID: 3, GroupID: 5, Name: "Old hall", Kind: ResourceKindHall, ArchivedAt: &archivedAt},
+		{ID: 1, GroupID: 5, Name: "Court 1", KindID: 1, MaxConcurrentTeams: intPtr(2)},
+		{ID: 2, GroupID: 5, Name: "Court 2", KindID: 1},
+		{ID: 3, GroupID: 5, Name: "Old hall", KindID: 1, ArchivedAt: &archivedAt},
 	}
 	return &planSeasonsStub{seasons: seasons, today: ParseSeasonDate("2026-10-24")}, &planResourcesStub{resources: resources}
 }

@@ -141,14 +141,14 @@ func eventTeams(ids ...int64) []EventTeam {
 func storedEvent(id int64, teamIDs ...int64) Event {
 	location := "Clubhouse"
 	return Event{
-		ID: id, GroupID: 5, Kind: EventKindTraining, Title: "Practice", StartsAt: at("2026-11-02T17:00"), EndsAt: at("2026-11-02T18:30"),
+		ID: id, GroupID: 5, KindID: 1, Title: "Practice", StartsAt: at("2026-11-02T17:00"), EndsAt: at("2026-11-02T18:30"),
 		Location: &location, SignupMode: EventSignupOpen, Teams: eventTeams(teamIDs...), Version: 4,
 	}
 }
 
 func validEventInput(teamIDs ...int64) EventInput {
 	return EventInput{
-		Kind: EventKindChampionship, Title: " Autumn cup ", StartsAt: wall("2026-11-07T09:00"), EndsAt: wall("2026-11-07T16:00"),
+		KindID: 3, Title: " Autumn cup ", StartsAt: wall("2026-11-07T09:00"), EndsAt: wall("2026-11-07T16:00"),
 		TeamIDs: teamIDs, Location: " City stadium ", SignupMode: EventSignupNominated,
 	}
 }
@@ -169,9 +169,9 @@ func newTestEventService(t *testing.T, events *eventRepositoryStub, members ...G
 	archivedAt := int64(1)
 	two := 2
 	resources := newResourceStub(
-		Resource{ID: 31, GroupID: 5, Name: "Court 1", Kind: ResourceKindCourt, MaxConcurrentTeams: &two},
-		Resource{ID: 32, GroupID: 5, Name: "Old hall", Kind: ResourceKindHall, ArchivedAt: &archivedAt},
-		Resource{ID: 33, GroupID: 6, Name: "Elsewhere", Kind: ResourceKindField},
+		Resource{ID: 31, GroupID: 5, Name: "Court 1", KindID: 1, MaxConcurrentTeams: &two},
+		Resource{ID: 32, GroupID: 5, Name: "Old hall", KindID: 1, ArchivedAt: &archivedAt},
+		Resource{ID: 33, GroupID: 6, Name: "Elsewhere", KindID: 1},
 	)
 	resourceService, _ := newTestResourceService(t, resources)
 	teams := newTeamStub(
@@ -336,7 +336,7 @@ func TestBuildEventValidation(t *testing.T) {
 		{name: "valid", input: with(func(*EventInput) {})},
 		{name: "resource instead of location", input: with(func(i *EventInput) { i.Location, i.ResourceID = "", 31 })},
 		{name: "limit and deadline", input: with(func(i *EventInput) { i.MaxParticipants, i.SignupDeadline = 999, wall("2026-11-06T20:00") })},
-		{name: "unknown kind", input: with(func(i *EventInput) { i.Kind = "party" }), wantErr: ErrInvalidEventKind},
+		{name: "unknown kind", input: with(func(i *EventInput) { i.KindID = 0 }), wantErr: ErrInvalidEventKind},
 		{name: "empty title", input: with(func(i *EventInput) { i.Title = " " }), wantErr: ErrInvalidEventTitle},
 		{name: "long title", input: with(func(i *EventInput) { i.Title = strings.Repeat("a", 129) }), wantErr: ErrInvalidEventTitle},
 		{name: "control character", input: with(func(i *EventInput) { i.Title = "a\nb" }), wantErr: ErrInvalidEventTitle},
@@ -411,7 +411,7 @@ func TestEventServiceCreatePermissions(t *testing.T) {
 				}
 				return
 			}
-			if created.GroupID != 5 || created.Kind != EventKindChampionship || created.SignupMode != EventSignupNominated || created.CreatedAt != eventNow.Unix() {
+			if created.GroupID != 5 || created.KindID != 3 || created.SignupMode != EventSignupNominated || created.CreatedAt != eventNow.Unix() {
 				t.Fatalf("created = %+v", created)
 			}
 			if len(setup.auditor.records) != 1 {
@@ -421,7 +421,7 @@ func TestEventServiceCreatePermissions(t *testing.T) {
 			if record.Action != AuditActionEventCreated || record.TargetType != "group" || record.TargetID != "5" || record.IP != "192.0.2.1" {
 				t.Fatalf("audit record = %+v", record)
 			}
-			if !strings.Contains(record.Detail, "event 100: Autumn cup; championship; 2026-11-07T08:00:00Z to 2026-11-07T15:00:00Z; teams ") || !strings.Contains(record.Detail, "; location") || strings.Contains(record.Detail, "City stadium") {
+			if !strings.Contains(record.Detail, "event 100: Autumn cup; kind #3; 2026-11-07T08:00:00Z to 2026-11-07T15:00:00Z; teams ") || !strings.Contains(record.Detail, "; location") || strings.Contains(record.Detail, "City stadium") {
 				t.Fatalf("audit detail = %q", record.Detail)
 			}
 			if strings.Contains(record.Detail, "(site administrator)") != (test.name == "site administrator") {

@@ -57,6 +57,7 @@ func newParticipantClub(t *testing.T) participantClub {
 		t.Fatal(err)
 	}
 	club.groupID, club.otherGroupID = group.ID, other.ID
+	seedKinds(t, harness, group.ID, other.ID)
 	for _, member := range []struct {
 		id    int64
 		roles []string

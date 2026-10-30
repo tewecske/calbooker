@@ -157,13 +157,13 @@ func (w CalendarWeek) wallMinute(instant time.Time) int {
 	return local.Hour()*60 + local.Minute()
 }
 
-// CalendarFilter narrows a calendar to one team, resource, or kind. Zero
+// CalendarFilter narrows a calendar to one team, resource, or event kind. Zero
 // values do not filter. A filter is applied to the events EventService
 // already returned for the account, so it never shows more than that.
 type CalendarFilter struct {
 	TeamID     int64
 	ResourceID int64
-	Kind       string
+	KindID     int64
 }
 
 // Matches reports whether event passes the filter.
@@ -174,7 +174,7 @@ func (f CalendarFilter) Matches(event Event) bool {
 	if f.ResourceID > 0 && (event.ResourceID == nil || *event.ResourceID != f.ResourceID) {
 		return false
 	}
-	return f.Kind == "" || event.Kind == f.Kind
+	return f.KindID <= 0 || event.KindID == f.KindID
 }
 
 // FilterCalendarEvents returns the events that pass filter, in order.

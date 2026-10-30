@@ -107,6 +107,7 @@ type GroupDetailView struct {
 	Children        *ChildrenView
 	Resources       *ResourcesView
 	Resource        *ResourceDetailView
+	Kinds           *KindsView
 	Seasons         *SeasonsView
 	Season          *SeasonDetailView
 	Events          *EventsView
@@ -145,6 +146,8 @@ type GroupSettingsView struct {
 	Slug      string
 	Version   int64
 	TimeZones []TimeZoneOption
+	// KindsURL links to the event kind and resource kind management page.
+	KindsURL string
 }
 
 // GroupMembersView is the member list.
@@ -241,6 +244,7 @@ func registerGroupRoutes(mux *http.ServeMux, groups *groupHandler) {
 	registerInviteRoutes(mux, groups)
 	registerChildRoutes(mux, groups)
 	registerResourceRoutes(mux, groups)
+	registerKindRoutes(mux, groups)
 	registerSeasonRoutes(mux, groups)
 	registerEventRoutes(mux, groups)
 	registerCalendarRoutes(mux, groups)
@@ -276,7 +280,7 @@ func groupLabels(renderer *PageRenderer) map[locale.Code]map[string]string {
 	for _, language := range locale.Codes() {
 		values := make(map[string]string)
 		for _, id := range renderer.catalogs.Keys(language) {
-			if !strings.HasPrefix(id, "groups.") && !strings.HasPrefix(id, "teams.") && !strings.HasPrefix(id, "invites.") && !strings.HasPrefix(id, "children.") && !strings.HasPrefix(id, "resources.") && !strings.HasPrefix(id, "seasons.") && !strings.HasPrefix(id, "events.") && !strings.HasPrefix(id, "coaches.") && !strings.HasPrefix(id, "plan.") && !strings.HasPrefix(id, "participation.") && !strings.HasPrefix(id, "calendar.") && !strings.HasPrefix(id, "coach_board.") && !strings.HasPrefix(id, "statistics.") && !strings.HasPrefix(id, "training_plan.") && !strings.HasPrefix(id, "event_generation.") {
+			if !strings.HasPrefix(id, "groups.") && !strings.HasPrefix(id, "teams.") && !strings.HasPrefix(id, "invites.") && !strings.HasPrefix(id, "children.") && !strings.HasPrefix(id, "resources.") && !strings.HasPrefix(id, "kinds.") && !strings.HasPrefix(id, "seasons.") && !strings.HasPrefix(id, "events.") && !strings.HasPrefix(id, "coaches.") && !strings.HasPrefix(id, "plan.") && !strings.HasPrefix(id, "participation.") && !strings.HasPrefix(id, "calendar.") && !strings.HasPrefix(id, "coach_board.") && !strings.HasPrefix(id, "statistics.") && !strings.HasPrefix(id, "training_plan.") && !strings.HasPrefix(id, "event_generation.") {
 				continue
 			}
 			if text, err := renderer.catalogs.Translate(language, id, nil); err == nil {
@@ -590,7 +594,7 @@ func (h *groupHandler) groupRequest(writer http.ResponseWriter, request *http.Re
 func (h *groupHandler) renderWriteError(writer http.ResponseWriter, request *http.Request, current groupRequest, section string, teamID int64, err error, form FormData) {
 	message, status := "", http.StatusUnprocessableEntity
 	switch {
-	case errors.Is(err, service.ErrGroupNotFound), errors.Is(err, service.ErrTeamNotFound), errors.Is(err, service.ErrResourceNotFound), errors.Is(err, service.ErrSeasonNotFound), errors.Is(err, service.ErrEventNotFound):
+	case errors.Is(err, service.ErrGroupNotFound), errors.Is(err, service.ErrTeamNotFound), errors.Is(err, service.ErrResourceNotFound), errors.Is(err, service.ErrSeasonNotFound), errors.Is(err, service.ErrEventNotFound), errors.Is(err, service.ErrKindNotFound):
 		h.renderGroupNotFound(writer, request, current.language)
 		return
 	case errors.Is(err, service.ErrGroupForbidden):
@@ -650,6 +654,8 @@ func (h *groupHandler) renderWriteError(writer http.ResponseWriter, request *htt
 		_, message = resourceErrorField(err)
 	case errors.Is(err, service.ErrSeasonCoachNotFound):
 		message, status = "seasons.error.coach_not_found", http.StatusNotFound
+	case kindErrorMessage(err) != "":
+		message = kindErrorMessage(err)
 	case seasonErrorMessage(err) != "":
 		message = seasonErrorMessage(err)
 	case eventErrorMessage(err) != "":
@@ -701,6 +707,7 @@ func (h *groupHandler) renderSection(writer http.ResponseWriter, request *http.R
 			Slug:      slug,
 			Version:   group.Version,
 			TimeZones: timeZoneOptions(zone),
+			KindsURL:  h.groupPath(current.language, group.Slug, "/kinds"),
 		}
 	case groupSectionMembers:
 		members, err := h.dependencies.Groups.Members(ctx, current.access)
@@ -743,6 +750,10 @@ func (h *groupHandler) renderSection(writer http.ResponseWriter, request *http.R
 		}
 	case groupSectionResources:
 		if !h.loadResources(writer, request, current, group.ID, form, view) {
+			return
+		}
+	case groupSectionKinds:
+		if !h.loadKinds(writer, request, current, view) {
 			return
 		}
 	case groupSectionResource:
@@ -840,7 +851,7 @@ func (h *groupHandler) groupShell(current groupRequest, group service.Group, sec
 		items = append(items, struct{ id, label, route string }{groupSectionSettings, "groups.nav.settings", "/settings"})
 	}
 	for _, item := range items {
-		currentSection := section == item.id || ((section == groupSectionTeam || section == groupSectionTeamEvents || section == groupSectionTeamCalendar || section == groupSectionTeamInvites) && item.id == groupSectionTeams) || (section == groupSectionResource && item.id == groupSectionResources) || ((section == groupSectionSeason || section == groupSectionCoachBoard) && item.id == groupSectionSeasons) || (section == groupSectionEvent && item.id == groupSectionEvents) ||
+		currentSection := section == item.id || (section == groupSectionKinds && item.id == groupSectionSettings) || ((section == groupSectionTeam || section == groupSectionTeamEvents || section == groupSectionTeamCalendar || section == groupSectionTeamInvites) && item.id == groupSectionTeams) || (section == groupSectionResource && item.id == groupSectionResources) || ((section == groupSectionSeason || section == groupSectionCoachBoard) && item.id == groupSectionSeasons) || (section == groupSectionEvent && item.id == groupSectionEvents) ||
 			(item.id == groupSectionCoaches && (section == groupSectionAvailability || section == groupSectionAvailabilityOverview)) ||
 			(section == groupSectionPlanSlot && item.id == groupSectionPlan) ||
 			(section == groupSectionEventGeneration && item.id == groupSectionTrainingPlan)

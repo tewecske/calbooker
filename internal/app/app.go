@@ -36,6 +36,7 @@ type Graph struct {
 	Invites               *postgresstore.InviteRepository
 	Profiles              *postgresstore.ProfileRepository
 	Resources             *postgresstore.ResourceRepository
+	Kinds                 *postgresstore.KindRepository
 	Seasons               *postgresstore.SeasonRepository
 	Events                *postgresstore.EventRepository
 	Coaches               *postgresstore.CoachRepository
@@ -64,6 +65,7 @@ type Graph struct {
 	Invite                *service.InviteService
 	Profile               *service.ProfileService
 	Resource              *service.ResourceService
+	Kind                  *service.KindService
 	Season                *service.SeasonService
 	Event                 *service.EventService
 	Coach                 *service.CoachService
@@ -175,6 +177,10 @@ func New(database *sql.DB, appConfig config.Config) (*Graph, error) {
 	profilesRepository, err := postgresstore.NewProfileRepository(database)
 	if err != nil {
 		return nil, fmt.Errorf("construct profile repository: %w", err)
+	}
+	kindsRepository, err := postgresstore.NewKindRepository(database)
+	if err != nil {
+		return nil, fmt.Errorf("construct kind repository: %w", err)
 	}
 	resourcesRepository, err := postgresstore.NewResourceRepository(database)
 	if err != nil {
@@ -335,10 +341,17 @@ func New(database *sql.DB, appConfig config.Config) (*Graph, error) {
 	if err != nil {
 		return nil, fmt.Errorf("construct resource service: %w", err)
 	}
+	kindService, err := service.NewKindService(kindsRepository, users)
+	if err != nil {
+		return nil, fmt.Errorf("construct kind service: %w", err)
+	}
+	resourceService.SetKinds(kindService)
+	groupService.SetKinds(kindService)
 	eventService, err := service.NewEventService(eventsRepository, teamsRepository, resourceService, groupMembershipsRepository, users)
 	if err != nil {
 		return nil, fmt.Errorf("construct event service: %w", err)
 	}
+	eventService.SetKinds(kindService)
 	planSlotService, err := service.NewPlanSlotService(planSlotsRepository, seasonService, resourceService, users)
 	if err != nil {
 		return nil, fmt.Errorf("construct plan slot service: %w", err)
@@ -380,6 +393,7 @@ func New(database *sql.DB, appConfig config.Config) (*Graph, error) {
 	inviteService.SetAuditor(auditService)
 	profileService.SetAuditor(auditService)
 	resourceService.SetAuditor(auditService)
+	kindService.SetAuditor(auditService)
 	seasonService.SetAuditor(auditService)
 	eventService.SetAuditor(auditService)
 	coachService.SetAuditor(auditService)
@@ -459,6 +473,7 @@ func New(database *sql.DB, appConfig config.Config) (*Graph, error) {
 		Invites:               invitesRepository,
 		Profiles:              profilesRepository,
 		Resources:             resourcesRepository,
+		Kinds:                 kindsRepository,
 		Seasons:               seasonsRepository,
 		Events:                eventsRepository,
 		Coaches:               coachesRepository,
@@ -487,6 +502,7 @@ func New(database *sql.DB, appConfig config.Config) (*Graph, error) {
 		Invite:                inviteService,
 		Profile:               profileService,
 		Resource:              resourceService,
+		Kind:                  kindService,
 		Season:                seasonService,
 		Event:                 eventService,
 		Coach:                 coachService,

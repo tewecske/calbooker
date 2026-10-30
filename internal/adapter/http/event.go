@@ -54,9 +54,12 @@ type EventsView struct {
 
 // EventRowView is one event in a list.
 type EventRowView struct {
-	ID        int64
-	URL       string
-	Title     string
+	ID    int64
+	URL   string
+	Title string
+	// KindID is the group's event kind; Kind is its system code (empty for
+	// kinds an administrator added).
+	KindID    int64
 	Kind      string
 	KindLabel string
 	When      string
@@ -412,8 +415,9 @@ func (h *groupHandler) eventRow(language locale.Code, groupSlug string, zone str
 		ID:        event.ID,
 		URL:       h.groupPath(language, groupSlug, "/events/"+strconv.FormatInt(event.ID, 10)),
 		Title:     event.Title,
-		Kind:      event.Kind,
-		KindLabel: h.t(language, "events.kind."+event.Kind),
+		KindID:    event.KindID,
+		Kind:      event.KindCode,
+		KindLabel: event.KindName(string(language)),
 		When:      formatEventRange(event.StartsAt, event.EndsAt, zone),
 		Cancelled: event.Cancelled(),
 	}
@@ -459,7 +463,7 @@ func (h *groupHandler) eventWarningText(language locale.Code, zone string, warni
 // write, else from the stored event (nil for a new event).
 func (h *groupHandler) eventFormView(language locale.Code, prefix, actionURL string, options service.EventFormOptions, event *service.Event, form FormData) *EventFormView {
 	view := &EventFormView{L: h.labels[language], Prefix: prefix, ActionURL: actionURL, TimeZone: options.TimeZone}
-	kind, signup, resource := service.EventKindTraining, service.EventSignupOpen, ""
+	kind, signup, resource := "", service.EventSignupOpen, ""
 	var teams, coaches []string
 	switch {
 	case form.Submitted:
@@ -473,7 +477,7 @@ func (h *groupHandler) eventFormView(language locale.Code, prefix, actionURL str
 		view.SignupModeError, view.MaxParticipantsError = form.Error("signup_mode"), form.Error("max_participants")
 		view.SignupDeadlineError, view.CoachesError = form.Error("signup_deadline"), form.Error("coach_user_id")
 	case event != nil:
-		kind, signup, view.Title = event.Kind, event.SignupMode, event.Title
+		kind, signup, view.Title = strconv.FormatInt(event.KindID, 10), event.SignupMode, event.Title
 		view.StartsAt = formatEventFormTime(event.StartsAt, options.TimeZone)
 		view.EndsAt = formatEventFormTime(event.EndsAt, options.TimeZone)
 		if event.ResourceID != nil {
@@ -495,8 +499,25 @@ func (h *groupHandler) eventFormView(language locale.Code, prefix, actionURL str
 			coaches = append(coaches, strconv.FormatInt(id, 10))
 		}
 	}
-	for _, code := range service.EventKinds() {
-		view.KindOptions = append(view.KindOptions, SelectOptionView{Value: code, Label: h.t(language, "events.kind."+code), Selected: code == kind})
+	if kind == "" {
+		// A new event starts on the group's first training-like kind: the
+		// system training kind when it is offered, else the first kind.
+		for _, option := range options.Kinds {
+			if option.SystemCode == service.EventKindTraining {
+				kind = strconv.FormatInt(option.ID, 10)
+			}
+		}
+		if kind == "" && len(options.Kinds) > 0 {
+			kind = strconv.FormatInt(options.Kinds[0].ID, 10)
+		}
+	}
+	for _, option := range options.Kinds {
+		value := strconv.FormatInt(option.ID, 10)
+		label := option.Name(string(language))
+		if option.Archived() {
+			label += " (" + h.t(language, "kinds.archived_badge") + ")"
+		}
+		view.KindOptions = append(view.KindOptions, SelectOptionView{Value: value, Label: label, Selected: value == kind})
 	}
 	for _, mode := range service.EventSignupModes() {
 		view.SignupOptions = append(view.SignupOptions, SelectOptionView{Value: mode, Label: h.t(language, "events.signup."+mode), Selected: mode == signup})
@@ -540,6 +561,8 @@ func eventErrorField(err error) (string, string) {
 	switch {
 	case errors.Is(err, service.ErrInvalidEventKind):
 		return "kind", "events.error.invalid_kind"
+	case errors.Is(err, service.ErrEventKindArchived):
+		return "kind", "events.error.kind_archived"
 	case errors.Is(err, service.ErrInvalidEventTitle):
 		return "title", "events.error.invalid_title"
 	case errors.Is(err, service.ErrInvalidEventStart):
@@ -594,7 +617,7 @@ func eventForm(request *http.Request) (service.EventInput, FormData) {
 		"signup_deadline":  strings.TrimSpace(request.PostFormValue("signup_deadline")),
 	}
 	input := service.EventInput{
-		Kind:            values["kind"],
+		KindID:          optionalFormNumber(values["kind"]),
 		Title:           values["title"],
 		StartsAt:        service.ParseEventLocalTime(values["starts_at"]),
 		EndsAt:          service.ParseEventLocalTime(values["ends_at"]),

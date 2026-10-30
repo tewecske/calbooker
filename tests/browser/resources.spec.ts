@@ -28,7 +28,7 @@ test.describe("resources", () => {
     await page.locator("nav a[data-section=resources]").click();
     await expect(page.getByTestId("resources-empty")).toBeVisible();
     await page.locator("#resource-new-name").fill(fieldName);
-    await page.locator("#resource-new-kind").selectOption("field");
+    await page.locator("#resource-new-kind").selectOption({ label: "Field" });
     await page.locator("#resource-new-max-teams").fill("2");
     await page.locator("#resource-new-description").fill("Behind the clubhouse");
     await page.getByRole("button", { name: "Add a resource" }).click();
@@ -48,7 +48,7 @@ test.describe("resources", () => {
     const resourceURL = page.url();
     await expect(page.locator("#resource-heading")).toHaveText(fieldName);
     await page.locator("#resource-edit-name").fill(renamed);
-    await page.locator("#resource-edit-kind").selectOption("court");
+    await page.locator("#resource-edit-kind").selectOption({ label: "Court" });
     await page.locator("#resource-edit-max-teams").fill("");
     await page.getByRole("button", { name: "Save resource" }).click();
     await expect(page.locator("#alerts")).toContainText("Resource saved.");
@@ -72,7 +72,7 @@ test.describe("resources", () => {
     const hallName = uniqueName("Hall");
     await page.goto(`${groupURL}/resources`);
     await page.locator("#resource-new-name").fill(hallName);
-    await page.locator("#resource-new-kind").selectOption("hall");
+    await page.locator("#resource-new-kind").selectOption({ label: "Sports hall" });
     await page.getByRole("button", { name: "Add a resource" }).click();
     await expect(page.locator("#alerts")).toContainText("Resource added.");
     await page.goto(resourceURL);

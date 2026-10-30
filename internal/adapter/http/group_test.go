@@ -37,6 +37,7 @@ func groupTestDependencies(t *testing.T, access *service.GroupAccess) (Dependenc
 	dependencies.Invites = &invitesUseCaseStub{}
 	dependencies.Profiles = &profilesUseCaseStub{}
 	dependencies.Resources = &resourcesUseCaseStub{}
+	dependencies.Kinds = newKindsStub()
 	dependencies.Seasons = &seasonsUseCaseStub{}
 	dependencies.GroupAccess = &groupAccessStub{access: access}
 	return dependencies, groups, teams

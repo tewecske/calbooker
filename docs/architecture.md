@@ -193,9 +193,7 @@ get `service.ErrGroupNotFound`, which handlers render as 404.
 
 - `ResourceService` (`internal/service/resource.go`, store
   `internal/store/postgres/resources.go`, migration 000005) owns `resources`:
-  name, kind (a stable code from `service.ResourceKinds()`: `field`, `court`,
-  `hall`, `pool`, `room`, `other`, labelled per language as
-  `resources.kind.<code>`), optional description, optional
+  name, kind (a per-group `resource_kinds` row, #43), optional description, optional
   `max_concurrent_teams` (1 to 99, empty is no limit), `archived_at`, and
   `version` for revision-checked edits.
 - Use cases: `List(access)` (all, active first) and `ActiveResources(access)`
@@ -271,8 +269,8 @@ get `service.ErrGroupNotFound`, which handlers render as 404.
 ## Events
 
 - `EventService` (`internal/service/event.go`, store
-  `internal/store/postgres/events.go`, migration 000007) owns `events` (kind
-  `training`/`match`/`championship`/`other`, title, `starts_at`/`ends_at` as
+  `internal/store/postgres/events.go`, migration 000007) owns `events` (a per-group
+  `event_kinds` row, title, `starts_at`/`ends_at` as
   `timestamptz`, exactly one of `resource_id` and a free-text `location`,
   `signup_mode` `open`/`nominated`, optional `max_participants` 1 to 999 and
   `signup_deadline` before the start, `cancelled_at`, `plan_training_id`
@@ -407,7 +405,13 @@ get `service.ErrGroupNotFound`, which handlers render as 404.
   Links and the filter form inside `#calendar` are boosted (`hx-boost`,
   target `#page-content`, URL pushed); without JavaScript they are plain
   links and a GET form. The group switcher lists the account's groups when
-  there are several, keeping the week and the kind filter.
+  there are several, keeping the week.
+- `KindService` (`internal/service/kind.go`, store
+  `internal/store/postgres/kinds.go`, migration 000014, #43) owns the per-group
+  `event_kinds` and `resource_kinds`. Management page
+  `/{language}/groups/{group}/kinds` (POSTs `/kinds/{events|resources}[/{id}[/archive|/move|/delete]]`)
+  for admins and managers; the event `training` kind is protected. Audited as
+  `group.event_kind.*` and `group.resource_kind.*`.
 - Answer badges (#30): the handler asks
   `ParticipationService.CalendarAnswers(access, week.From, week.To)` once per
   page. It returns the viewer's own `event_participants` answers (`signed_up`,

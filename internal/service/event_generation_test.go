@@ -114,7 +114,7 @@ func TestGenerateCreatesEventsFromThePlan(t *testing.T) {
 		t.Fatalf("counts = %+v, events = %d, want 4 created", result.Counts, len(f.repo.events))
 	}
 	first := f.repo.events[0]
-	if first.Kind != EventKindTraining || first.SignupMode != EventSignupOpen || first.Title != "Lions" || first.ResourceID == nil || *first.ResourceID != 1 {
+	if first.KindCode != EventKindTraining || first.SignupMode != EventSignupOpen || first.Title != "Lions" || first.ResourceID == nil || *first.ResourceID != 1 {
 		t.Fatalf("event = %+v, want an open training of Lions on the field", first)
 	}
 	if !first.StartsAt.Equal(mustInstant(t, "2027-01-05T16:00")) || !first.EndsAt.Equal(mustInstant(t, "2027-01-05T17:30")) {

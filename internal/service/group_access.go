@@ -265,6 +265,14 @@ func (a *GroupAccess) CanManageResources() bool {
 	return a.CanManageGroup()
 }
 
+// CanManageKinds reports whether the account may add, rename, reorder,
+// archive, and delete the group's event kinds and resource kinds (admins,
+// managers, and site administrators). Everyone who sees the group sees the
+// kind names on the events and resources that use them.
+func (a *GroupAccess) CanManageKinds() bool {
+	return a.CanManageGroup()
+}
+
 // CanViewResources reports whether the account sees the resource list:
 // those who manage resources, and coaches (read only). Players and parents
 // see a resource only where an event or plan names it.

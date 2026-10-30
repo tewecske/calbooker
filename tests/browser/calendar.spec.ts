@@ -25,7 +25,7 @@ async function createGroup(page: Page, name: string): Promise<string> {
 
 async function createEvent(page: Page, groupURL: string, event: { kind: string; title: string; team: string; day: string; from: string; to: string }): Promise<void> {
   await page.goto(`${groupURL}/events`);
-  await page.locator("#event-new-kind").selectOption(event.kind);
+  await page.locator("#event-new-kind").selectOption({ label: event.kind });
   await page.locator("#event-new-title").fill(event.title);
   await page.locator("#event-new-starts-at").fill(`${event.day}T${event.from}`);
   await page.locator("#event-new-ends-at").fill(`${event.day}T${event.to}`);
@@ -61,8 +61,8 @@ test.describe("calendar", () => {
       await page.getByRole("button", { name: "Create a team" }).click();
       await page.waitForURL(/\/en\/groups\/[a-z0-9-]+\/teams\/[a-z0-9-]+$/);
     }
-    await createEvent(page, groupURL, { kind: "training", title: training, team: lions, day: nextWeekDay, from: "11:00", to: "12:30" });
-    await createEvent(page, groupURL, { kind: "match", title: match, team: tigers, day: nextWeekDay, from: "13:00", to: "14:30" });
+    await createEvent(page, groupURL, { kind: "Training", title: training, team: lions, day: nextWeekDay, from: "11:00", to: "12:30" });
+    await createEvent(page, groupURL, { kind: "Match", title: match, team: tigers, day: nextWeekDay, from: "13:00", to: "14:30" });
 
     // This week is empty; the next week shows both events on the grid.
     await page.goto(groupURL);

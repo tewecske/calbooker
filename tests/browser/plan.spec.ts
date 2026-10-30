@@ -80,7 +80,7 @@ test.describe("plan", () => {
     // A court that takes one team at a time, and two seasons with A/B weeks.
     await page.goto(`${groupURL}/resources`);
     await page.locator("#resource-new-name").fill(courtName);
-    await page.locator("#resource-new-kind").selectOption("court");
+    await page.locator("#resource-new-kind").selectOption({ label: "Court" });
     await page.locator("#resource-new-max-teams").fill("1");
     await page.getByRole("button", { name: "Add a resource" }).click();
     await expect(page.locator("#alerts")).toContainText("Resource added.");

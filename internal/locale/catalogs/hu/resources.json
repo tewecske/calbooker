@@ -5,12 +5,6 @@
     "resources.intro": {"text": "Pályák, csarnokok, uszodák és termek, amelyeket a klub edzésekre és eseményekre foglal."},
     "resources.name": {"text": "Név"},
     "resources.kind": {"text": "Típus"},
-    "resources.kind.field": {"text": "Füves pálya"},
-    "resources.kind.court": {"text": "Pálya"},
-    "resources.kind.hall": {"text": "Sportcsarnok"},
-    "resources.kind.pool": {"text": "Uszoda"},
-    "resources.kind.room": {"text": "Terem"},
-    "resources.kind.other": {"text": "Egyéb"},
     "resources.description": {"text": "Leírás"},
     "resources.description.help": {"text": "Nem kötelező, például a cím vagy a pálya melyik fele."},
     "resources.capacity": {"text": "Egyszerre használó csapatok"},
@@ -36,6 +30,7 @@
     "resources.error.name_taken": {"text": "Egy másik használatban lévő helyszínnek már ez a neve."},
     "resources.error.invalid_kind": {"text": "Válasszon típust a listából."},
     "resources.error.invalid_description": {"text": "Adjon meg legfeljebb 255 karakteres, egysoros leírást."},
-    "resources.error.invalid_capacity": {"text": "Adjon meg egy egész számot 1 és 99 között, vagy hagyja üresen."}
+    "resources.error.invalid_capacity": {"text": "Adjon meg egy egész számot 1 és 99 között, vagy hagyja üresen."},
+    "resources.error.kind_archived": {"text": "Ez a típus archivált. Válasszon másikat."}
   }
 }

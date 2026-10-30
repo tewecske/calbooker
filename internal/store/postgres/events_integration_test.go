@@ -33,7 +33,7 @@ func eventInstant(raw string) time.Time {
 func integrationEvent(groupID int64, title, starts, ends string, teamIDs ...int64) service.Event {
 	location := "City stadium"
 	event := service.Event{
-		GroupID: groupID, Kind: service.EventKindTraining, Title: title, StartsAt: eventInstant(starts), EndsAt: eventInstant(ends),
+		GroupID: groupID, KindCode: service.EventKindTraining, Title: title, StartsAt: eventInstant(starts), EndsAt: eventInstant(ends),
 		Location: &location, SignupMode: service.EventSignupOpen, CreatedAt: 200,
 	}
 	for _, id := range teamIDs {
@@ -88,14 +88,15 @@ func TestEventRepositoryLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	court, err := resources.CreateResource(ctx, service.Resource{GroupID: group.ID, Name: "Court 1", Kind: service.ResourceKindCourt, CreatedAt: 103})
+	court, err := resources.CreateResource(ctx, service.Resource{GroupID: group.ID, Name: "Court 1", KindID: kindID(t, harness, service.KindScopeResource, group.ID, "court"), CreatedAt: 103})
 	if err != nil {
 		t.Fatal(err)
 	}
-	foreignCourt, err := resources.CreateResource(ctx, service.Resource{GroupID: other.ID, Name: "Court 1", Kind: service.ResourceKindCourt, CreatedAt: 103})
+	foreignCourt, err := resources.CreateResource(ctx, service.Resource{GroupID: other.ID, Name: "Court 1", KindID: kindID(t, harness, service.KindScopeResource, other.ID, "court"), CreatedAt: 103})
 	if err != nil {
 		t.Fatal(err)
 	}
+	seedKinds(t, harness, group.ID, other.ID)
 	if zone, err := events.GroupTimeZone(ctx, group.ID); err != nil || zone != "Europe/Budapest" {
 		t.Fatalf("GroupTimeZone() = %q, %v", zone, err)
 	}
@@ -105,7 +106,8 @@ func TestEventRepositoryLifecycle(t *testing.T) {
 
 	// A full event: two teams, a resource, an extra coach, limit, deadline.
 	match := integrationEvent(group.ID, "Cup", "2026-11-07T08:00:00Z", "2026-11-07T15:00:00Z", tigers.ID, lions.ID)
-	match.Kind, match.SignupMode = service.EventKindChampionship, service.EventSignupNominated
+	match.KindID, match.KindCode = kindID(t, harness, service.KindScopeEvent, group.ID, service.EventKindChampionship), ""
+	match.SignupMode = service.EventSignupNominated
 	match.Location, match.ResourceID = nil, &court.ID
 	limit := 18
 	deadline := eventInstant("2026-11-06T19:00:00Z")
@@ -117,7 +119,7 @@ func TestEventRepositoryLifecycle(t *testing.T) {
 	}
 	if created.ID <= 0 || created.Version != 0 || !created.StartsAt.Equal(match.StartsAt) || !created.EndsAt.Equal(match.EndsAt) ||
 		created.ResourceName == nil || *created.ResourceName != "Court 1" || created.Location != nil || *created.MaxParticipants != 18 ||
-		!created.SignupDeadline.Equal(deadline) || created.Kind != service.EventKindChampionship || created.Cancelled() || created.Generated() {
+		!created.SignupDeadline.Equal(deadline) || created.KindCode != service.EventKindChampionship || created.KindID != match.KindID || created.KindNameEN != "Championship" || created.KindNameHU != "Bajnokság" || created.Cancelled() || created.Generated() {
 		t.Fatalf("created = %+v", created)
 	}
 	if len(created.Teams) != 2 || created.Teams[0].Name != "Lions" || created.Teams[1].Name != "Tigers" {
@@ -155,7 +157,10 @@ func TestEventRepositoryLifecycle(t *testing.T) {
 		"reversed times":             func(e *service.Event) { e.StartsAt, e.EndsAt = e.EndsAt, e.StartsAt },
 		"deadline after the start":   func(e *service.Event) { late := e.EndsAt; e.SignupDeadline = &late },
 		"limit out of range":         func(e *service.Event) { big := 1000; e.MaxParticipants = &big },
-		"unknown kind":               func(e *service.Event) { e.Kind = "party" },
+		"unknown kind":               func(e *service.Event) { e.KindID, e.KindCode = 0, "party" },
+		"kind of another group": func(e *service.Event) {
+			e.KindID, e.KindCode = kindID(t, harness, service.KindScopeEvent, other.ID, service.EventKindMatch), ""
+		},
 		"week not a Monday": func(e *service.Event) {
 			tuesday := service.ParseSeasonDate("2026-11-03")
 			e.GeneratedForWeek = &tuesday

@@ -152,10 +152,10 @@ func TestCalendarFilterAndResources(t *testing.T) {
 	court, hall := int64(31), int64(32)
 	courtName, hallName := "court 1", "Hall"
 	events := []Event{
-		{ID: 1, Kind: EventKindTraining, Teams: eventTeams(1), ResourceID: &court, ResourceName: &courtName},
-		{ID: 2, Kind: EventKindMatch, Teams: eventTeams(2)},
-		{ID: 3, Kind: EventKindTraining, Teams: eventTeams(1, 2), ResourceID: &hall, ResourceName: &hallName},
-		{ID: 4, Kind: EventKindOther, Teams: eventTeams(3), ResourceID: &court, ResourceName: &courtName},
+		{ID: 1, KindID: 1, Teams: eventTeams(1), ResourceID: &court, ResourceName: &courtName},
+		{ID: 2, KindID: 2, Teams: eventTeams(2)},
+		{ID: 3, KindID: 1, Teams: eventTeams(1, 2), ResourceID: &hall, ResourceName: &hallName},
+		{ID: 4, KindID: 4, Teams: eventTeams(3), ResourceID: &court, ResourceName: &courtName},
 	}
 	ids := func(list []Event) []int64 {
 		out := make([]int64, 0, len(list))
@@ -171,8 +171,8 @@ func TestCalendarFilterAndResources(t *testing.T) {
 		{filter: CalendarFilter{}, want: []int64{1, 2, 3, 4}},
 		{filter: CalendarFilter{TeamID: 1}, want: []int64{1, 3}},
 		{filter: CalendarFilter{ResourceID: 31}, want: []int64{1, 4}},
-		{filter: CalendarFilter{Kind: EventKindTraining}, want: []int64{1, 3}},
-		{filter: CalendarFilter{TeamID: 2, Kind: EventKindTraining}, want: []int64{3}},
+		{filter: CalendarFilter{KindID: 1}, want: []int64{1, 3}},
+		{filter: CalendarFilter{TeamID: 2, KindID: 1}, want: []int64{3}},
 		{filter: CalendarFilter{TeamID: 9}, want: []int64{}},
 	}
 	for _, test := range tests {
@@ -194,7 +194,7 @@ func TestCalendarFilterAndResources(t *testing.T) {
 func TestCalendarVisibilityPerRole(t *testing.T) {
 	lions := storedEvent(1, 1)
 	tigers := storedEvent(2, 2)
-	tigers.Kind = EventKindMatch
+	tigers.KindID = 2
 	extra := storedEvent(3, 3)
 	extra.Coaches = []EventCoach{{UserID: 8}}
 	both := storedEvent(4, 1, 2)
@@ -220,7 +220,7 @@ func TestCalendarVisibilityPerRole(t *testing.T) {
 		{name: "coach and extra coach", actor: extraCoach, want: []int64{2, 3, 4}},
 		{name: "coach filtered by a team they do not see", actor: extraCoach, filter: CalendarFilter{TeamID: 1}, want: []int64{4}},
 		{name: "player", actor: playerOn(1), want: []int64{1, 4}},
-		{name: "player filtered by kind", actor: playerOn(1), filter: CalendarFilter{Kind: EventKindMatch}, want: []int64{}},
+		{name: "player filtered by kind", actor: playerOn(1), filter: CalendarFilter{KindID: 2}, want: []int64{}},
 		{name: "parent with a child in another team", actor: parent, want: []int64{2, 3, 4}},
 		{name: "parent filtered by the child's team", actor: parent, filter: CalendarFilter{TeamID: 3}, want: []int64{3}},
 		{name: "member without teams", actor: actorWith(memberWith(GroupRolePlayer)), want: []int64{}},

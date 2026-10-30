@@ -55,13 +55,14 @@ func (s visibleTeamsStub) List(_ context.Context, access *service.GroupAccess) (
 }
 
 func calendarEvent(id int64, kind, starts, ends string, teamIDs ...int64) service.Event {
+	kindID := testEventKindIDs[kind]
 	teams := make([]service.EventTeam, 0, len(teamIDs))
 	for _, teamID := range teamIDs {
 		teams = append(teams, service.EventTeam{ID: teamID, Name: calendarTeamNames[teamID]})
 	}
 	location := "City park"
 	return service.Event{
-		ID: id, GroupID: 3, Kind: kind, Title: "Event " + strconv.FormatInt(id, 10),
+		ID: id, GroupID: 3, KindID: kindID, KindCode: kind, KindNameEN: testEventKindNames[kind], Title: "Event " + strconv.FormatInt(id, 10),
 		StartsAt: budapestTime(starts), EndsAt: budapestTime(ends), Location: &location,
 		SignupMode: service.EventSignupOpen, Teams: teams, Version: 1,
 	}
@@ -109,9 +110,9 @@ func calendarDependencies(t *testing.T, access *service.GroupAccess) (Dependenci
 	}
 	dependencies.Teams = visibleTeamsStub{teams}
 	dependencies.Resources = &resourcesUseCaseStub{list: []service.Resource{
-		{ID: 31, GroupID: 3, Name: "Court 1", Kind: service.ResourceKindCourt},
-		{ID: 32, GroupID: 3, Name: "Hall", Kind: service.ResourceKindHall},
-		{ID: 33, GroupID: 3, Name: "Pool", Kind: service.ResourceKindPool},
+		{ID: 31, GroupID: 3, Name: "Court 1", KindID: 1},
+		{ID: 32, GroupID: 3, Name: "Hall", KindID: 1},
+		{ID: 33, GroupID: 3, Name: "Pool", KindID: 1},
 	}}
 	events := &calendarEventsStub{eventsUseCaseStub: &eventsUseCaseStub{}, all: calendarFixture()}
 	dependencies.Events = events
@@ -223,17 +224,17 @@ func TestCalendarFiltersNeverWiden(t *testing.T) {
 	}{
 		{name: "admin by team", access: groupMemberAs(service.GroupRoleAdmin), query: "team=1", want: []int64{1, 5}, kept: "team=1"},
 		{name: "admin by resource", access: groupMemberAs(service.GroupRoleAdmin), query: "resource=31", want: []int64{1}, kept: "resource=31"},
-		{name: "admin by kind", access: groupMemberAs(service.GroupRoleAdmin), query: "kind=training", want: []int64{1, 5, 6}, kept: "kind=training"},
-		{name: "admin by team and kind", access: groupMemberAs(service.GroupRoleAdmin), query: "team=2&kind=match", want: []int64{2}, kept: "kind=match&team=2"},
+		{name: "admin by kind", access: groupMemberAs(service.GroupRoleAdmin), query: "kind=1", want: []int64{1, 5, 6}, kept: "kind=1"},
+		{name: "admin by team and kind", access: groupMemberAs(service.GroupRoleAdmin), query: "team=2&kind=2", want: []int64{2}, kept: "kind=2&team=2"},
 		{name: "coach by own team", access: calendarCoach(), query: "team=1", want: []int64{1, 5}, kept: "team=1"},
 		{name: "coach by a team they do not see", access: calendarCoach(), query: "team=3", want: []int64{1, 3, 5}},
 		{name: "coach by an unused resource", access: calendarCoach(), query: "resource=33", want: []int64{}, kept: "resource=33"},
 		{name: "player by another team", access: playerOfTeam(2), query: "team=1", want: []int64{2, 5, 6}},
 		{name: "player by a resource not on their events", access: playerOfTeam(2), query: "resource=31", want: []int64{2, 5, 6}},
-		{name: "player by kind", access: playerOfTeam(2), query: "kind=championship", want: []int64{}, kept: "kind=championship"},
+		{name: "player by kind", access: playerOfTeam(2), query: "kind=3", want: []int64{}, kept: "kind=3"},
 		{name: "parent by child's team", access: calendarParent(), query: "team=3", want: []int64{3}, kept: "team=3"},
 		{name: "parent by resource of child's event", access: calendarParent(), query: "resource=32", want: []int64{3}, kept: "resource=32"},
-		{name: "unknown kind and bad IDs", access: playerOfTeam(2), query: "kind=party&team=x&resource=-1", want: []int64{2, 5, 6}},
+		{name: "unknown kind and bad IDs", access: playerOfTeam(2), query: "kind=99&team=x&resource=-1", want: []int64{2, 5, 6}},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -343,18 +344,18 @@ func TestCalendarFragmentAndLanguages(t *testing.T) {
 	}
 }
 
-func TestCalendarGroupSwitcherKeepsTheWeek(t *testing.T) {
+func TestCalendarGroupSwitcherKeepsTheWeekOnly(t *testing.T) {
 	dependencies, _ := calendarDependencies(t, playerOfTeam(2))
-	body := serveGroups(t, dependencies, http.MethodGet, "/en/groups/lions/calendar?week=2026-10-21&team=2&kind=match", "", false).Body.String()
+	body := serveGroups(t, dependencies, http.MethodGet, "/en/groups/lions/calendar?week=2026-10-21&team=2&kind=2", "", false).Body.String()
 	if strings.Contains(body, `data-testid="calendar-groups"`) {
 		t.Fatal("switcher shown for a single group")
 	}
 	groups := dependencies.Groups.(*groupsUseCaseStub)
 	groups.summaries = []service.GroupSummary{{Group: service.Group{ID: 3, Slug: "lions", Name: "Lions Club"}}, {Group: service.Group{ID: 9, Slug: "swim-club", Name: "Swim Club"}}}
-	body = serveGroups(t, dependencies, http.MethodGet, "/en/groups/lions/calendar?week=2026-10-21&team=2&kind=match", "", false).Body.String()
+	body = serveGroups(t, dependencies, http.MethodGet, "/en/groups/lions/calendar?week=2026-10-21&team=2&kind=2", "", false).Body.String()
 	for _, want := range []string{
-		`<a href="/en/groups/swim-club/calendar?kind=match&amp;week=2026-10-19" data-calendar-group>Swim Club</a>`,
-		`<a href="/en/groups/lions/calendar?kind=match&amp;week=2026-10-19" class="menu-active" aria-current="page" data-calendar-group>Lions Club</a>`,
+		`<a href="/en/groups/swim-club/calendar?week=2026-10-19" data-calendar-group>Swim Club</a>`,
+		`<a href="/en/groups/lions/calendar?week=2026-10-19" class="menu-active" aria-current="page" data-calendar-group>Lions Club</a>`,
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("switcher missing %q", want)

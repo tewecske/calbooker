@@ -525,7 +525,9 @@ teams (group_id, name, slug, birth_year_from, birth_year_to, description?, archi
 team_members (team_id, user_id, role: player | parent)
 child_profiles (user_id, group_id, birth_year, created_by, version)   the users row has kind 'profile'
 guardians (group_id, parent_user_id, child_user_id)  parent needs the parent role; linked parents are derived onto rosters
-resources (group_id, name, kind, description?, max_concurrent_teams?, archived_at?, version)   kind: field | court | hall | pool | room | other
+resources (group_id, name, kind_id, description?, max_concurrent_teams?, archived_at?, version)   kind_id references resource_kinds (group_id, id)
+event_kinds (group_id, system_code?, name_en, name_hu, position, archived_at?, version)   per group; system_code marks seeded kinds ('training' | 'match' | 'championship' | 'other'); NULL for kinds an admin added
+resource_kinds (group_id, system_code?, name_en, name_hu, position, archived_at?, version)   per group; seeded codes field | court | hall | pool | room | other
 seasons (group_id, name, starts_on, ends_on, version)   dates in the group's calendar; seasons of a group never overlap
 season_parts (group_id, season_id, position 1 | 2, name, starts_on, ends_on, alternating_weeks bool)   edited with the season's version
 season_team_coaches (group_id, season_id, team_id, coach_user_id, is_head)   coach needs the coach role; one head coach per team and season
@@ -533,7 +535,7 @@ coach_qualifications (group_id, coach_user_id, min_age, max_age)   ages 0..99; c
 coach_availability (group_id, season_part_id, coach_user_id, week, weekday, start_minute, end_minute)   merged per week and weekday
 plan_slots (group_id, season_part_id, resource_id, week, weekday, start_minute, end_minute, min_age?, max_age?, max_teams?, version)   A/B only in alternating parts; slots may overlap
 plan_trainings (group_id, season_part_id, team_id, resource_id, plan_slot_id?, week, weekday, start_minute, end_minute)   several per team; slot optional, own times
-events (group_id, kind, title, starts_at, ends_at, resource_id?, location?, signup_mode,
+events (group_id, kind_id, title, starts_at, ends_at, resource_id?, location?, signup_mode,
         max_participants?, signup_deadline?,
         cancelled_at?, plan_training_id?, generated_for_week?, edited_at?, version)
 event_teams (event_id, team_id)
@@ -565,3 +567,35 @@ lines:
 Shared hot spots: `handler.go` (one line per area), `GroupAccess`, the group
 navigation in `templates/groups.html`, `static/app.js`, and `cmd/web` wiring.
 Keep changes there small and rebase often.
+
+Refinements made in #43 (open for the owner to confirm):
+
+- The fixed kind lists of #4 and #8 are now per-group tables `event_kinds` and
+  `resource_kinds`. Events and resources reference `(group_id, kind_id)`, so a
+  kind never crosses groups. Migration 000014 gives every existing group the
+  old kinds (en and hu names from the old labels) and maps existing rows; new
+  groups get the same defaults from `GroupService.Create`.
+- Names: an English name (required) and a Hungarian name (optional; empty
+  shows the English one). Names are unique among a group's active kinds,
+  case-insensitively. At most 50 kinds per list.
+- System codes: seeded rows keep `system_code` (events: `training`, `match`,
+  `championship`, `other`; resources: `field`, `court`, `hall`, `pool`, `room`,
+  `other`); admin-added kinds have none. Only the event kind `training`
+  carries behaviour (generation, #15, creates it) and so can be renamed and
+  moved but neither archived nor deleted. The other codes are only
+  identifiers: the calendar colours `training`, `match`, and `championship`
+  kinds, other kinds use the neutral colour. Any other kind can be deleted
+  when unused.
+- Archive hides a kind from pickers for new events and resources; an item that
+  already has an archived kind keeps it and can be saved with it. Delete is
+  allowed only when nothing uses the kind (the foreign key also refuses it).
+- Management page: `/{language}/groups/{group}/kinds`, linked from the group
+  Settings page (Settings stays highlighted). Admins, managers, and site
+  administrators add, rename, move up and down, archive, restore, and delete;
+  others get access denied, non-members 404. Everyone who sees an event or
+  resource sees the kind name. Changes are audited as
+  `group.event_kind.*` and `group.resource_kind.*`.
+- The calendar kind filter lists all of the group's event kinds (archived ones
+  too, so old events can be found) and uses the kind ID in `?kind=`; old
+  `?kind=training` links are ignored. Switching groups keeps only the week,
+  because kind IDs belong to one group. Statistics do not depend on kinds.

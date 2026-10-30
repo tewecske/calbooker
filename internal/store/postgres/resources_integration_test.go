@@ -34,23 +34,23 @@ func TestResourceRepositoryLifecycle(t *testing.T) {
 
 	description := "North end"
 	limit := 2
-	created, err := resources.CreateResource(ctx, service.Resource{GroupID: group.ID, Name: "Main field", Kind: service.ResourceKindField, Description: &description, MaxConcurrentTeams: &limit, CreatedAt: 101})
+	created, err := resources.CreateResource(ctx, service.Resource{GroupID: group.ID, Name: "Main field", KindID: kindID(t, harness, service.KindScopeResource, group.ID, "field"), Description: &description, MaxConcurrentTeams: &limit, CreatedAt: 101})
 	if err != nil {
 		t.Fatalf("CreateResource() error = %v", err)
 	}
 	if created.ID <= 0 || created.Version != 0 || created.Description == nil || *created.Description != description || created.MaxConcurrentTeams == nil || *created.MaxConcurrentTeams != 2 {
 		t.Fatalf("created = %+v", created)
 	}
-	pool, err := resources.CreateResource(ctx, service.Resource{GroupID: group.ID, Name: "Pool", Kind: service.ResourceKindPool, CreatedAt: 102})
+	pool, err := resources.CreateResource(ctx, service.Resource{GroupID: group.ID, Name: "Pool", KindID: kindID(t, harness, service.KindScopeResource, group.ID, "pool"), CreatedAt: 102})
 	if err != nil || pool.MaxConcurrentTeams != nil || pool.Description != nil {
 		t.Fatalf("CreateResource(no limit) = %+v, %v", pool, err)
 	}
 
 	// Constraints refuse what validation would refuse.
 	for _, bad := range []service.Resource{
-		{GroupID: group.ID, Name: "Bad kind", Kind: "stadium", CreatedAt: 103},
-		{GroupID: group.ID, Name: " ", Kind: service.ResourceKindRoom, CreatedAt: 103},
-		{GroupID: group.ID, Name: "Zero", Kind: service.ResourceKindRoom, MaxConcurrentTeams: new(int), CreatedAt: 103},
+		{GroupID: group.ID, Name: "Bad kind", KindID: 0, CreatedAt: 103},
+		{GroupID: group.ID, Name: " ", KindID: kindID(t, harness, service.KindScopeResource, group.ID, "room"), CreatedAt: 103},
+		{GroupID: group.ID, Name: "Zero", KindID: kindID(t, harness, service.KindScopeResource, group.ID, "room"), MaxConcurrentTeams: new(int), CreatedAt: 103},
 	} {
 		if _, err := resources.CreateResource(ctx, bad); err == nil {
 			t.Errorf("CreateResource(%+v) stored an invalid resource", bad)
@@ -58,7 +58,7 @@ func TestResourceRepositoryLifecycle(t *testing.T) {
 	}
 
 	// Names are unique among active resources, ignoring case.
-	if _, err := resources.CreateResource(ctx, service.Resource{GroupID: group.ID, Name: "MAIN FIELD", Kind: service.ResourceKindCourt, CreatedAt: 104}); !errors.Is(err, service.ErrResourceNameTaken) {
+	if _, err := resources.CreateResource(ctx, service.Resource{GroupID: group.ID, Name: "MAIN FIELD", KindID: kindID(t, harness, service.KindScopeResource, group.ID, "court"), CreatedAt: 104}); !errors.Is(err, service.ErrResourceNameTaken) {
 		t.Fatalf("duplicate name error = %v, want ErrResourceNameTaken", err)
 	}
 
@@ -87,7 +87,7 @@ func TestResourceRepositoryLifecycle(t *testing.T) {
 	if found, err := resources.FindResource(ctx, group.ID, archived.ID); err != nil || !found.Archived() {
 		t.Fatalf("FindResource(archived) = %+v, %v; archived resources stay loadable", found, err)
 	}
-	successor, err := resources.CreateResource(ctx, service.Resource{GroupID: group.ID, Name: "Main Pitch", Kind: service.ResourceKindField, CreatedAt: 201})
+	successor, err := resources.CreateResource(ctx, service.Resource{GroupID: group.ID, Name: "Main Pitch", KindID: kindID(t, harness, service.KindScopeResource, group.ID, "field"), CreatedAt: 201})
 	if err != nil {
 		t.Fatalf("CreateResource(reused name) error = %v", err)
 	}
@@ -126,12 +126,12 @@ func TestResourceRepositoryGroupScoping(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateGroupWithAdmin(B) error = %v", err)
 	}
-	resourceA, err := resources.CreateResource(ctx, service.Resource{GroupID: groupA.ID, Name: "Main field", Kind: service.ResourceKindField, CreatedAt: 101})
+	resourceA, err := resources.CreateResource(ctx, service.Resource{GroupID: groupA.ID, Name: "Main field", KindID: kindID(t, harness, service.KindScopeResource, groupA.ID, "field"), CreatedAt: 101})
 	if err != nil {
 		t.Fatalf("CreateResource(A) error = %v", err)
 	}
 	// The same name in another group is fine.
-	resourceB, err := resources.CreateResource(ctx, service.Resource{GroupID: groupB.ID, Name: "Main field", Kind: service.ResourceKindField, CreatedAt: 101})
+	resourceB, err := resources.CreateResource(ctx, service.Resource{GroupID: groupB.ID, Name: "Main field", KindID: kindID(t, harness, service.KindScopeResource, groupB.ID, "field"), CreatedAt: 101})
 	if err != nil {
 		t.Fatalf("CreateResource(B, same name) error = %v", err)
 	}
@@ -183,7 +183,7 @@ func TestResourceCompositeReference(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateGroupWithAdmin(B) error = %v", err)
 	}
-	resourceA, err := resources.CreateResource(ctx, service.Resource{GroupID: groupA.ID, Name: "Main", Kind: service.ResourceKindField, CreatedAt: 101})
+	resourceA, err := resources.CreateResource(ctx, service.Resource{GroupID: groupA.ID, Name: "Main", KindID: kindID(t, harness, service.KindScopeResource, groupA.ID, "field"), CreatedAt: 101})
 	if err != nil {
 		t.Fatalf("CreateResource() error = %v", err)
 	}

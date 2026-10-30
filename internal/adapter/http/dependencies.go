@@ -37,10 +37,12 @@ type Dependencies struct {
 	Invites     InviteUseCases
 	Profiles    ProfileUseCases
 	Resources   ResourceUseCases
-	Seasons     SeasonUseCases
-	Events      EventUseCases
-	Coaches     CoachUseCases
-	Plan        PlanUseCases
+	// Kinds are the group's event kinds and resource kinds (#43).
+	Kinds   KindUseCases
+	Seasons SeasonUseCases
+	Events  EventUseCases
+	Coaches CoachUseCases
+	Plan    PlanUseCases
 	// TrainingPlan is the training plan board (#14).
 	TrainingPlan TrainingPlanUseCases
 	// EventGeneration generates events from the training plan (#15).

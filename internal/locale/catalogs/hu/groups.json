@@ -76,6 +76,7 @@
     "groups.slug": {"text": "Hivatkozásnév"},
     "groups.slug_help": {"text": "A csoport hivatkozásaiban szerepel. Kisbetűk, számok és kötőjelek; módosítása megváltoztatja a csoport webcímét."},
     "groups.error.invalid_slug": {"text": "Használjon kisbetűket, számokat és egyes kötőjeleket, legfeljebb 64 karakterig. Csak számok, valamint az olyan szavak, mint a „new” vagy a „settings” nem engedélyezettek."},
-    "groups.error.slug_taken": {"text": "Ezt a hivatkozásnevet már használja egy másik csoport."}
+    "groups.error.slug_taken": {"text": "Ezt a hivatkozásnevet már használja egy másik csoport."},
+    "groups.settings.kinds": {"text": "Esemény- és erőforrástípusok kezelése"}
   }
 }

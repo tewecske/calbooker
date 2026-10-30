@@ -80,7 +80,7 @@ test.describe("events", () => {
     const teams = coach.page.getByTestId("event-new-teams");
     await expect(teams.getByLabel(lions)).toBeVisible();
     await expect(teams.getByLabel(tigers)).toHaveCount(0);
-    await coach.page.locator("#event-new-kind").selectOption("championship");
+    await coach.page.locator("#event-new-kind").selectOption({ label: "Championship" });
     await coach.page.locator("#event-new-title").fill(title);
     await coach.page.locator("#event-new-starts-at").fill(`${dateFromToday(7)}T09:00`);
     await coach.page.locator("#event-new-ends-at").fill(`${dateFromToday(7)}T16:00`);

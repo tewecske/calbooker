@@ -32,7 +32,7 @@ func TestEventGenerationRepository(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateGroupWithAdmin() error = %v", err)
 	}
-	field, err := resources.CreateResource(ctx, service.Resource{GroupID: group.ID, Name: "Field", Kind: service.ResourceKindField, CreatedAt: 100})
+	field, err := resources.CreateResource(ctx, service.Resource{GroupID: group.ID, Name: "Field", KindID: kindID(t, harness, service.KindScopeResource, group.ID, "field"), CreatedAt: 100})
 	if err != nil {
 		t.Fatalf("CreateResource() error = %v", err)
 	}
@@ -98,7 +98,7 @@ func TestEventGenerationRepository(t *testing.T) {
 		t.Fatalf("first run = %+v, events %d, want 3", first.Counts, len(list))
 	}
 	for _, event := range list {
-		if event.Kind != service.EventKindTraining || event.SignupMode != service.EventSignupOpen || event.PlanTrainingID == nil || event.GeneratedForWeek == nil ||
+		if event.KindCode != service.EventKindTraining || event.SignupMode != service.EventSignupOpen || event.PlanTrainingID == nil || event.GeneratedForWeek == nil ||
 			event.ResourceID == nil || *event.ResourceID != field.ID || len(event.Teams) != 1 || event.EditedAt != nil {
 			t.Fatalf("event = %+v, want an open generated training with one team and a resource", event)
 		}

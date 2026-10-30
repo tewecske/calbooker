@@ -450,6 +450,63 @@ Refinements made in #44 (open for the owner to confirm):
   The group-level Events and Calendar are unchanged.
 - A team the account cannot see, or a non-member, gets 404 on every tab.
 
+Refinements made in #47 (open for the owner to confirm):
+
+- Team invites: the team page has an invite card for staff and the team's
+  coaches (the `CanCreateInvite` rules): pick player or parent, an optional
+  expiry and use limit, and the code is bound to that team. Joining adds the
+  player or parent to the team (an existing member gets the team added).
+  Staff still add existing members to a team by hand. The group's Invites
+  page stays and shows every invite.
+- Several teams: a player can be on several teams and a parent can have
+  children on several teams (several invites, or by hand). Access, the
+  calendar, the event list, and sign-up already work from the union of the
+  teams; an event of two of a player's teams is one event (counted once in
+  statistics). Tests cover a player on two teams and a parent with children on
+  two teams.
+- Call-ups: a coach of the event (or staff) calls up any player of the group
+  who is not on the event's teams (`event_participants.called_up`). A call-up
+  is a nomination across teams: the row has the status `nominated`, counts
+  against the participant limit, and works in open and nominated events. It
+  needs a player who is a member of the group with the player role. Coaches
+  and staff may go over the limit.
+- Visibility: a called-up player, and a parent of a called-up child, can see
+  that one event (list, calendar, event page, and the participant list), and
+  nothing else of the event's teams: no team page, no roster, no other
+  events. `GroupAccess` gets the called-up event IDs per request
+  (`CanViewEvent`), and the event list query adds them to the visible scope.
+  Withdrawing the call-up (clearing the row) takes the event away again.
+- Answering: a called-up player (or parent) can opt out ("Can't come") and
+  take the place back ("I'll come after all") while sign-up is open and the
+  limit allows, in every sign-up mode. The row stays a call-up (a `declined`
+  call-up still shows the event, so the place can be taken back). Coaches
+  can mark the call-up not coming, nominate again, or withdraw it.
+- Leaving out: a coach of the event or staff can leave a player of the
+  event's teams out (status `left_out`, the "Leave out" button). The player
+  sees "Left out" and cannot answer; the place is not counted against the
+  limit; a coach can clear it again. It does not apply to called-up players
+  (withdraw them instead).
+- Overlap warning: after a call-up, the page lists the player's other events
+  at the same time (not cancelled; events the player is signed up or called
+  up for, and events of the player's teams the player has not declined or
+  been left out of). It is only a warning; the call-up stays. Sign-ups and
+  nominations by the player do not warn.
+- Statistics: confirmed attendance at a called-up event counts for the
+  called-up player: the event counts as one of the player's events (the
+  denominator) and, when the coach confirms attendance, as attended. A
+  declined call-up is not counted. A player left out of an event is not
+  counted for it either, unless attendance was confirmed anyway. A player
+  with a call-up appears in the player statistics even without a team. Team
+  rows are unchanged: they count the team's own players at the team's own
+  events, so a called-up guest never changes another team's figures.
+- Call-ups against nominations: a nomination picks a player of the event's
+  teams for a nominated event (the player already sees the event). A call-up
+  brings in a player from outside the teams for any event, and is what makes
+  the event visible to that player. Both use the same status and limit.
+- Audit: `group.event.participant_called_up` and
+  `group.event.participant_left_out`; removals use
+  `group.event.participant_removed`. Own answers stay unaudited.
+
 ## Data model
 
 All tables carry `group_id` (directly or through their parent) so every query
@@ -481,8 +538,9 @@ events (group_id, kind, title, starts_at, ends_at, resource_id?, location?, sign
         cancelled_at?, plan_training_id?, generated_for_week?, edited_at?, version)
 event_teams (event_id, team_id)
 event_coaches (event_id, coach_user_id)              extra coaches only
-event_participants (group_id, event_id, user_id, status?: signed_up | declined | nominated,
-                    attended bool?, updated_by?, updated_at)   no status: a walk-in added at attendance
+event_participants (group_id, event_id, user_id, status?: signed_up | declined | nominated | left_out,
+                    called_up bool, attended bool?, updated_by?, updated_at)   no status: a walk-in added at attendance;
+                                                                              called_up: status nominated or declined (#47)
 ```
 
 Authorization lives in one service type, `GroupAccess` (built per request from

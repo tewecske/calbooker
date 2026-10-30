@@ -48,6 +48,7 @@ func (r *StatisticsRepository) TeamStatistics(ctx context.Context, filter servic
 			FROM held
 			JOIN team_members tm ON tm.group_id = $1 AND tm.team_id = held.team_id AND tm.role = 'player'
 			LEFT JOIN event_participants p ON p.group_id = $1 AND p.event_id = held.event_id AND p.user_id = tm.user_id
+			WHERE coalesce(p.status, '') <> 'left_out' OR p.attended IS TRUE
 		), totals AS (
 			SELECT team_id, count(*) AS opportunities,
 				count(*) FILTER (WHERE status IN ('signed_up', 'nominated')) AS signed_up,
@@ -84,8 +85,11 @@ func (r *StatisticsRepository) TeamStatistics(ctx context.Context, filter servic
 // PlayerStatistics returns one row per player in scope, by name: with
 // filter.AllTeams every player on a team; otherwise the players of
 // filter.TeamIDs and the players in filter.UserIDs. Events are the held
-// events of the teams the player is on now, counted once even when two of
-// the player's teams share an event.
+// events of the teams the player is on now (counted once even when two of
+// the player's teams share an event, and not counted when a coach left the
+// player out) plus the held events the player is called up for (#47; not
+// counted when the player declined them), so a called-up player attending
+// another team's event counts as attending it.
 func (r *StatisticsRepository) PlayerStatistics(ctx context.Context, filter service.StatisticsFilter) ([]service.PlayerStatistics, error) {
 	db, err := r.database(ctx)
 	if err != nil {
@@ -93,18 +97,30 @@ func (r *StatisticsRepository) PlayerStatistics(ctx context.Context, filter serv
 	}
 	rows, err := db.QueryContext(ctx, `
 		WITH scope AS (
-			SELECT DISTINCT tm.user_id
+			SELECT tm.user_id
 			FROM team_members tm
 			WHERE tm.group_id = $1 AND tm.role = 'player'
 				AND ($5::boolean OR tm.team_id = ANY($6::bigint[]) OR tm.user_id = ANY($7::bigint[]))
+			UNION
+			SELECT p.user_id
+			FROM event_participants p
+			WHERE p.group_id = $1 AND p.called_up AND ($5::boolean OR p.user_id = ANY($7::bigint[]))
 		), cells AS (
-			SELECT DISTINCT scope.user_id, e.id AS event_id, p.status, p.attended
+			SELECT scope.user_id, e.id AS event_id, p.status, p.attended
 			FROM scope
 			JOIN team_members tm ON tm.group_id = $1 AND tm.user_id = scope.user_id AND tm.role = 'player'
 			JOIN event_teams et ON et.group_id = $1 AND et.team_id = tm.team_id
 			JOIN events e ON e.group_id = $1 AND e.id = et.event_id AND e.cancelled_at IS NULL
 				AND e.starts_at >= $2 AND e.starts_at < $3 AND e.ends_at <= $4
 			LEFT JOIN event_participants p ON p.group_id = $1 AND p.event_id = e.id AND p.user_id = scope.user_id
+			WHERE coalesce(p.status, '') <> 'left_out' OR p.attended IS TRUE
+			UNION
+			SELECT scope.user_id, e.id, p.status, p.attended
+			FROM scope
+			JOIN event_participants p ON p.group_id = $1 AND p.user_id = scope.user_id AND p.called_up
+			JOIN events e ON e.group_id = $1 AND e.id = p.event_id AND e.cancelled_at IS NULL
+				AND e.starts_at >= $2 AND e.starts_at < $3 AND e.ends_at <= $4
+			WHERE p.status <> 'declined' OR p.attended IS TRUE
 		), totals AS (
 			SELECT user_id, count(*) AS events,
 				count(*) FILTER (WHERE status IN ('signed_up', 'nominated')) AS signed_up,

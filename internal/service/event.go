@@ -259,11 +259,13 @@ type EventQuery struct {
 }
 
 // EventScope limits a query to what an account sees: every event (All), or
-// events of TeamIDs plus the events UserID is an extra coach of.
+// events of TeamIDs, the events UserID is an extra coach of, and the events
+// in EventIDs (call-ups, #47).
 type EventScope struct {
-	All     bool
-	TeamIDs []int64
-	UserID  int64
+	All      bool
+	TeamIDs  []int64
+	UserID   int64
+	EventIDs []int64
 }
 
 // EventWarning is a soft problem of an event, shown with it.
@@ -911,7 +913,7 @@ func eventScope(access *GroupAccess) EventScope {
 	if access.SeesAllTeams() {
 		return EventScope{All: true}
 	}
-	return EventScope{TeamIDs: access.VisibleTeamIDs(), UserID: access.UserID()}
+	return EventScope{TeamIDs: access.VisibleTeamIDs(), UserID: access.UserID(), EventIDs: access.CalledUpEventIDs()}
 }
 
 func mapEventWriteError(operation string, err error) error {

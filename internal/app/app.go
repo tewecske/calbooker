@@ -307,6 +307,7 @@ func New(database *sql.DB, appConfig config.Config) (*Graph, error) {
 		return nil, fmt.Errorf("construct group access service: %w", err)
 	}
 	groupAccess.SetChildTeams(profilesRepository)
+	groupAccess.SetCallUps(participantsRepository)
 	seasonService, err := service.NewSeasonService(seasonsRepository, groupMembershipsRepository, users)
 	if err != nil {
 		return nil, fmt.Errorf("construct season service: %w", err)

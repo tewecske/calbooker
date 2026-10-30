@@ -131,6 +131,80 @@
   {{template "team-tabs" .}}
 {{end}}
 
+{{/* Invite tab of a team page (#47). */}}
+{{define "team-invites-tab"}}
+  {{with .Group}}{{$L := .L}}{{with .Team}}
+    {{with .Invites}}
+      {{with .Created}}
+        <div role="status" class="alert alert-success alert-soft" data-testid="invite-created">
+          <span>{{$L.invites_created_help}}</span>
+          <code class="rounded-box bg-base-100 p-2 tracking-[0.2em]" data-testid="invite-created-code">{{.}}</code>
+        </div>
+      {{end}}
+      <section class="card card-border bg-base-100 shadow-sm" aria-labelledby="team-invites-heading" data-testid="team-invites">
+        <div class="card-body">
+          <h2 id="team-invites-heading" class="card-title">{{$L.invites_team_heading}}</h2>
+          <p class="text-sm opacity-70">{{$L.invites_team_card_help}}</p>
+          <form class="grid gap-4 sm:grid-cols-3" method="post" action="{{.CreateURL}}" hx-post="{{.CreateURL}}" hx-target="#page-content" hx-swap="outerHTML" hx-disabled-elt="this">
+            <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
+            <fieldset class="fieldset">
+              <label class="fieldset-legend" for="team-invite-role">{{$L.invites_role}}</label>
+              <select id="team-invite-role" class="select w-full" name="role" required aria-describedby="team-invite-error">{{template "select-options" .Roles}}</select>
+            </fieldset>
+            <fieldset class="fieldset">
+              <label class="fieldset-legend" for="team-invite-expires">{{$L.invites_expires}}</label>
+              <select id="team-invite-expires" class="select w-full" name="expires_in">{{template "select-options" .Expiries}}</select>
+            </fieldset>
+            <fieldset class="fieldset">
+              <label class="fieldset-legend" for="team-invite-max-uses">{{$L.invites_max_uses}}</label>
+              <input id="team-invite-max-uses" class="input w-full" type="number" name="max_uses" min="1" max="10000" value="{{.MaxUses}}">
+            </fieldset>
+            {{with .Error}}<p id="team-invite-error" class="text-sm text-error sm:col-span-3" role="alert">{{.}}</p>{{end}}
+            <div class="sm:col-span-3"><button class="btn btn-primary" type="submit">{{$L.invites_create}}</button></div>
+          </form>
+          {{if .Rows}}
+            <div class="overflow-x-auto">
+              <table class="table" data-testid="team-invite-list">
+                <thead>
+                  <tr>
+                    <th scope="col">{{$L.invites_code}}</th>
+                    <th scope="col">{{$L.invites_role}}</th>
+                    <th scope="col">{{$L.invites_uses}}</th>
+                    <th scope="col">{{$L.invites_expires}}</th>
+                    <th scope="col">{{$L.invites_status}}</th>
+                    <th scope="col"><span class="sr-only">{{$L.invites_actions}}</span></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {{range .Rows}}
+                    <tr data-invite-id="{{.ID}}" data-invite-status="{{.Status}}">
+                      <td><code class="tracking-[0.2em]" data-testid="invite-code">{{.Code}}</code></td>
+                      <td>{{.RoleLabel}}</td>
+                      <td>{{.Uses}}</td>
+                      <td>{{if .Expires}}{{.Expires}}{{else}}<span class="opacity-70">{{$L.invites_expires_never}}</span>{{end}}</td>
+                      <td><span class="badge badge-soft{{if .Active}} badge-success{{end}}">{{.StatusLabel}}</span></td>
+                      <td class="text-right">
+                        {{if .Active}}
+                          <form method="post" action="{{.RevokeURL}}" hx-post="{{.RevokeURL}}" hx-target="#page-content" hx-swap="outerHTML" hx-disabled-elt="this" hx-confirm="{{$L.invites_revoke_confirm}}">
+                            <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
+                            <button class="btn btn-xs btn-outline btn-error" type="submit" aria-label="{{$L.invites_revoke}}: {{.Code}}">{{$L.invites_revoke}}</button>
+                          </form>
+                        {{end}}
+                      </td>
+                    </tr>
+                  {{end}}
+                </tbody>
+              </table>
+            </div>
+          {{else}}
+            <p class="text-sm opacity-70">{{$L.invites_team_empty}}</p>
+          {{end}}
+        </div>
+      </section>
+    {{end}}
+  {{end}}{{end}}
+{{end}}
+
 {{define "group-team"}}
   {{with .Group}}{{$L := .L}}{{with .Team}}
     <p><a class="link" href="{{.TeamsURL}}">{{$L.teams_back}}</a></p>

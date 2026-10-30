@@ -84,7 +84,7 @@ func (r *ParticipantRepository) ListParticipants(ctx context.Context, groupID, e
 		return nil, err
 	}
 	rows, err := db.QueryContext(ctx, `
-		SELECT event_id, user_id, status, attended, updated_by, updated_at
+		SELECT event_id, user_id, status, called_up, attended, updated_by, updated_at
 		FROM event_participants
 		WHERE group_id = $1 AND event_id = $2
 		ORDER BY user_id
@@ -128,7 +128,7 @@ func (r *ParticipantRepository) ChangeParticipant(ctx context.Context, groupID, 
 	}
 	state := service.ParticipationState{Event: event}
 	row := tx.QueryRowContext(ctx, `
-		SELECT event_id, user_id, status, attended, updated_by, updated_at
+		SELECT event_id, user_id, status, called_up, attended, updated_by, updated_at
 		FROM event_participants WHERE group_id = $1 AND event_id = $2 AND user_id = $3
 	`, groupID, eventID, userID)
 	switch current, err := scanParticipant(row); {
@@ -158,11 +158,11 @@ func (r *ParticipantRepository) ChangeParticipant(ctx context.Context, groupID, 
 		// Nothing changed.
 	default:
 		if _, err := tx.ExecContext(ctx, `
-			INSERT INTO event_participants (group_id, event_id, user_id, status, attended, updated_by, updated_at)
-			VALUES ($1, $2, $3, $4, $5, $6, $7)
-			ON CONFLICT (event_id, user_id) DO UPDATE SET status = EXCLUDED.status, attended = EXCLUDED.attended,
+			INSERT INTO event_participants (group_id, event_id, user_id, status, called_up, attended, updated_by, updated_at)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+			ON CONFLICT (event_id, user_id) DO UPDATE SET status = EXCLUDED.status, called_up = EXCLUDED.called_up, attended = EXCLUDED.attended,
 				updated_by = EXCLUDED.updated_by, updated_at = EXCLUDED.updated_at
-		`, groupID, eventID, userID, nullableStatus(next.Status), nullableBool(next.Attended), next.UpdatedBy, next.UpdatedAt); err != nil {
+		`, groupID, eventID, userID, nullableStatus(next.Status), next.CalledUp, nullableBool(next.Attended), next.UpdatedBy, next.UpdatedAt); err != nil {
 			return nil, mapParticipantError(err)
 		}
 	}
@@ -305,6 +305,72 @@ func (r *ParticipantRepository) ListAnswers(ctx context.Context, groupID int64, 
 	return answers, nil
 }
 
+// ListOverlaps returns the user's other events that overlap [from, to): the
+// ones the user is signed up or called up for (signed up or nominated) and
+// the ones of the user's teams the user has not declined or been left out
+// of. Cancelled events and excludeEventID are skipped.
+func (r *ParticipantRepository) ListOverlaps(ctx context.Context, groupID, userID int64, from, to time.Time, excludeEventID int64) ([]service.OverlapEvent, error) {
+	db, err := r.database(ctx)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := db.QueryContext(ctx, `
+		SELECT e.id, e.title, e.starts_at, e.ends_at
+		FROM events e
+		LEFT JOIN event_participants p ON p.group_id = e.group_id AND p.event_id = e.id AND p.user_id = $2
+		WHERE e.group_id = $1 AND e.id <> $5 AND e.cancelled_at IS NULL AND e.starts_at < $4 AND e.ends_at > $3
+			AND (p.status IN ('signed_up', 'nominated')
+				OR (p.status IS NULL AND EXISTS (
+					SELECT 1 FROM event_teams et
+					JOIN team_members tm ON tm.group_id = et.group_id AND tm.team_id = et.team_id AND tm.user_id = $2 AND tm.role = 'player'
+					WHERE et.group_id = e.group_id AND et.event_id = e.id)))
+		ORDER BY e.starts_at, e.id
+	`, groupID, userID, from, to, excludeEventID)
+	if err != nil {
+		return nil, mapParticipantError(err)
+	}
+	defer func() { _ = rows.Close() }()
+	overlaps := make([]service.OverlapEvent, 0)
+	for rows.Next() {
+		var overlap service.OverlapEvent
+		if err := rows.Scan(&overlap.EventID, &overlap.Title, &overlap.StartsAt, &overlap.EndsAt); err != nil {
+			return nil, mapParticipantError(err)
+		}
+		overlaps = append(overlaps, overlap)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, mapParticipantError(err)
+	}
+	return overlaps, nil
+}
+
+// CalledUpEventIDs returns the events of the group the users are called up
+// for, in ascending order.
+func (r *ParticipantRepository) CalledUpEventIDs(ctx context.Context, groupID int64, userIDs []int64) ([]int64, error) {
+	db, err := r.database(ctx)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := db.QueryContext(ctx, `
+		SELECT DISTINCT event_id FROM event_participants
+		WHERE group_id = $1 AND called_up AND user_id = ANY($2::bigint[])
+		ORDER BY event_id
+	`, groupID, idsOrEmpty(userIDs))
+	if err != nil {
+		return nil, mapParticipantError(err)
+	}
+	defer func() { _ = rows.Close() }()
+	ids := make([]int64, 0)
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			return nil, mapParticipantError(err)
+		}
+		ids = append(ids, id)
+	}
+	return ids, mapParticipantError(rows.Err())
+}
+
 func (r *ParticipantRepository) database(ctx context.Context) (*sql.DB, error) {
 	if err := ValidateContext(ctx); err != nil {
 		return nil, err
@@ -359,7 +425,7 @@ func scanParticipant(row rowScanner) (service.Participant, error) {
 		attended    sql.NullBool
 		updatedBy   sql.NullInt64
 	)
-	if err := row.Scan(&participant.EventID, &participant.UserID, &status, &attended, &updatedBy, &participant.UpdatedAt); err != nil {
+	if err := row.Scan(&participant.EventID, &participant.UserID, &status, &participant.CalledUp, &attended, &updatedBy, &participant.UpdatedAt); err != nil {
 		return service.Participant{}, mapParticipantError(err)
 	}
 	if status.Valid {
@@ -407,7 +473,7 @@ func mapParticipantError(err error) error {
 			return service.ErrEventNotFound
 		case "event_participants_member_fk":
 			return service.ErrMembershipNotFound
-		case "event_participants_status_allowed", "event_participants_answer_or_attendance":
+		case "event_participants_status_allowed", "event_participants_answer_or_attendance", "event_participants_called_up_answer":
 			return service.ErrInvalidParticipantStatus
 		}
 	}

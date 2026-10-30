@@ -343,6 +343,18 @@ get `service.ErrGroupNotFound`, which handlers render as 404.
   `[]AttendanceRecord{EventID, TeamIDs, UserID, StartsAt}` of non-cancelled
   events starting in `[from, to)`, all for staff, otherwise only events of
   the teams the account sees.
+- Call-ups (#47, migration 000015): `CallUp(actor, eventID, userID)` writes a
+  row with `called_up` (status `nominated`, or `declined` after an opt-out)
+  for a group player outside the event's teams, and returns the player's
+  overlapping events as a warning (`ListOverlaps`). Status `left_out` leaves a
+  team player out (`Respond`). `GroupAccessService` loads the called-up event
+  IDs of the member and their children (`CallUpSource`, implemented by the
+  participant store) so `CanViewEvent` and the event list scope
+  (`EventScope.EventIDs`) include them; a call-up never grants team access.
+  Statistics add called-up events to the player's figures and drop left-out
+  ones. Rules and differences from nominations: `docs/design/booking.md`,
+  "Refinements made in #47". The team page invite card is
+  `internal/adapter/http/team_invites.go`.
 - Concurrency: `ChangeParticipant` and `RecordAttendance` lock the event row
   (`SELECT ... FOR UPDATE`), read the member's row and the places taken, and
   let the service decide (`ParticipantDecision`) inside the transaction, so

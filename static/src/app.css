@@ -126,6 +126,39 @@
 .wg-item-badges {
   @apply flex flex-wrap gap-0.5;
 }
+.wg-item-markers {
+  @apply flex flex-wrap gap-0.5;
+}
+/* Child colours on the parent calendar (#46): a fixed palette, assigned in
+   order of child. The dot sits next to the child's name, so colour is never
+   the only cue. */
+.child-dot {
+  @apply inline-block size-3 shrink-0 rounded-full ring-1 ring-base-content/30;
+}
+.child-color-0 {
+  @apply bg-sky-500;
+}
+.child-color-1 {
+  @apply bg-rose-500;
+}
+.child-color-2 {
+  @apply bg-amber-500;
+}
+.child-color-3 {
+  @apply bg-emerald-500;
+}
+.child-color-4 {
+  @apply bg-violet-500;
+}
+.child-color-5 {
+  @apply bg-orange-500;
+}
+.child-color-6 {
+  @apply bg-teal-500;
+}
+.child-color-7 {
+  @apply bg-fuchsia-500;
+}
 .wg-item-warn {
   @apply outline-2 outline-offset-[-2px] outline-warning;
 }

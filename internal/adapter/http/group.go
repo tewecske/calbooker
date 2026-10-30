@@ -818,44 +818,62 @@ func (h *groupHandler) groupShell(current groupRequest, group service.Group, sec
 		RoleLabels: h.roleLabels(language, current.access.Roles()),
 		ListURL:    h.path(language, "/groups"),
 	}
-	items := []struct{ id, label, route string }{
-		{groupSectionOverview, "groups.nav.overview", ""},
-		{groupSectionMembers, "groups.nav.members", "/members"},
-		{groupSectionTeams, "groups.nav.teams", "/teams"},
-		{groupSectionEvents, "events.nav", "/events"},
-		{groupSectionCalendar, "calendar.nav", "/calendar"},
+	type navEntry struct{ id, label, route string }
+	var items []navEntry
+	// Players and parents start on the calendar and see their teams inside
+	// the team pages: no Overview and no Members (#46). A single team takes
+	// the place of "Teams" and links straight to the team page.
+	teamsName, teamsRoute := "", "/teams"
+	if current.access.IsFamilyOnly() {
+		if team, ok := h.singleTeam(current); ok {
+			teamsName, teamsRoute = team.Name, "/teams/"+team.Slug
+		}
+		items = []navEntry{
+			{groupSectionCalendar, "calendar.nav", "/calendar"},
+			{groupSectionTeams, "groups.nav.teams", teamsRoute},
+			{groupSectionEvents, "events.nav", "/events"},
+		}
+	} else {
+		items = []navEntry{
+			{groupSectionOverview, "groups.nav.overview", ""},
+			{groupSectionMembers, "groups.nav.members", "/members"},
+			{groupSectionTeams, "groups.nav.teams", "/teams"},
+			{groupSectionEvents, "events.nav", "/events"},
+			{groupSectionCalendar, "calendar.nav", "/calendar"},
+		}
 	}
 	if current.access.CanViewSeasons() {
-		items = append(items, struct{ id, label, route string }{groupSectionSeasons, "seasons.nav", "/seasons"})
+		items = append(items, navEntry{groupSectionSeasons, "seasons.nav", "/seasons"})
 	}
 	if current.access.CanViewCoaches() {
-		items = append(items, struct{ id, label, route string }{groupSectionCoaches, "coaches.nav", "/coaches"})
+		items = append(items, navEntry{groupSectionCoaches, "coaches.nav", "/coaches"})
 	}
 	if current.access.CanViewPlan() {
-		items = append(items, struct{ id, label, route string }{groupSectionPlan, "plan.nav", "/plan"})
-		items = append(items, struct{ id, label, route string }{groupSectionTrainingPlan, "training_plan.nav", "/training-plan"})
+		items = append(items, navEntry{groupSectionPlan, "plan.nav", "/plan"})
+		items = append(items, navEntry{groupSectionTrainingPlan, "training_plan.nav", "/training-plan"})
 	}
 	if current.access.CanViewResources() {
-		items = append(items, struct{ id, label, route string }{groupSectionResources, "resources.nav", "/resources"})
+		items = append(items, navEntry{groupSectionResources, "resources.nav", "/resources"})
 	}
 	if current.access.CanViewStatistics() {
-		items = append(items, struct{ id, label, route string }{groupSectionStatistics, "statistics.nav", "/statistics"})
-	}
-	if current.access.CanViewChildren() {
-		items = append(items, struct{ id, label, route string }{groupSectionChildren, "groups.nav.children", "/children"})
+		items = append(items, navEntry{groupSectionStatistics, "statistics.nav", "/statistics"})
 	}
 	if current.access.CanManageInvites() {
-		items = append(items, struct{ id, label, route string }{groupSectionInvites, "groups.nav.invites", "/invites"})
+		items = append(items, navEntry{groupSectionInvites, "groups.nav.invites", "/invites"})
 	}
 	if current.access.CanManageGroup() {
-		items = append(items, struct{ id, label, route string }{groupSectionSettings, "groups.nav.settings", "/settings"})
+		items = append(items, navEntry{groupSectionSettings, "groups.nav.settings", "/settings"})
 	}
 	for _, item := range items {
 		currentSection := section == item.id || (section == groupSectionKinds && item.id == groupSectionSettings) || ((section == groupSectionTeam || section == groupSectionTeamEvents || section == groupSectionTeamCalendar || section == groupSectionTeamInvites) && item.id == groupSectionTeams) || (section == groupSectionResource && item.id == groupSectionResources) || ((section == groupSectionSeason || section == groupSectionCoachBoard) && item.id == groupSectionSeasons) || (section == groupSectionEvent && item.id == groupSectionEvents) ||
 			(item.id == groupSectionCoaches && (section == groupSectionAvailability || section == groupSectionAvailabilityOverview)) ||
 			(section == groupSectionPlanSlot && item.id == groupSectionPlan) ||
 			(section == groupSectionEventGeneration && item.id == groupSectionTrainingPlan)
-		view.Nav = append(view.Nav, GroupNavItem{ID: item.id, Label: h.t(language, item.label), URL: h.groupPath(language, group.Slug, item.route), Current: currentSection})
+		label := h.t(language, item.label)
+		if item.id == groupSectionTeams && teamsName != "" {
+			label = teamsName
+		}
+		view.Nav = append(view.Nav, GroupNavItem{ID: item.id, Label: label, URL: h.groupPath(language, group.Slug, item.route), Current: currentSection})
 	}
 	return view
 }

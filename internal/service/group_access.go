@@ -157,6 +157,21 @@ func (a *GroupAccess) HasRole(role string) bool {
 	return a.IsMember() && slices.Contains(a.roles, role)
 }
 
+// IsFamilyOnly reports whether the member holds only the player and parent
+// roles (and is not a site administrator). Their start page is the calendar
+// and their navigation leaves out the staff pages (#46).
+func (a *GroupAccess) IsFamilyOnly() bool {
+	if !a.IsMember() || a.siteAdmin || len(a.roles) == 0 {
+		return false
+	}
+	for _, role := range a.roles {
+		if role != GroupRolePlayer && role != GroupRoleParent {
+			return false
+		}
+	}
+	return true
+}
+
 // CanManageGroup reports whether the account may change group settings,
 // teams, and member roles (admins, managers, and site administrators).
 func (a *GroupAccess) CanManageGroup() bool {

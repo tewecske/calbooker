@@ -143,6 +143,12 @@ type WeekGridConfig struct {
 	DragHint string
 }
 
+// WeekGridMarker is a colour dot on a grid item.
+type WeekGridMarker struct {
+	Class string
+	Label string
+}
+
 // WeekGridItem is one thing on the grid. Features fill it from their own
 // records; IDs are opaque strings echoed back in change requests.
 type WeekGridItem struct {
@@ -171,6 +177,9 @@ type WeekGridItem struct {
 	// Badges are short texts shown as small badges on the item, for example
 	// "Cancelled" or the viewer's sign-up status.
 	Badges []string
+	// Markers are small colour dots, for example the children an event is
+	// for (#46). Class is a CSS class; Label is the accessible name.
+	Markers []WeekGridMarker
 	// Background items are drawn behind the other items of their column at
 	// the full column width, take no lane, and cannot be moved or clicked
 	// through, for example the resource slots a training plan fills.

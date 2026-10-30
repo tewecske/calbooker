@@ -4,7 +4,7 @@ import { join } from "node:path";
 
 import { expect, type Browser, type BrowserContext, type Page } from "@playwright/test";
 
-import { signInAtProvider, signUpAtProvider, startSignIn, type SignedInUser } from "./auth";
+import { landingPattern, settleOnHome, signInAtProvider, signUpAtProvider, startSignIn, type SignedInUser } from "./auth";
 import { allowExtraTime } from "./backoff";
 import { appURL, clientID, clientName, providerURL, repositoryRoot } from "./env";
 import { uniqueEmail, uniquePassword } from "./names";
@@ -151,7 +151,8 @@ async function restore(context: BrowserContext, page: Page, account: PoolAccount
   if (providerSignedIn) {
     // Silent single sign-on through Hydra; no provider form involved.
     await startSignIn(page);
-    if (page.url() === `${appURL}/en/home`) {
+    if (landingPattern.test(page.url())) {
+      await settleOnHome(page);
       return true;
     }
   }
@@ -168,7 +169,7 @@ async function restore(context: BrowserContext, page: Page, account: PoolAccount
   if (outcome !== "done") {
     throw new Error(`pool sign-in failed at the provider: ${outcome}`);
   }
-  await expect(page).toHaveURL(`${appURL}/en/home`);
+  await settleOnHome(page);
   return true;
 }
 

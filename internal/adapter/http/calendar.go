@@ -44,6 +44,11 @@ type CalendarView struct {
 	TeamOptions     []SelectOptionView
 	ResourceOptions []SelectOptionView
 	KindOptions     []SelectOptionView
+	// Children are the viewer's children with their colours (#46); the
+	// filter and the legend show only when there are some.
+	Children      []CalendarChildView
+	ChildOptions  []SelectOptionView
+	ChildSelected bool
 	// Groups is the group switcher (the viewer's groups, the same week);
 	// empty unless the viewer has more than one group.
 	Groups []CalendarGroupView
@@ -58,6 +63,25 @@ type CalendarGroupView struct {
 	URL     string
 	Current bool
 }
+
+// CalendarChildView is a child with the colour that marks their events.
+// Class is one of the fixed palette classes in static/src/app.css.
+type CalendarChildView struct {
+	Name  string
+	Class string
+}
+
+// calendarChild is a child of the viewer with the teams they play on.
+type calendarChild struct {
+	UserID  int64
+	Name    string
+	Class   string
+	TeamIDs []int64
+}
+
+// calendarChildPalette is the number of child colour classes
+// (child-color-0 ... child-color-7 in static/src/app.css).
+const calendarChildPalette = 8
 
 // CalendarDayView is one day of the day list.
 type CalendarDayView struct {
@@ -87,6 +111,8 @@ type CalendarItemView struct {
 	// Answers are the viewer's own sign-up answer and their children's
 	// (#30), one badge each.
 	Answers []CalendarAnswerView
+	// Children are the viewer's children this event is for (#46).
+	Children []CalendarChildView
 }
 
 // CalendarAnswerView is one answer badge. Label is the status, prefixed
@@ -177,6 +203,10 @@ func (h *groupHandler) loadCalendarScope(writer http.ResponseWriter, request *ht
 	if !ok {
 		return false
 	}
+	children, ok := h.calendarChildren(writer, request, current)
+	if !ok {
+		return false
+	}
 	if id := calendarQueryID(values.Get("team")); id > 0 && slices.ContainsFunc(teamOptions, optionHasValue(id)) {
 		selection.filter.TeamID = id
 	}
@@ -201,19 +231,47 @@ func (h *groupHandler) loadCalendarScope(writer http.ResponseWriter, request *ht
 		value := strconv.FormatInt(kind.ID, 10)
 		page.KindOptions = append(page.KindOptions, SelectOptionView{Value: value, Label: kind.Name(string(language)), Selected: kind.ID == selection.filter.KindID})
 	}
-	page.Filtered = viewerFilter != service.CalendarFilter{}
-	page.PreviousURL = calendarURL(page.BaseURL, week.Previous(), viewerFilter)
-	page.NextURL = calendarURL(page.BaseURL, week.Next(), viewerFilter)
-	page.TodayURL = calendarURL(page.BaseURL, time.Time{}, viewerFilter)
+	// The child filter only offers the viewer's own children; anything else
+	// is dropped. It narrows the list and never widens it.
+	var childFilter *calendarChild
+	if id := calendarQueryID(values.Get("child")); id > 0 {
+		if index := slices.IndexFunc(children, func(child calendarChild) bool { return child.UserID == id }); index >= 0 {
+			childFilter = &children[index]
+		}
+	}
+	for _, child := range children {
+		page.Children = append(page.Children, CalendarChildView{Name: child.Name, Class: child.Class})
+		page.ChildOptions = append(page.ChildOptions, SelectOptionView{Value: strconv.FormatInt(child.UserID, 10), Label: child.Name, Selected: childFilter != nil && childFilter.UserID == child.UserID})
+	}
+	page.ChildSelected = childFilter != nil
+	page.Filtered = viewerFilter != service.CalendarFilter{} || childFilter != nil
+	withChild := func(link string) string {
+		if childFilter == nil {
+			return link
+		}
+		separator := "?"
+		if strings.Contains(link, "?") {
+			separator = "&"
+		}
+		return link + separator + "child=" + strconv.FormatInt(childFilter.UserID, 10)
+	}
+	page.PreviousURL = withChild(calendarURL(page.BaseURL, week.Previous(), viewerFilter))
+	page.NextURL = withChild(calendarURL(page.BaseURL, week.Next(), viewerFilter))
+	page.TodayURL = withChild(calendarURL(page.BaseURL, time.Time{}, viewerFilter))
 	page.ClearURL = calendarURL(page.BaseURL, week.Monday, service.CalendarFilter{})
 
 	shown := service.FilterCalendarEvents(events, selection.filter)
+	if childFilter != nil {
+		shown = slices.DeleteFunc(slices.Clone(shown), func(event service.Event) bool {
+			return !slices.ContainsFunc(event.TeamIDs(), func(id int64) bool { return slices.Contains(childFilter.TeamIDs, id) })
+		})
+	}
 	page.Empty = len(shown) == 0
 	answers, ok := h.calendarAnswers(writer, request, current, week, shown)
 	if !ok {
 		return false
 	}
-	items, days := h.calendarItems(language, group, week, shown, answers)
+	items, days := h.calendarItems(language, group, week, shown, answers, children)
 	grid, err := BuildWeekGrid(calendarGridConfig(week, items, page.PreviousURL, page.NextURL), items, h.renderer.WeekGridTranslator(language))
 	if err != nil {
 		h.renderError(writer, request, http.StatusInternalServerError)
@@ -239,6 +297,53 @@ func (h *groupHandler) loadCalendarScope(writer http.ResponseWriter, request *ht
 	}
 	view.Calendar = page
 	return true
+}
+
+// calendarChildren lists the viewer's children (guardian links only, also
+// for staff who are parents) with a stable colour each: the palette is
+// assigned in order of user ID. Without children, or without the profile use
+// cases, there is nothing to mark.
+func (h *groupHandler) calendarChildren(writer http.ResponseWriter, request *http.Request, current groupRequest) ([]calendarChild, bool) {
+	ids := current.access.ChildUserIDs()
+	if len(ids) == 0 || h.dependencies.Profiles == nil {
+		return nil, true
+	}
+	overview, err := h.dependencies.Profiles.Children(request.Context(), current.access)
+	if err != nil {
+		h.renderLoadError(writer, request, current.language, err)
+		return nil, false
+	}
+	var children []calendarChild
+	for _, entry := range overview.Children {
+		if !current.access.IsGuardianOf(entry.Person.UserID) {
+			continue
+		}
+		child := calendarChild{
+			UserID: entry.Person.UserID,
+			Name:   h.memberLabel(current.language, entry.Person.UserID, entry.Person.DisplayName, entry.Person.Username, nil),
+		}
+		for _, team := range entry.Teams {
+			child.TeamIDs = append(child.TeamIDs, team.ID)
+		}
+		children = append(children, child)
+	}
+	slices.SortFunc(children, func(a, b calendarChild) int { return cmp.Compare(a.UserID, b.UserID) })
+	for index := range children {
+		children[index].Class = "child-color-" + strconv.Itoa(index%calendarChildPalette)
+	}
+	return children, true
+}
+
+// eventChildren are the children whose teams the event is for.
+func eventChildren(event service.Event, children []calendarChild) []CalendarChildView {
+	var marks []CalendarChildView
+	teams := event.TeamIDs()
+	for _, child := range children {
+		if slices.ContainsFunc(child.TeamIDs, func(id int64) bool { return slices.Contains(teams, id) }) {
+			marks = append(marks, CalendarChildView{Name: child.Name, Class: child.Class})
+		}
+	}
+	return marks
 }
 
 // calendarTeamOptions offers the teams the account sees.
@@ -350,7 +455,7 @@ func (h *groupHandler) calendarAnswers(writer http.ResponseWriter, request *http
 
 // calendarItems turns the week's events into grid items (one per event and
 // day) and the day list's entries.
-func (h *groupHandler) calendarItems(language locale.Code, group service.Group, week service.CalendarWeek, events []service.Event, answers map[int64][]CalendarAnswerView) ([]WeekGridItem, [7][]CalendarItemView) {
+func (h *groupHandler) calendarItems(language locale.Code, group service.Group, week service.CalendarWeek, events []service.Event, answers map[int64][]CalendarAnswerView, children []calendarChild) ([]WeekGridItem, [7][]CalendarItemView) {
 	var (
 		items []WeekGridItem
 		days  [7][]CalendarItemView
@@ -358,6 +463,7 @@ func (h *groupHandler) calendarItems(language locale.Code, group service.Group, 
 	cancelled := h.t(language, "events.cancelled")
 	for _, event := range events {
 		row := h.eventRow(language, group.Slug, group.TimeZone, event)
+		marks := eventChildren(event, children)
 		segments := week.Segments(event)
 		for _, segment := range segments {
 			entry := CalendarItemView{
@@ -373,6 +479,7 @@ func (h *groupHandler) calendarItems(language locale.Code, group service.Group, 
 				Place:     row.Place,
 				Cancelled: row.Cancelled,
 				Answers:   answers[event.ID],
+				Children:  marks,
 			}
 			days[segment.Weekday-1] = append(days[segment.Weekday-1], entry)
 			item := WeekGridItem{
@@ -385,6 +492,9 @@ func (h *groupHandler) calendarItems(language locale.Code, group service.Group, 
 				Variant:     calendarVariant(event.KindCode),
 				URL:         row.URL,
 				Muted:       row.Cancelled,
+			}
+			for _, mark := range marks {
+				item.Markers = append(item.Markers, WeekGridMarker{Class: mark.Class, Label: mark.Name})
 			}
 			if row.Cancelled {
 				item.Badges = append(item.Badges, cancelled)

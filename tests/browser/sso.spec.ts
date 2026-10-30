@@ -5,6 +5,7 @@ import {
   becomeGuest,
   createInvite,
   poolUser,
+  landingPattern,
   providerAdmin,
   providerURL,
   signInAtProvider,
@@ -54,7 +55,8 @@ test.describe("single sign-on", () => {
     // Forget the calbooker session only; the provider and Hydra sessions stay.
     await context.clearCookies({ domain: new URL(appURL).hostname });
     await startSignIn(page);
-    await expect(page).toHaveURL(`${appURL}/en/home`);
+    // The start page depends on the account's groups and teams (#46).
+    await expect(page).toHaveURL(landingPattern);
     await context.close();
   });
 
@@ -119,7 +121,8 @@ test.describe("single sign-on", () => {
     await guest.getByTestId("guest-upgrade-sso").click();
     await expect(guest).toHaveURL(`${providerURL}/en/sign-in`);
     await signUpAtProvider(guest, uniqueEmail("calbooker-guest"), uniquePassword());
-    await expect(guest).toHaveURL(`${appURL}/en/home`);
+    // A player in one group, without a team, starts on that group's calendar.
+    await expect(guest).toHaveURL(`${groupURL}/calendar`);
 
     await expect(guest.locator("[data-guest-banner]")).toHaveCount(0);
     await guest.goto(groupURL);

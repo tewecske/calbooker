@@ -65,7 +65,8 @@ test.describe("invites and children", () => {
     await joinWithCode(parent.page, appURL, parentCode);
     await parent.page.waitForURL(groupURL);
     await expect(parent.page.getByTestId("group-viewer-roles")).toHaveText(/Parent/);
-    await parent.page.locator("nav a[data-section=children]").click();
+    // Children is no longer in the menus (#46); the page stays reachable.
+    await parent.page.goto(`${groupURL}/children`);
     await parent.page.locator("#child-new-name").fill("Anna");
     await parent.page.locator("#child-new-birth-year").fill("2016");
     await parent.page.getByRole("button", { name: "Add a child" }).click();

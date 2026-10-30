@@ -375,6 +375,19 @@ get `service.ErrGroupNotFound`, which handlers render as 404.
   the normal event use case and redirects to the event page. Every tab resolves
   the team with `TeamService.BySlug` first (invisible team: 404).
 
+## Start page and role navigation
+
+- `landingRoute` (`internal/adapter/http/landing.go`) decides where the SSO
+  callback sends the browser: one active team, else a player or parent's
+  group calendar, else the group page, else home. `landingFor` collects the
+  account's groups and teams through `GroupAccess` and falls back to home on
+  any failure; only members count a group.
+- The group menu (`groupShell`) is built per role: accounts with only the
+  player and parent roles (`GroupAccess.IsFamilyOnly`) get Calendar, Teams
+  (the team's name and a direct link when they have exactly one team) and
+  Events, without Overview, Members or Children. The Children entry is gone
+  for everyone; its routes remain.
+
 ## Calendar
 
 - `/{language}/groups/{group}/calendar?week=YYYY-MM-DD&team=&resource=&kind=`
@@ -412,6 +425,12 @@ get `service.ErrGroupNotFound`, which handlers render as 404.
   `/{language}/groups/{group}/kinds` (POSTs `/kinds/{events|resources}[/{id}[/archive|/move|/delete]]`)
   for admins and managers; the event `training` kind is protected. Audited as
   `group.event_kind.*` and `group.resource_kind.*`.
+
+  `ProfileService.Children` supplies each child and their teams; events get
+  the dots of the children whose teams they include (`WeekGridItem.Markers`
+  on the grid, `CalendarItemView.Children` in the day list) and the
+  `?child=` filter narrows the visible list. The palette classes live in
+  `static/src/app.css`.
 - Answer badges (#30): the handler asks
   `ParticipationService.CalendarAnswers(access, week.From, week.To)` once per
   page. It returns the viewer's own `event_participants` answers (`signed_up`,

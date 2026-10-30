@@ -83,7 +83,7 @@ func TestTeamEventsTabByRole(t *testing.T) {
 				if !strings.Contains(body, `action="/en/groups/lions/teams/t4/events"`) {
 					t.Error("create form does not post to the team's events")
 				}
-				if !strings.Contains(body, `id="event-new-team-4" class="checkbox" type="checkbox" name="team_id" value="4" checked`) || strings.Contains(body, `value="5" checked`) {
+				if !strings.Contains(body, `<option value="4" selected>`) || strings.Contains(body, `<option value="5" selected>`) {
 					t.Error("create form should preselect only the team")
 				}
 			}

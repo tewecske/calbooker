@@ -26,6 +26,7 @@
     "teams.roster.parent_of": {"text": "Szülője:"},
     "teams.tab.roster": {"text": "Névsor"},
     "teams.tab.events": {"text": "Események"},
+    "teams.tab.invites": {"text": "Meghívók"},
     "teams.tab.calendar": {"text": "Naptár"},
     "teams.roster.parents_label": {"text": "Szülők:"},
     "teams.edit": {"text": "Csapat szerkesztése"},

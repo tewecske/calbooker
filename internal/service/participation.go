@@ -18,13 +18,17 @@ const (
 	// ParticipantDeclined is "Can't come", or a nominated player who opted
 	// out.
 	ParticipantDeclined = "declined"
-	// ParticipantNominated is a player picked by a coach.
+	// ParticipantNominated is a player picked by a coach. A called-up
+	// player (Participant.CalledUp) is nominated too.
 	ParticipantNominated = "nominated"
+	// ParticipantLeftOut is a player of the event's teams a coach left out
+	// (#47).
+	ParticipantLeftOut = "left_out"
 )
 
 // ParticipantStatuses returns every answer in display order.
 func ParticipantStatuses() []string {
-	return []string{ParticipantSignedUp, ParticipantNominated, ParticipantDeclined}
+	return []string{ParticipantSignedUp, ParticipantNominated, ParticipantDeclined, ParticipantLeftOut}
 }
 
 // Stable participation audit action codes; the group is the target. Only
@@ -35,6 +39,8 @@ const (
 	AuditActionParticipantUpdated   = "group.event.participant_updated"
 	AuditActionParticipantRemoved   = "group.event.participant_removed"
 	AuditActionAttendanceRecorded   = "group.event.attendance_recorded"
+	AuditActionParticipantCalledUp  = "group.event.participant_called_up"
+	AuditActionParticipantLeftOut   = "group.event.participant_left_out"
 )
 
 // maxAttendanceMarks bounds one attendance submission.
@@ -76,9 +82,12 @@ var (
 // Participant is one member's row for one event: the answer and, after the
 // event, the confirmed attendance (nil until a coach confirms it).
 type Participant struct {
-	EventID   int64
-	UserID    int64
-	Status    string
+	EventID int64
+	UserID  int64
+	Status  string
+	// CalledUp: a coach called the player up for this event from outside its
+	// teams (#47). The status is nominated, or declined after an opt-out.
+	CalledUp  bool
 	Attended  *bool
 	UpdatedBy *int64
 	UpdatedAt int64
@@ -176,6 +185,14 @@ type ParticipantRepository interface {
 	// events of the group that overlap [from, to), with the members' names,
 	// ordered by event and member.
 	ListAnswers(ctx context.Context, groupID int64, userIDs []int64, from, to time.Time) ([]CalendarAnswer, error)
+	// ListOverlaps returns the user's other events of the group that overlap
+	// [from, to), not cancelled, excluding excludeEventID: events the user
+	// is signed up or called up for, and events of the user's teams the user
+	// has not declined or been left out of. Earliest first.
+	ListOverlaps(ctx context.Context, groupID, userID int64, from, to time.Time, excludeEventID int64) ([]OverlapEvent, error)
+	// CalledUpEventIDs returns the events of the group the users are called
+	// up for (rows with called_up), for event visibility.
+	CalledUpEventIDs(ctx context.Context, groupID int64, userIDs []int64) ([]int64, error)
 }
 
 // ParticipationEvents is the part of EventService participation uses.
@@ -208,6 +225,9 @@ type ParticipationRoster struct {
 	// WalkIns are the group's other players, offered as walk-ins while
 	// attendance is open.
 	WalkIns []EventPlayer
+	// CallUps are the group's players outside the event's teams without a
+	// row, offered to the event's coaches while the event has not started.
+	CallUps []EventPlayer
 }
 
 // ParticipationEntry is one player on the list.
@@ -215,8 +235,10 @@ type ParticipationEntry struct {
 	Player EventPlayer
 	// OnEventTeam: the player plays on one of the event's teams.
 	OnEventTeam bool
-	Status      string
-	Attended    *bool
+	// CalledUp: a coach called the player up from outside the event's teams.
+	CalledUp bool
+	Status   string
+	Attended *bool
 	// Self: the account itself; Child: a linked child of the account.
 	Self  bool
 	Child bool
@@ -316,16 +338,19 @@ func (s *ParticipationService) Roster(ctx context.Context, access *GroupAccess, 
 			if roster.AttendanceOpen && player.IsPlayer {
 				roster.WalkIns = append(roster.WalkIns, player)
 			}
+			if roster.CanManage && player.IsPlayer && (roster.Phase == ParticipationOpen || roster.Phase == ParticipationClosed) {
+				roster.CallUps = append(roster.CallUps, player)
+			}
 			continue
 		}
-		entry := ParticipationEntry{Player: player, OnEventTeam: onTeam, Self: player.UserID == access.UserID(), Child: access.IsGuardianOf(player.UserID)}
+		entry := ParticipationEntry{Player: player, OnEventTeam: onTeam, CalledUp: hasRow && row.CalledUp, Self: player.UserID == access.UserID(), Child: access.IsGuardianOf(player.UserID)}
 		var current *Participant
 		if hasRow {
 			entry.Status, entry.Attended = row.Status, row.Attended
 			current = &row
 		}
 		manage := roster.CanManage
-		if onTeam && (manage || access.CanRespondFor(event, player.UserID)) {
+		if (onTeam || entry.CalledUp) && (manage || access.CanRespondFor(event, player.UserID)) {
 			for _, status := range ParticipantStatuses() {
 				if status != entry.Status && checkParticipation(state, now, current, roster.Taken, status, manage) == nil {
 					entry.Choices = append(entry.Choices, status)
@@ -372,9 +397,12 @@ func (s *ParticipationService) Respond(ctx context.Context, actor GroupActor, ev
 		return nil, fmt.Errorf("list event players: %w", err)
 	}
 	teams := event.TeamIDs()
-	if !slices.ContainsFunc(players, func(player EventPlayer) bool {
+	onTeam := slices.ContainsFunc(players, func(player EventPlayer) bool {
 		return player.UserID == userID && player.IsPlayer && slices.ContainsFunc(player.TeamIDs, func(id int64) bool { return slices.Contains(teams, id) })
-	}) {
+	})
+	// Only players of the event's teams are left out; players of other
+	// teams answer only when a coach called them up (checked on the row).
+	if status == ParticipantLeftOut && !onTeam {
 		return nil, ErrParticipantNotEligible
 	}
 	now := s.now()
@@ -383,6 +411,9 @@ func (s *ParticipationService) Respond(ctx context.Context, actor GroupActor, ev
 	changed := false
 	written, err := s.participants.ChangeParticipant(ctx, access.GroupID(), event.ID, userID, func(state ParticipationState) (*Participant, error) {
 		previous, changed = state.Current, false
+		if !onTeam && (state.Current == nil || !state.Current.CalledUp) {
+			return nil, ErrParticipantNotEligible
+		}
 		if err := checkParticipation(state.Event, now, state.Current, state.Taken, status, manage); err != nil {
 			return nil, err
 		}
@@ -398,14 +429,14 @@ func (s *ParticipationService) Respond(ctx context.Context, actor GroupActor, ev
 			if state.Current != nil && state.Current.Attended != nil {
 				// Attendance is kept; only the answer goes.
 				row := *state.Current
-				row.Status, row.UpdatedBy, row.UpdatedAt = "", &actorID, now.Unix()
+				row.Status, row.CalledUp, row.UpdatedBy, row.UpdatedAt = "", false, &actorID, now.Unix()
 				return &row, nil
 			}
 			return nil, nil
 		}
 		row := Participant{EventID: event.ID, UserID: userID, Status: status, UpdatedBy: &actorID, UpdatedAt: now.Unix()}
 		if state.Current != nil {
-			row.Attended = state.Current.Attended
+			row.Attended, row.CalledUp = state.Current.Attended, state.Current.CalledUp
 		}
 		return &row, nil
 	})
@@ -419,6 +450,8 @@ func (s *ParticipationService) Respond(ctx context.Context, actor GroupActor, ev
 			action = AuditActionParticipantRemoved
 		case status == ParticipantNominated:
 			action = AuditActionParticipantNominated
+		case status == ParticipantLeftOut:
+			action = AuditActionParticipantLeftOut
 		}
 		from := "none"
 		if previous != nil && previous.Status != "" {
@@ -431,6 +464,89 @@ func (s *ParticipationService) Respond(ctx context.Context, actor GroupActor, ev
 		s.record(ctx, actor, action, event, "member "+strconv.FormatInt(userID, 10)+": "+from+" to "+to)
 	}
 	return written, nil
+}
+
+// OverlapEvent is another event of a player that overlaps an event in time:
+// one the player is signed up or called up for, or one of the player's
+// teams that the player has not declined or been left out of.
+type OverlapEvent struct {
+	EventID  int64
+	Title    string
+	StartsAt time.Time
+	EndsAt   time.Time
+}
+
+// CallUpResult is the outcome of a call-up: the player's row and the
+// player's other events at the same time (a warning, never a block).
+type CallUpResult struct {
+	Participant *Participant
+	Overlaps    []OverlapEvent
+}
+
+// CallUp calls a player of the group up for the event (#47): a nomination
+// across teams. Only staff and the event's coaches, any mode, only for a
+// player who does not play on the event's teams (team players are nominated
+// or answer as usual), until the event starts, never for a cancelled event.
+// The place counts against the participant limit, but the limit does not
+// stop a call-up. The called-up player and linked parents then see the event.
+// Overlapping events of the player are returned as a warning.
+func (s *ParticipationService) CallUp(ctx context.Context, actor GroupActor, eventID, userID int64) (CallUpResult, error) {
+	if err := s.validate(ctx); err != nil {
+		return CallUpResult{}, err
+	}
+	access := actor.Access
+	if !access.CanView() {
+		return CallUpResult{}, ErrGroupNotFound
+	}
+	detail, err := s.events.Detail(ctx, access, eventID)
+	if err != nil {
+		return CallUpResult{}, err
+	}
+	event := detail.Event
+	if !access.CanManageParticipants(event, teamCoachIDs(detail)) {
+		return CallUpResult{}, ErrGroupForbidden
+	}
+	players, err := s.participants.ListEventPlayers(ctx, access.GroupID(), event.ID)
+	if err != nil {
+		return CallUpResult{}, fmt.Errorf("list event players: %w", err)
+	}
+	teams := event.TeamIDs()
+	if !slices.ContainsFunc(players, func(player EventPlayer) bool {
+		return player.UserID == userID && player.IsPlayer && !slices.ContainsFunc(player.TeamIDs, func(id int64) bool { return slices.Contains(teams, id) })
+	}) {
+		return CallUpResult{}, ErrParticipantNotEligible
+	}
+	now := s.now()
+	actorID := access.UserID()
+	changed := false
+	written, err := s.participants.ChangeParticipant(ctx, access.GroupID(), event.ID, userID, func(state ParticipationState) (*Participant, error) {
+		changed = false
+		switch {
+		case state.Event.Cancelled:
+			return nil, ErrParticipationCancelled
+		case !now.Before(state.Event.StartsAt):
+			return nil, ErrParticipationStarted
+		case state.Current != nil && state.Current.CalledUp:
+			return state.Current, nil
+		}
+		changed = true
+		row := Participant{EventID: event.ID, UserID: userID, Status: ParticipantNominated, CalledUp: true, UpdatedBy: &actorID, UpdatedAt: now.Unix()}
+		if state.Current != nil {
+			row.Attended = state.Current.Attended
+		}
+		return &row, nil
+	})
+	if err != nil {
+		return CallUpResult{}, mapParticipationError("call up participant", err)
+	}
+	result := CallUpResult{Participant: written}
+	if changed {
+		s.record(ctx, actor, AuditActionParticipantCalledUp, event, "member "+strconv.FormatInt(userID, 10))
+		if result.Overlaps, err = s.participants.ListOverlaps(ctx, access.GroupID(), userID, event.StartsAt, event.EndsAt, event.ID); err != nil {
+			return CallUpResult{}, fmt.Errorf("list overlapping events: %w", err)
+		}
+	}
+	return result, nil
 }
 
 // RecordAttendance confirms who attended the event: marks for players on the
@@ -608,7 +724,25 @@ func checkParticipation(event ParticipationEvent, now time.Time, current *Partic
 		return nil
 	}
 	nominated := event.SignupMode == EventSignupNominated
+	if current != nil && current.CalledUp {
+		// A called-up row follows the same rules in every sign-up mode: the
+		// player opts out and may take the place back.
+		switch {
+		case manage && (status == "" || status == ParticipantNominated || status == ParticipantDeclined):
+		case !manage && status == ParticipantDeclined && countsAgainstLimit(from):
+		case !manage && status == ParticipantNominated && from == ParticipantDeclined:
+		default:
+			return ErrInvalidParticipantStatus
+		}
+		if !manage && countsAgainstLimit(status) && !countsAgainstLimit(from) && event.MaxParticipants != nil && taken >= *event.MaxParticipants {
+			return ErrEventFull
+		}
+		return nil
+	}
 	switch {
+	case from == ParticipantLeftOut && !manage:
+		return ErrInvalidParticipantStatus
+	case manage && status == ParticipantLeftOut:
 	case manage && status == "":
 	case manage && nominated && (status == ParticipantNominated || status == ParticipantDeclined):
 	case manage && !nominated && (status == ParticipantSignedUp || status == ParticipantDeclined):

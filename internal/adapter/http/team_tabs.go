@@ -9,11 +9,12 @@ import (
 
 // Team page tabs. The roster is the team page itself; Events and Calendar
 // reuse the group's event list and weekly calendar with the team fixed.
-// Later tabs (invites, #47) join the list in teamTabs.
+// The Invites tab (#47) shows for staff and the team's coaches.
 const (
 	teamTabRoster   = "roster"
 	teamTabEvents   = "events"
 	teamTabCalendar = "calendar"
+	teamTabInvites  = "invites"
 )
 
 // TeamTabsView is the submenu of a team page.
@@ -39,6 +40,9 @@ func (h *groupHandler) teamTabs(current groupRequest, team service.Team, active 
 		{ID: teamTabRoster, Label: h.t(language, "teams.tab.roster"), URL: base},
 		{ID: teamTabEvents, Label: h.t(language, "teams.tab.events"), URL: base + "/events"},
 		{ID: teamTabCalendar, Label: h.t(language, "teams.tab.calendar"), URL: base + "/calendar"},
+	}
+	if h.dependencies.Invites != nil && !team.Archived() && current.access.CanCreateInvite(service.GroupRolePlayer, team.ID) {
+		tabs = append(tabs, TeamTabView{ID: teamTabInvites, Label: h.t(language, "teams.tab.invites"), URL: base + "/invites"})
 	}
 	for index := range tabs {
 		tabs[index].Current = tabs[index].ID == active
@@ -99,6 +103,10 @@ func (h *groupHandler) loadTeamTab(writer http.ResponseWriter, request *http.Req
 	if err != nil {
 		h.renderLoadError(writer, request, current.language, err)
 		return false
+	}
+	if section == groupSectionTeamInvites {
+		view.TeamTabs = h.teamTabs(current, team, teamTabInvites)
+		return h.loadTeamInvitesTab(writer, request, current, team, form, view)
 	}
 	if section == groupSectionTeamCalendar {
 		view.TeamTabs = h.teamTabs(current, team, teamTabCalendar)

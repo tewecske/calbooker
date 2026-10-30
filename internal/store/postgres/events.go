@@ -114,11 +114,12 @@ func (r *EventRepository) ListEvents(ctx context.Context, groupID int64, query s
 			AND ($6::bigint = 0 OR e.id <> $6::bigint)
 			AND ($7::boolean
 				OR EXISTS (SELECT 1 FROM event_teams et WHERE et.event_id = e.id AND et.team_id = ANY($8::bigint[]))
-				OR EXISTS (SELECT 1 FROM event_coaches ec WHERE ec.event_id = e.id AND ec.coach_user_id = $9::bigint))
+				OR EXISTS (SELECT 1 FROM event_coaches ec WHERE ec.event_id = e.id AND ec.coach_user_id = $9::bigint)
+				OR e.id = ANY($11::bigint[]))
 		ORDER BY e.starts_at `+order+`, e.id `+order+`
 		LIMIT $10
 	`, groupID, nullableInstant(query.From), nullableInstant(query.To), query.TeamID, query.ActiveOnly, query.ExcludeID,
-		scope.All, teamIDs, scope.UserID, limit)
+		scope.All, teamIDs, scope.UserID, limit, idsOrEmpty(scope.EventIDs))
 }
 
 // UpdateEvent writes the event at the expected revision and replaces its

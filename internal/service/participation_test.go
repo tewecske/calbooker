@@ -34,6 +34,9 @@ type participantRepositoryStub struct {
 	rows    map[int64]Participant
 	records []AttendanceRecord
 	changes int
+	// overlaps are the overlapping events returned per user (#47).
+	overlaps       map[int64][]OverlapEvent
+	overlapQueries []int64
 }
 
 func (r *participantRepositoryStub) ListEventPlayers(_ context.Context, groupID, _ int64) ([]EventPlayer, error) {
@@ -148,6 +151,25 @@ func (r *participantRepositoryStub) ListAnswers(_ context.Context, _ int64, user
 		}
 	}
 	return answers, nil
+}
+
+func (r *participantRepositoryStub) ListOverlaps(_ context.Context, _, userID int64, _, _ time.Time, excludeEventID int64) ([]OverlapEvent, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.overlapQueries = append(r.overlapQueries, userID)
+	return slices.Clone(r.overlaps[userID]), nil
+}
+
+func (r *participantRepositoryStub) CalledUpEventIDs(_ context.Context, _ int64, userIDs []int64) ([]int64, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	ids := make([]int64, 0)
+	for _, row := range r.rows {
+		if row.CalledUp && slices.Contains(userIDs, row.UserID) {
+			ids = append(ids, row.EventID)
+		}
+	}
+	return ids, nil
 }
 
 type participationSetup struct {
@@ -626,7 +648,7 @@ func TestParticipationRoster(t *testing.T) {
 		t.Fatalf("coach roster = %+v", managed)
 	}
 	for _, entry := range managed.Entries {
-		if entry.Player.UserID == 22 && (!entry.CanRemove || !slices.Equal(entry.Choices, []string{ParticipantDeclined})) {
+		if entry.Player.UserID == 22 && (!entry.CanRemove || !slices.Equal(entry.Choices, []string{ParticipantDeclined, ParticipantLeftOut})) {
 			t.Fatalf("coach entry = %+v", entry)
 		}
 	}

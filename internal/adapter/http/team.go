@@ -128,6 +128,9 @@ type TeamDetailView struct {
 	// Coaches is the season coaches card; nil when the account sees no
 	// season and cannot assign coaches.
 	Coaches *TeamCoachesView
+	// Invites is the invite card (#47); nil when the account may not invite
+	// to the team.
+	Invites *TeamInvitesView
 }
 
 // RosterRowView is one player or parent on a team.
@@ -167,6 +170,7 @@ func registerTeamRoutes(mux *http.ServeMux, groups *groupHandler) {
 		mux.HandleFunc("GET "+prefix+"/groups/{group}/teams/{team}/calendar", groups.teamCalendar)
 		mux.HandleFunc("POST "+prefix+"/groups/{group}/teams/{team}/roster/add", groups.addToRoster)
 		mux.HandleFunc("POST "+prefix+"/groups/{group}/teams/{team}/roster/remove", groups.removeFromRoster)
+		registerTeamInviteRoutesFor(mux, prefix, groups)
 	}
 }
 
@@ -385,7 +389,7 @@ func (h *groupHandler) loadTeam(writer http.ResponseWriter, request *http.Reques
 		team.Description = *detail.Team.Description
 	}
 	if team.CanEdit {
-		team.EditForm = h.teamFormView(current, "team-edit", base, &detail.Team, form)
+		team.EditForm = h.teamFormView(current, "team-edit", base, &detail.Team, teamFormData(form))
 	}
 	csrf := csrfToken(request)
 	team.PlayerList = RosterListView{CanManage: team.CanManageRoster, RemoveURL: team.RosterRemoveURL, RemoveLabel: h.t(language, "teams.roster.remove"), EmptyLabel: h.t(language, "teams.roster.no_players"), ParentsLabel: h.t(language, "teams.roster.parents_label"), CSRFToken: csrf}

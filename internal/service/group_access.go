@@ -74,6 +74,10 @@ type GroupAccessGrants struct {
 	ChildTeamIDs []int64
 	// ChildUserIDs are the members the account is a guardian of.
 	ChildUserIDs []int64
+	// CalledUpEventIDs are the events the member or one of their children is
+	// called up for (#47): the member sees them although they are not events
+	// of a visible team.
+	CalledUpEventIDs []int64
 }
 
 // GroupAccess is the single authorization point for one account in one
@@ -89,6 +93,7 @@ type GroupAccess struct {
 	coached   []int64
 	children  []int64
 	childIDs  []int64
+	calledUp  []int64
 }
 
 // NewGroupAccess builds the access of userID in groupID from its grants.
@@ -103,6 +108,7 @@ func NewGroupAccess(groupID, userID int64, grants GroupAccessGrants) *GroupAcces
 		coached:   slices.Clone(grants.CoachedTeamIDs),
 		children:  slices.Clone(grants.ChildTeamIDs),
 		childIDs:  slices.Clone(grants.ChildUserIDs),
+		calledUp:  slices.Clone(grants.CalledUpEventIDs),
 	}
 }
 
@@ -315,7 +321,9 @@ func (a *GroupAccess) CanEditEvent(event Event) bool {
 // CanViewEvent reports whether the event is visible (the Visibility rule):
 // admins, managers, and site administrators see every event; others see the
 // events of their own teams, the teams they coach, their children's teams,
-// and the events they are an extra coach of.
+// the events they are an extra coach of, and the events they or their
+// children are called up for (#47). A call-up shows that one event only, not
+// the called-up player's access to its teams.
 func (a *GroupAccess) CanViewEvent(event Event) bool {
 	if !a.CanView() || event.GroupID != a.groupID {
 		return false
@@ -329,7 +337,16 @@ func (a *GroupAccess) CanViewEvent(event Event) bool {
 			return true
 		}
 	}
-	return a.IsMember() && slices.Contains(event.CoachUserIDs(), a.userID)
+	return a.IsMember() && (slices.Contains(event.CoachUserIDs(), a.userID) || slices.Contains(a.calledUp, event.ID))
+}
+
+// CalledUpEventIDs returns the events the member or their children are
+// called up for.
+func (a *GroupAccess) CalledUpEventIDs() []int64 {
+	if !a.IsMember() {
+		return nil
+	}
+	return slices.Clone(a.calledUp)
 }
 
 // CanViewCoaches reports whether the account sees the coaches page: staff
@@ -489,6 +506,11 @@ type TeamRelationSource interface {
 	TeamIDs(ctx context.Context, groupID, userID int64) ([]int64, error)
 }
 
+// CallUpSource lists the events users are called up for (#47).
+type CallUpSource interface {
+	CalledUpEventIDs(ctx context.Context, groupID int64, userIDs []int64) ([]int64, error)
+}
+
 // ChildRelationSource lists a parent's children and, through TeamIDs, the
 // teams on which those children play (guardians).
 type ChildRelationSource interface {
@@ -518,6 +540,7 @@ type GroupAccessService struct {
 	users      UserRepository
 	coached    TeamRelationSource
 	children   ChildRelationSource
+	callUps    CallUpSource
 }
 
 // NewGroupAccessService constructs the access builder.
@@ -544,6 +567,14 @@ func (s *GroupAccessService) SetCoachedTeams(source TeamRelationSource) {
 func (s *GroupAccessService) SetChildTeams(source ChildRelationSource) {
 	if s != nil {
 		s.children = source
+	}
+}
+
+// SetCallUps attaches the source of call-ups. It is intended to be called
+// once during startup.
+func (s *GroupAccessService) SetCallUps(source CallUpSource) {
+	if s != nil {
+		s.callUps = source
 	}
 }
 
@@ -597,6 +628,12 @@ func (s *GroupAccessService) For(ctx context.Context, userID, groupID int64) (*G
 			if grants.ChildTeamIDs, err = s.children.TeamIDs(ctx, groupID, userID); err != nil {
 				return nil, fmt.Errorf("find children's teams: %w", err)
 			}
+		}
+	}
+	if grants.Member && s.callUps != nil && (slices.Contains(grants.Roles, GroupRolePlayer) || len(grants.ChildUserIDs) > 0) {
+		ids := append([]int64{userID}, grants.ChildUserIDs...)
+		if grants.CalledUpEventIDs, err = s.callUps.CalledUpEventIDs(ctx, groupID, ids); err != nil {
+			return nil, fmt.Errorf("find call-ups: %w", err)
 		}
 	}
 	return NewGroupAccess(groupID, userID, grants), nil

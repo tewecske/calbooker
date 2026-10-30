@@ -1,4 +1,4 @@
-{{define "participant-status-badge"}}<span class="badge badge-soft badge-sm{{if eq .Status "signed_up"}} badge-success{{else if eq .Status "nominated"}} badge-info{{else if eq .Status "declined"}} badge-error{{end}}" data-testid="participant-status">{{.StatusLabel}}</span>{{end}}
+{{define "participant-status-badge"}}<span class="badge badge-soft badge-sm{{if eq .Status "signed_up"}} badge-success{{else if eq .Status "nominated"}} badge-info{{else if eq .Status "declined"}} badge-error{{else if eq .Status "left_out"}} badge-warning{{end}}" data-testid="participant-status">{{.StatusLabel}}</span>{{end}}
 
 {{define "event-participation"}}
   {{with .Group}}{{$L := .L}}{{with .Event}}{{with .Participation}}{{$respond := .RespondURL}}
@@ -27,7 +27,7 @@
                       {{if .Child}} <span class="badge badge-secondary badge-soft badge-xs">{{$L.participation_your_child}}</span>{{end}}
                       {{if .Guest}} <span class="badge badge-ghost badge-xs">{{$L.participation_guest}}</span>{{end}}
                       {{if .Profile}} <span class="badge badge-ghost badge-xs">{{$L.participation_profile}}</span>{{end}}
-                      {{if not .OnEventTeam}} <span class="badge badge-ghost badge-xs">{{$L.participation_other_team}}</span>{{end}}
+                      {{if .CalledUp}} <span class="badge badge-accent badge-soft badge-xs" data-testid="participant-called-up">{{$L.participation_called_up_badge}}</span>{{else if not .OnEventTeam}} <span class="badge badge-ghost badge-xs">{{$L.participation_other_team}}</span>{{end}}
                     </td>
                     {{if $.Group.Event.Participation.ShowEmails}}<td>{{.Email}}</td>{{end}}
                     <td>{{template "participant-status-badge" .}}</td>
@@ -61,6 +61,22 @@
           </div>
         {{else}}
           <p class="text-sm opacity-70" data-testid="participation-empty">{{$L.participation_empty}}</p>
+        {{end}}
+
+        {{if .CallUps}}
+          <div class="divider"></div>
+          <form class="grid gap-4 sm:grid-cols-[1fr_auto] sm:items-end" method="post" action="{{.CallUpURL}}" hx-post="{{.CallUpURL}}" hx-target="#page-content" hx-swap="outerHTML" hx-disabled-elt="this" data-testid="call-up-form">
+            <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
+            <fieldset class="fieldset">
+              <legend class="fieldset-legend">{{$L.participation_call_up_heading}}</legend>
+              <label class="label whitespace-normal" for="call-up-player">{{$L.participation_call_up_help}}</label>
+              <select id="call-up-player" class="select w-full" name="user_id" required>
+                <option value="">{{$L.participation_call_up_none}}</option>
+                {{range .CallUps}}<option value="{{.Value}}">{{.Label}}</option>{{end}}
+              </select>
+            </fieldset>
+            <div><button class="btn" type="submit">{{$L.participation_call_up_submit}}</button></div>
+          </form>
         {{end}}
 
         {{if .AttendanceOpen}}

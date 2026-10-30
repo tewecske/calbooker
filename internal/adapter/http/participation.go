@@ -18,6 +18,8 @@ type ParticipationUseCases interface {
 	Roster(ctx context.Context, access *service.GroupAccess, detail service.EventDetail) (service.ParticipationRoster, error)
 	Respond(ctx context.Context, actor service.GroupActor, eventID, userID int64, status string) (*service.Participant, error)
 	RecordAttendance(ctx context.Context, actor service.GroupActor, eventID int64, marks []service.AttendanceMark) error
+	// CallUp calls a player outside the event's teams up for the event (#47).
+	CallUp(ctx context.Context, actor service.GroupActor, eventID, userID int64) (service.CallUpResult, error)
 	// CalendarAnswers returns the viewer's own answers and their children's
 	// for the events overlapping [from, to) (#30).
 	CalendarAnswers(ctx context.Context, access *service.GroupAccess, from, to time.Time) ([]service.CalendarAnswer, error)
@@ -30,12 +32,15 @@ type ParticipationView struct {
 	Summary            string
 	RespondURL         string
 	AttendanceURL      string
+	CallUpURL          string
 	CanManage          bool
 	ShowEmails         bool
 	AttendanceOpen     bool
 	AttendanceRecorded bool
 	Entries            []ParticipantView
 	WalkIns            []SelectOptionView
+	// CallUps are the players a coach can call up for the event.
+	CallUps []SelectOptionView
 }
 
 // ParticipantView is one player on an event's participant list.
@@ -48,6 +53,7 @@ type ParticipantView struct {
 	Self        bool
 	Child       bool
 	OnEventTeam bool
+	CalledUp    bool
 	Status      string
 	StatusLabel string
 	// Attendance is "yes", "no", or "" (not confirmed).
@@ -74,6 +80,7 @@ func registerParticipationRoutes(mux *http.ServeMux, groups *groupHandler) {
 	for _, prefix := range localizedPrefixes() {
 		mux.HandleFunc("POST "+prefix+"/groups/{group}/events/{eventID}/participation", groups.respondToEvent)
 		mux.HandleFunc("POST "+prefix+"/groups/{group}/events/{eventID}/attendance", groups.recordAttendance)
+		mux.HandleFunc("POST "+prefix+"/groups/{group}/events/{eventID}/call-up", groups.callUpPlayer)
 	}
 }
 
@@ -99,6 +106,33 @@ func (h *groupHandler) respondToEvent(writer http.ResponseWriter, request *http.
 		return
 	}
 	h.renderSection(writer, request, current, groupSectionEvent, eventID, FormData{}, []Alert{{Level: "success", Message: h.t(current.language, "participation.saved")}}, http.StatusOK)
+}
+
+func (h *groupHandler) callUpPlayer(writer http.ResponseWriter, request *http.Request) {
+	current, eventID, ok := h.participationRequest(writer, request)
+	if !ok {
+		return
+	}
+	_ = request.ParseForm()
+	userID, err := strconv.ParseInt(strings.TrimSpace(request.PostFormValue("user_id")), 10, 64)
+	if err != nil || userID <= 0 {
+		h.renderWriteError(writer, request, current, groupSectionEvent, eventID, service.ErrParticipantNotEligible, FormData{})
+		return
+	}
+	result, err := h.dependencies.Participation.CallUp(request.Context(), current.actor(), eventID, userID)
+	if err != nil {
+		h.renderWriteError(writer, request, current, groupSectionEvent, eventID, err, FormData{})
+		return
+	}
+	alerts := []Alert{{Level: "success", Message: h.t(current.language, "participation.call_up.done")}}
+	if len(result.Overlaps) > 0 {
+		titles := make([]string, 0, len(result.Overlaps))
+		for _, overlap := range result.Overlaps {
+			titles = append(titles, overlap.Title)
+		}
+		alerts = append(alerts, Alert{Level: "warning", Message: h.translate(current.language, "participation.call_up.overlap", map[string]string{"events": strings.Join(titles, ", ")})})
+	}
+	h.renderSection(writer, request, current, groupSectionEvent, eventID, FormData{}, alerts, http.StatusOK)
 }
 
 func (h *groupHandler) recordAttendance(writer http.ResponseWriter, request *http.Request) {
@@ -178,6 +212,7 @@ func (h *groupHandler) participationView(language locale.Code, eventURL string, 
 		PhaseLabel:         h.t(language, "participation.phase."+roster.Phase),
 		RespondURL:         eventURL + "/participation",
 		AttendanceURL:      eventURL + "/attendance",
+		CallUpURL:          eventURL + "/call-up",
 		CanManage:          roster.CanManage,
 		ShowEmails:         roster.ShowEmails,
 		AttendanceOpen:     roster.AttendanceOpen,
@@ -199,6 +234,7 @@ func (h *groupHandler) participationView(language locale.Code, eventURL string, 
 			Self:        entry.Self,
 			Child:       entry.Child,
 			OnEventTeam: entry.OnEventTeam,
+			CalledUp:    entry.CalledUp,
 			Status:      entry.Status,
 			CanRemove:   entry.CanRemove,
 		}
@@ -206,6 +242,8 @@ func (h *groupHandler) participationView(language locale.Code, eventURL string, 
 			row.Email = *player.Email
 		}
 		switch {
+		case entry.CalledUp && entry.Status == service.ParticipantNominated:
+			row.StatusLabel = h.t(language, "participation.status.called_up")
 		case entry.Status != "":
 			row.StatusLabel = h.t(language, "participation.status."+entry.Status)
 		case entry.Attended != nil:
@@ -234,12 +272,17 @@ func (h *groupHandler) participationView(language locale.Code, eventURL string, 
 				Primary:   status != service.ParticipantDeclined,
 			})
 		}
-		if nominated {
+		if entry.CalledUp {
+			row.RemoveLabel = h.t(language, "participation.remove_call_up")
+		} else if nominated {
 			row.RemoveLabel = h.t(language, "participation.remove_nomination")
 		} else {
 			row.RemoveLabel = h.t(language, "participation.remove")
 		}
 		view.Entries = append(view.Entries, row)
+	}
+	for _, player := range roster.CallUps {
+		view.CallUps = append(view.CallUps, SelectOptionView{Value: strconv.FormatInt(player.UserID, 10), Label: h.memberLabel(language, player.UserID, player.DisplayName, player.Username, nil)})
 	}
 	for _, player := range roster.WalkIns {
 		view.WalkIns = append(view.WalkIns, SelectOptionView{Value: strconv.FormatInt(player.UserID, 10), Label: h.memberLabel(language, player.UserID, player.DisplayName, player.Username, nil)})

@@ -160,6 +160,39 @@ func TestInviteRepositoryRedeemGrantsRoleAndTeam(t *testing.T) {
 	if _, err := invites.RedeemInvite(ctx, 9_000_000, guestID, 202); !errors.Is(err, service.ErrGroupInviteNotFound) {
 		t.Fatalf("RedeemInvite(unknown) error = %v", err)
 	}
+
+	// A second team invite adds the player to a second team (#47), and a team
+	// invite for the parent role puts the parent on that team's roster.
+	tigers, err := teams.CreateTeam(ctx, service.Team{GroupID: group.ID, Name: "Tigers", BirthYearFrom: 2017, BirthYearTo: 2017, CreatedAt: 103})
+	if err != nil {
+		t.Fatalf("CreateTeam(tigers) error = %v", err)
+	}
+	second, err := invites.CreateInvite(ctx, service.GroupInvite{GroupID: group.ID, Code: "PLAYERTEAM33", Role: service.GroupRolePlayer, TeamID: &tigers.ID, CreatedAt: 104})
+	if err != nil {
+		t.Fatalf("CreateInvite(second team) error = %v", err)
+	}
+	secondParent, err := invites.CreateInvite(ctx, service.GroupInvite{GroupID: group.ID, Code: "PARENTTEAM33", Role: service.GroupRoleParent, TeamID: &tigers.ID, CreatedAt: 104})
+	if err != nil {
+		t.Fatalf("CreateInvite(second team parent) error = %v", err)
+	}
+	for _, invite := range []service.GroupInvite{second, secondParent} {
+		if redeemed, err := invites.RedeemInvite(ctx, invite.ID, guestID, 203); err != nil || !redeemed.Changed || redeemed.TeamID != tigers.ID {
+			t.Fatalf("RedeemInvite(%s) = %+v, %v", invite.Role, redeemed, err)
+		}
+	}
+	for _, teamID := range []int64{team.ID, tigers.ID} {
+		roster, err := teams.ListRoster(ctx, group.ID, teamID)
+		if err != nil || !slices.ContainsFunc(roster, func(entry service.TeamRosterEntry) bool {
+			return entry.UserID == guestID && entry.Role == service.GroupRolePlayer
+		}) {
+			t.Fatalf("team %d roster = %+v, %v; the player belongs to both teams", teamID, roster, err)
+		}
+	}
+	if roster, _ := teams.ListRoster(ctx, group.ID, tigers.ID); !slices.ContainsFunc(roster, func(entry service.TeamRosterEntry) bool {
+		return entry.UserID == guestID && entry.Role == service.GroupRoleParent
+	}) {
+		t.Fatalf("tigers roster = %+v, want the parent entry", roster)
+	}
 }
 
 func TestInviteRepositoryRedeemEnforcesLimitsUnderConcurrency(t *testing.T) {

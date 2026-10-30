@@ -26,6 +26,7 @@
     "teams.roster.parent_of": {"text": "Parent of"},
     "teams.tab.roster": {"text": "Roster"},
     "teams.tab.events": {"text": "Events"},
+    "teams.tab.invites": {"text": "Invites"},
     "teams.tab.calendar": {"text": "Calendar"},
     "teams.roster.parents_label": {"text": "Parents:"},
     "teams.edit": {"text": "Edit team"},

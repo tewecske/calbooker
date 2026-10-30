@@ -54,9 +54,9 @@ type EventsView struct {
 
 // EventRowView is one event in a list.
 type EventRowView struct {
-	ID        int64
-	URL       string
-	Title     string
+	ID    int64
+	URL   string
+	Title string
 	// KindID is the group's event kind; Kind is its system code (empty for
 	// kinds an administrator added).
 	KindID    int64

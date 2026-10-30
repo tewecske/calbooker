@@ -57,9 +57,9 @@ var (
 // Resource is a field, court, hall, pool, or room a group books. Archived
 // resources stay loadable for the plans and events that reference them.
 type Resource struct {
-	ID          int64
-	GroupID     int64
-	Name        string
+	ID      int64
+	GroupID int64
+	Name    string
 	// KindID is the group's resource kind. KindCode (the system code, empty
 	// for kinds an administrator added) and the names are filled on reads.
 	KindID      int64

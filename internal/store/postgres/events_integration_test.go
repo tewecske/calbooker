@@ -158,7 +158,9 @@ func TestEventRepositoryLifecycle(t *testing.T) {
 		"deadline after the start":   func(e *service.Event) { late := e.EndsAt; e.SignupDeadline = &late },
 		"limit out of range":         func(e *service.Event) { big := 1000; e.MaxParticipants = &big },
 		"unknown kind":               func(e *service.Event) { e.KindID, e.KindCode = 0, "party" },
-		"kind of another group":      func(e *service.Event) { e.KindID, e.KindCode = kindID(t, harness, service.KindScopeEvent, other.ID, service.EventKindMatch), "" },
+		"kind of another group": func(e *service.Event) {
+			e.KindID, e.KindCode = kindID(t, harness, service.KindScopeEvent, other.ID, service.EventKindMatch), ""
+		},
 		"week not a Monday": func(e *service.Event) {
 			tuesday := service.ParseSeasonDate("2026-11-03")
 			e.GeneratedForWeek = &tuesday

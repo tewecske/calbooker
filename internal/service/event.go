@@ -136,8 +136,8 @@ func (e *EventFieldError) Unwrap() error {
 // form shows them in the group's time zone. Version covers the event, its
 // teams, and its extra coaches.
 type Event struct {
-	ID         int64
-	GroupID    int64
+	ID      int64
+	GroupID int64
 	// KindID is the group's event kind. KindCode (the system code, empty for
 	// kinds an administrator added) and the names are filled on reads.
 	KindID     int64

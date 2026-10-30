@@ -185,10 +185,11 @@ Progress is in the Status table below. The original first steps were:
 | 38 | merged (parent links on Members, A/B switch on plan pages) | #40 |
 | 42 | merged (slug URLs, migration 000013) | #49 |
 | 43 | in progress (lane A) | |
-| 44 | in progress (lane B) | |
+| 44 | merged (team page tabs) | #50 |
+| 46 | in progress (lane B) | |
 | 47 | in progress (lane C) | |
 | 41 | merged (scroll guard; cause not reproduced) | #48 |
-| 45, 46 | open (after #43, #44) | |
+| 45 | open (after #43) | |
 
 ## Owner answers (2026-10-23)
 

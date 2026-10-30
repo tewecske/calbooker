@@ -428,6 +428,28 @@ Refinements made in #42 (open for the owner to confirm):
   access check); POSTs to old URLs are 404. Other lanes build links with the
   slug.
 
+Refinements made in #44 (open for the owner to confirm):
+
+- A team page has a submenu with three tabs: Roster (the team page itself,
+  `.../teams/{team}`), Events (`.../teams/{team}/events`) and Calendar
+  (`.../teams/{team}/calendar`). The group Teams tab stays highlighted. New
+  team tabs (invites, #47) are added to one list in `team_tabs.go`.
+- Roster: each player row lists the player's parents on the team, so a parent
+  with two children on the team appears under both; the parents list keeps
+  showing "Parent of" for each parent. Parents come from the derived
+  guardian links (#3), as before. Players in several teams show in each
+  team's roster.
+- Events tab: the group's event list with the team fixed (upcoming and past,
+  no team filter). Rows link to the normal event page. The create form posts
+  to the tab, preselects the team (other teams can still be ticked), and is
+  shown only to accounts whose form offers that team, the same rule as the
+  group list (`CanCreateEvent`). Edit and cancel stay on the event page.
+- Calendar tab: the #10 week calendar with the team fixed: events visible to
+  the viewer that include the team; no team filter and no group switcher; week
+  and kind/resource filters and the own-answer badges (#30) work as before.
+  The group-level Events and Calendar are unchanged.
+- A team the account cannot see, or a non-member, gets 404 on every tab.
+
 ## Data model
 
 All tables carry `group_id` (directly or through their parent) so every query

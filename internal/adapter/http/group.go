@@ -48,9 +48,12 @@ const (
 	groupSectionMembers  = "members"
 	groupSectionTeams    = "teams"
 	groupSectionTeam     = "team"
-	groupSectionInvites  = "invites"
-	groupSectionChildren = "children"
-	groupSectionSettings = "settings"
+	// The team page's Events and Calendar tabs (team.go).
+	groupSectionTeamEvents   = "team-events"
+	groupSectionTeamCalendar = "team-calendar"
+	groupSectionInvites      = "invites"
+	groupSectionChildren     = "children"
+	groupSectionSettings     = "settings"
 )
 
 // GroupsView contains the group list and join/create affordances.
@@ -98,6 +101,7 @@ type GroupDetailView struct {
 	Members         *GroupMembersView
 	Teams           *TeamsView
 	Team            *TeamDetailView
+	TeamTabs        *TeamTabsView
 	Invites         *InvitesView
 	Children        *ChildrenView
 	Resources       *ResourcesView
@@ -724,6 +728,10 @@ func (h *groupHandler) renderSection(writer http.ResponseWriter, request *http.R
 		if !h.loadTeam(writer, request, current, group.ID, teamID, form, view) {
 			return
 		}
+	case groupSectionTeamEvents, groupSectionTeamCalendar:
+		if !h.loadTeamTab(writer, request, current, group, section, teamID, form, view) {
+			return
+		}
 	case groupSectionInvites:
 		if !h.loadInvites(writer, request, current, group, form, view) {
 			return
@@ -831,7 +839,7 @@ func (h *groupHandler) groupShell(current groupRequest, group service.Group, sec
 		items = append(items, struct{ id, label, route string }{groupSectionSettings, "groups.nav.settings", "/settings"})
 	}
 	for _, item := range items {
-		currentSection := section == item.id || (section == groupSectionTeam && item.id == groupSectionTeams) || (section == groupSectionResource && item.id == groupSectionResources) || ((section == groupSectionSeason || section == groupSectionCoachBoard) && item.id == groupSectionSeasons) || (section == groupSectionEvent && item.id == groupSectionEvents) ||
+		currentSection := section == item.id || ((section == groupSectionTeam || section == groupSectionTeamEvents || section == groupSectionTeamCalendar) && item.id == groupSectionTeams) || (section == groupSectionResource && item.id == groupSectionResources) || ((section == groupSectionSeason || section == groupSectionCoachBoard) && item.id == groupSectionSeasons) || (section == groupSectionEvent && item.id == groupSectionEvents) ||
 			(item.id == groupSectionCoaches && (section == groupSectionAvailability || section == groupSectionAvailabilityOverview)) ||
 			(section == groupSectionPlanSlot && item.id == groupSectionPlan) ||
 			(section == groupSectionEventGeneration && item.id == groupSectionTrainingPlan)

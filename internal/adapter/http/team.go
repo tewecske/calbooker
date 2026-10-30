@@ -86,8 +86,10 @@ type RosterListView struct {
 	RemoveURL   string
 	RemoveLabel string
 	EmptyLabel  string
-	// ParentOfLabel introduces the children of a parent row.
+	// ParentOfLabel introduces the children of a parent row; ParentsLabel
+	// the parents of a player row.
 	ParentOfLabel string
+	ParentsLabel  string
 	CSRFToken     string
 }
 
@@ -137,8 +139,11 @@ type RosterRowView struct {
 	// Linked is true for a parent shown only through a guardian link; it
 	// is removed by unlinking, not from the roster.
 	Linked bool
-	// ParentOf names the players on this team the parent is a guardian of.
+	// ParentOf names the players on this team the parent is a guardian of;
+	// Parents names a player's parents on this team (a parent of two
+	// players appears on both rows).
 	ParentOf string
+	Parents  string
 }
 
 // RosterCandidateView is one member and role that can be added to the roster;
@@ -157,6 +162,9 @@ func registerTeamRoutes(mux *http.ServeMux, groups *groupHandler) {
 		mux.HandleFunc("GET "+prefix+"/groups/{group}/teams/{team}", groups.team)
 		mux.HandleFunc("POST "+prefix+"/groups/{group}/teams/{team}", groups.updateTeam)
 		mux.HandleFunc("POST "+prefix+"/groups/{group}/teams/{team}/archive", groups.archiveTeam)
+		mux.HandleFunc("GET "+prefix+"/groups/{group}/teams/{team}/events", groups.teamEvents)
+		mux.HandleFunc("POST "+prefix+"/groups/{group}/teams/{team}/events", groups.createTeamEvent)
+		mux.HandleFunc("GET "+prefix+"/groups/{group}/teams/{team}/calendar", groups.teamCalendar)
 		mux.HandleFunc("POST "+prefix+"/groups/{group}/teams/{team}/roster/add", groups.addToRoster)
 		mux.HandleFunc("POST "+prefix+"/groups/{group}/teams/{team}/roster/remove", groups.removeFromRoster)
 	}
@@ -380,13 +388,23 @@ func (h *groupHandler) loadTeam(writer http.ResponseWriter, request *http.Reques
 		team.EditForm = h.teamFormView(current, "team-edit", base, &detail.Team, form)
 	}
 	csrf := csrfToken(request)
-	team.PlayerList = RosterListView{CanManage: team.CanManageRoster, RemoveURL: team.RosterRemoveURL, RemoveLabel: h.t(language, "teams.roster.remove"), EmptyLabel: h.t(language, "teams.roster.no_players"), CSRFToken: csrf}
+	team.PlayerList = RosterListView{CanManage: team.CanManageRoster, RemoveURL: team.RosterRemoveURL, RemoveLabel: h.t(language, "teams.roster.remove"), EmptyLabel: h.t(language, "teams.roster.no_players"), ParentsLabel: h.t(language, "teams.roster.parents_label"), CSRFToken: csrf}
 	team.ParentList = RosterListView{CanManage: team.CanManageRoster, RemoveURL: team.RosterRemoveURL, RemoveLabel: h.t(language, "teams.roster.remove"), EmptyLabel: h.t(language, "teams.roster.no_parents"), ParentOfLabel: h.t(language, "teams.roster.parent_of"), CSRFToken: csrf}
 	onRoster := make(map[string]bool, len(detail.Roster))
 	playerLabels := make(map[int64]string)
 	for _, entry := range detail.Roster {
 		if entry.Role == service.GroupRolePlayer {
 			playerLabels[entry.UserID] = h.memberLabel(language, entry.UserID, entry.DisplayName, entry.Username, entry.Email)
+		}
+	}
+	parentsOf := make(map[int64][]string)
+	for _, entry := range detail.Roster {
+		if entry.Role != service.GroupRoleParent {
+			continue
+		}
+		label := h.memberLabel(language, entry.UserID, entry.DisplayName, entry.Username, entry.Email)
+		for _, childID := range entry.ChildUserIDs {
+			parentsOf[childID] = append(parentsOf[childID], label)
 		}
 	}
 	for _, entry := range detail.Roster {
@@ -401,6 +419,9 @@ func (h *groupHandler) loadTeam(writer http.ResponseWriter, request *http.Reques
 			}
 		}
 		row.ParentOf = strings.Join(children, ", ")
+		if entry.Role == service.GroupRolePlayer {
+			row.Parents = strings.Join(parentsOf[entry.UserID], ", ")
+		}
 		if !entry.Linked {
 			onRoster[rosterValue(entry.UserID, entry.Role)] = true
 		}
@@ -424,6 +445,7 @@ func (h *groupHandler) loadTeam(writer http.ResponseWriter, request *http.Reques
 		return false
 	}
 	view.Team = team
+	view.TeamTabs = h.teamTabs(current, detail.Team, teamTabRoster)
 	return true
 }
 

@@ -40,6 +40,13 @@ Issue numbers are the GitHub ones. "After" lists what must be merged first.
 | 14 | Training plan board | M4 Season planning | 12, 13 | C |
 | 15 | Generate events from the plan | M4 Season planning | 8, 14 | C |
 | 30 | Own answer on calendar entries | M3 Events | 10, 11 | A |
+| 41 | Members link/unlink keeps scroll position | M5 Owner feedback | 38 | B |
+| 42 | Readable URLs (group and team slugs) | M5 Owner feedback | – | A |
+| 43 | Event and resource kinds managed per group | M5 Owner feedback | 42 | A |
+| 44 | Team page submenu: roster, events, calendar | M5 Owner feedback | 42 | B |
+| 45 | Event form autocomplete pickers (hand-rolled) | M5 Owner feedback | 43 | A |
+| 46 | Role-based start page and navigation | M5 Owner feedback | 44 | B |
+| 47 | Team invites, multi-team players, per-event call-ups | M5 Owner feedback | 42 | C |
 
 - M1 is one subagent at a time: everything else builds on it.
 - Then at most three lanes run in parallel (A: data and events, B: grid and
@@ -176,6 +183,9 @@ Progress is in the Status table below. The original first steps were:
 | 35 | merged (mobile menu, signed-in home) | #36 |
 | 37 | merged (demo seed) | #39 |
 | 38 | merged (parent links on Members, A/B switch on plan pages) | #40 |
+| 42 | in progress (lane A, solo while routes change) | |
+| 41 | in progress (lane B) | |
+| 43, 44, 45, 46, 47 | open (wait for #42) | |
 
 ## Owner answers (2026-10-23)
 

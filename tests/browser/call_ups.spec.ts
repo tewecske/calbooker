@@ -91,9 +91,8 @@ test.describe("team invites and call-ups", () => {
     // them.
     const lionsCode = await createTeamInvite(coach.page, lionsURL, "player");
     await expect(coach.page.getByTestId("team-invite-list")).toContainText(lionsCode);
-    await coach.page.goto(tigersURL);
-    await expect(coach.page.locator("[data-team-tab=roster]")).toBeVisible();
-    await expect(coach.page.locator("[data-team-tab=invites]")).toHaveCount(0);
+    // The coach does not see the Tigers, so there is no invite tab for them.
+    expect((await coach.page.goto(`${tigersURL}/invites`))?.ok()).toBe(false);
     const playerA = await becomeGuest(browser);
     await joinWithCode(playerA.page, appURL, lionsCode);
     await playerA.page.waitForURL(lionsURL);

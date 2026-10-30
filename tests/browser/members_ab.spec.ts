@@ -54,11 +54,18 @@ test.describe("members links and A/B weeks", () => {
     await page.goto(`${groupURL}/members`);
     const parentRow = page.locator("tr[data-member-id]").filter({ has: page.locator("[data-role=parent]") });
     await expect(parentRow.getByTestId("member-players")).toContainText("None");
+    // A short window makes the page scroll, so a jump to the bottom is visible (#41).
+    await page.setViewportSize({ width: 1000, height: 130 });
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await parentRow.scrollIntoViewIfNeeded();
     const select = parentRow.locator("select[name=child_id]");
     const playerValue = (await select.locator("option:not([value=''])").first().getAttribute("value")) ?? "";
     await select.selectOption(playerValue);
+    await parentRow.getByRole("button", { name: "Link" }).evaluate((button) => button.scrollIntoView({ block: "start" }));
     await parentRow.getByRole("button", { name: "Link" }).click();
     await expect(page.locator("#alerts")).toContainText("Parent linked.");
+    // The linked row stays in view after linking (#41).
+    await expect(page.locator("tr[data-member-id]").filter({ has: page.locator("[data-role=parent]") })).toBeInViewport();
     await expect(page.locator("tr[data-member-id]").filter({ has: page.locator("[data-role=parent]") }).locator(`[data-player="${playerValue}"]`)).toBeVisible();
     // The player's row shows the parent.
     await expect(page.locator(`tr[data-member-id="${playerValue}"]`).getByTestId("member-parents")).toBeVisible();
@@ -71,6 +78,7 @@ test.describe("members links and A/B weeks", () => {
     await page.goto(`${groupURL}/members`);
     await page.locator(`[data-player="${playerValue}"]`).click();
     await expect(page.locator("#alerts")).toContainText("Parent unlinked.");
+    await expect(page.locator("tr[data-member-id]").filter({ has: page.locator("[data-role=parent]") })).toBeInViewport();
     await expect(page.locator(`tr[data-member-id="${playerValue}"]`).getByTestId("member-parents")).toHaveCount(0);
     await page.goto(teamURL);
     await expect(page.getByTestId("team-parents").locator("[data-roster-linked=true]")).toHaveCount(0);

@@ -207,7 +207,7 @@
               {{$manage := .CanManage}}{{$link := .CanLink}}{{$linkURL := .LinkURL}}{{$unlink := .UnlinkURL}}
               {{range .Members}}
                 {{$member := .}}
-                <tr data-member-id="{{.UserID}}">
+                <tr id="member-{{.UserID}}" data-member-id="{{.UserID}}">
                   <td>
                     <div class="font-medium">{{.Label}}{{if .IsSelf}} <span class="badge badge-ghost badge-sm">{{$L.groups_members_you}}</span>{{end}}{{if .IsGuest}} <span class="badge badge-outline badge-sm">{{$L.groups_members_guest}}</span>{{end}}{{if .IsProfile}} <span class="badge badge-outline badge-sm">{{$L.groups_members_profile}}</span>{{end}}</div>
                     {{if .Email}}<div class="text-sm opacity-70">{{.Email}}</div>{{end}}
@@ -215,7 +215,7 @@
                       {{if .IsParent}}
                         <div class="mt-2 flex flex-wrap items-center gap-1 text-sm" data-testid="member-players">{{$L.groups_members_players}}:
                           {{range .Players}}
-                            <form method="post" action="{{$unlink}}" hx-post="{{$unlink}}" hx-target="#page-content" hx-swap="outerHTML" hx-disabled-elt="this">
+                            <form method="post" action="{{$unlink}}" hx-post="{{$unlink}}" hx-target="#page-content" hx-swap="outerHTML show:#member-{{$member.UserID}}:top" hx-disabled-elt="this">
                               <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
                               <input type="hidden" name="return" value="members">
                               <input type="hidden" name="parent_id" value="{{$member.UserID}}">
@@ -227,7 +227,7 @@
                           {{end}}
                         </div>
                         {{if gt (len .LinkOptions) 1}}
-                          <form class="join mt-1" method="post" action="{{$linkURL}}" hx-post="{{$linkURL}}" hx-target="#page-content" hx-swap="outerHTML" hx-disabled-elt="this">
+                          <form class="join mt-1" method="post" action="{{$linkURL}}" hx-post="{{$linkURL}}" hx-target="#page-content" hx-swap="outerHTML show:#member-{{.UserID}}:top" hx-disabled-elt="this">
                             <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
                             <input type="hidden" name="return" value="members">
                             <input type="hidden" name="parent_id" value="{{.UserID}}">

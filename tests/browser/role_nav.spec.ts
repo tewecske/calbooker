@@ -35,7 +35,7 @@ async function createTeam(page: Page, groupURL: string, name: string, year: stri
 
 async function createEvent(page: Page, groupURL: string, event: { title: string; team: string; day: string; from: string; to: string }): Promise<void> {
   await page.goto(`${groupURL}/events`);
-  await page.locator("#event-new-kind").selectOption("training");
+  await page.locator("#event-new-kind").selectOption({ label: "Training" });
   await page.locator("#event-new-title").fill(event.title);
   await page.locator("#event-new-starts-at").fill(`${event.day}T${event.from}`);
   await page.locator("#event-new-ends-at").fill(`${event.day}T${event.to}`);

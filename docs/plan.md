@@ -183,9 +183,12 @@ Progress is in the Status table below. The original first steps were:
 | 35 | merged (mobile menu, signed-in home) | #36 |
 | 37 | merged (demo seed) | #39 |
 | 38 | merged (parent links on Members, A/B switch on plan pages) | #40 |
-| 42 | in progress (lane A, solo while routes change) | |
+| 42 | merged (slug URLs, migration 000013) | #49 |
+| 43 | in progress (lane A) | |
+| 44 | in progress (lane B) | |
+| 47 | in progress (lane C) | |
 | 41 | merged (scroll guard; cause not reproduced) | #48 |
-| 43, 44, 45, 46, 47 | open (wait for #42) | |
+| 45, 46 | open (after #43, #44) | |
 
 ## Owner answers (2026-10-23)
 

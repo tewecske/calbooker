@@ -18,10 +18,6 @@
     "events.cancelled_notice": {"text": "Ez az esemény elmarad."},
     "events.create": {"text": "Esemény hozzáadása"},
     "events.kind": {"text": "Típus"},
-    "events.kind.training": {"text": "Edzés"},
-    "events.kind.match": {"text": "Mérkőzés"},
-    "events.kind.championship": {"text": "Bajnokság"},
-    "events.kind.other": {"text": "Egyéb"},
     "events.starts_at": {"text": "Kezdés"},
     "events.ends_at": {"text": "Befejezés"},
     "events.no_teams": {"text": "Nincs olyan csapat, amelyhez eseményt adhatnál."},
@@ -72,6 +68,7 @@
     "events.error.invalid_max_participants": {"text": "Adj meg 1 és 999 közötti létszámkorlátot, vagy hagyd üresen."},
     "events.error.invalid_signup_deadline": {"text": "A jelentkezési határidőnek az esemény kezdete előtt kell lennie."},
     "events.error.invalid_coaches": {"text": "Legfeljebb 20 további edzőt választhatsz."},
-    "events.error.coach_role_missing": {"text": "A további edzőknek edző szerepkörrel kell rendelkezniük a csoportban."}
+    "events.error.coach_role_missing": {"text": "A további edzőknek edző szerepkörrel kell rendelkezniük a csoportban."},
+    "events.error.kind_archived": {"text": "Ez a típus archivált. Válassz másikat."}
   }
 }

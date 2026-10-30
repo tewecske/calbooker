@@ -1,0 +1,93 @@
+{{define "group-kinds"}}
+  {{with .Group}}{{$L := .L}}{{with .Kinds}}
+    <p><a class="link" href="{{.SettingsURL}}">{{$L.kinds_back}}</a></p>
+    {{range .Lists}}
+      <section class="card card-border bg-base-100 shadow-sm" aria-labelledby="kinds-{{.Segment}}-heading" data-testid="kinds-{{.Segment}}">
+        <div class="card-body">
+          <h2 id="kinds-{{.Segment}}-heading" class="card-title">{{.Heading}}</h2>
+          <p class="text-sm opacity-70">{{.Intro}}</p>
+          <div class="overflow-x-auto">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th scope="col">{{$L.kinds_name_en}} / {{$L.kinds_name_hu}}</th>
+                  <th scope="col">{{$L.kinds_uses}}</th>
+                  <th scope="col">{{$L.kinds_actions}}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {{$list := .}}
+                {{range .Rows}}
+                  <tr data-kind-id="{{.ID}}"{{with .Code}} data-kind-code="{{.}}"{{end}}{{if .Archived}} data-kind-archived="true"{{end}}>
+                    <td>
+                      <form class="flex flex-wrap items-end gap-2" method="post" action="{{.RenameURL}}" hx-post="{{.RenameURL}}" hx-target="#page-content" hx-swap="outerHTML" hx-disabled-elt="this">
+                        <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
+                        <input type="hidden" name="version" value="{{.Version}}">
+                        <label class="sr-only" for="kind-{{$list.Segment}}-{{.ID}}-en">{{$L.kinds_name_en}}: {{.DisplayName}}</label>
+                        <input id="kind-{{$list.Segment}}-{{.ID}}-en" class="input input-sm" name="name_en" required maxlength="48" value="{{.NameEN}}">
+                        <label class="sr-only" for="kind-{{$list.Segment}}-{{.ID}}-hu">{{$L.kinds_name_hu}}: {{.DisplayName}}</label>
+                        <input id="kind-{{$list.Segment}}-{{.ID}}-hu" class="input input-sm" name="name_hu" maxlength="48" value="{{.NameHU}}">
+                        <button class="btn btn-sm" type="submit">{{$L.kinds_rename}}</button>
+                        {{if .Archived}}<span class="badge badge-warning badge-soft" data-testid="kind-archived-badge">{{$L.kinds_archived_badge}}</span>{{end}}
+                        {{if .Protected}}<span class="badge badge-soft" data-testid="kind-protected-badge">{{$L.kinds_protected_badge}}</span>{{end}}
+                      </form>
+                    </td>
+                    <td data-testid="kind-uses">{{.Uses}}</td>
+                    <td>
+                      <div class="flex flex-wrap items-center gap-2">
+                        <form method="post" action="{{.MoveURL}}" hx-post="{{.MoveURL}}" hx-target="#page-content" hx-swap="outerHTML" hx-disabled-elt="this">
+                          <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
+                          <input type="hidden" name="direction" value="up">
+                          <button class="btn btn-sm btn-ghost" type="submit"{{if .First}} disabled{{end}} aria-label="{{$L.kinds_move_up}}: {{.DisplayName}}">&uarr;</button>
+                        </form>
+                        <form method="post" action="{{.MoveURL}}" hx-post="{{.MoveURL}}" hx-target="#page-content" hx-swap="outerHTML" hx-disabled-elt="this">
+                          <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
+                          <input type="hidden" name="direction" value="down">
+                          <button class="btn btn-sm btn-ghost" type="submit"{{if .Last}} disabled{{end}} aria-label="{{$L.kinds_move_down}}: {{.DisplayName}}">&darr;</button>
+                        </form>
+                        {{if not .Protected}}
+                          <form method="post" action="{{.ArchiveURL}}" hx-post="{{.ArchiveURL}}" hx-target="#page-content" hx-swap="outerHTML" hx-disabled-elt="this">
+                            <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
+                            <input type="hidden" name="version" value="{{.Version}}">
+                            {{if .Archived}}
+                              <input type="hidden" name="archived" value="false">
+                              <button class="btn btn-sm btn-outline" type="submit">{{$L.kinds_restore}}</button>
+                            {{else}}
+                              <input type="hidden" name="archived" value="true">
+                              <button class="btn btn-sm btn-outline btn-warning" type="submit">{{$L.kinds_archive}}</button>
+                            {{end}}
+                          </form>
+                        {{end}}
+                        {{if .CanDelete}}
+                          <form method="post" action="{{.DeleteURL}}" hx-post="{{.DeleteURL}}" hx-target="#page-content" hx-swap="outerHTML" hx-disabled-elt="this" hx-confirm="{{$L.kinds_delete_confirm}}">
+                            <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
+                            <input type="hidden" name="version" value="{{.Version}}">
+                            <button class="btn btn-sm btn-outline btn-error" type="submit">{{$L.kinds_delete}}</button>
+                          </form>
+                        {{end}}
+                      </div>
+                    </td>
+                  </tr>
+                {{end}}
+              </tbody>
+            </table>
+          </div>
+          <div class="divider"></div>
+          <form class="grid gap-4 sm:grid-cols-[1fr_1fr_auto] sm:items-end" method="post" action="{{.CreateURL}}" hx-post="{{.CreateURL}}" hx-target="#page-content" hx-swap="outerHTML" hx-disabled-elt="this">
+            <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
+            <fieldset class="fieldset">
+              <label class="fieldset-legend" for="kind-new-{{.Segment}}-en">{{$L.kinds_name_en}}</label>
+              <input id="kind-new-{{.Segment}}-en" class="input w-full" name="name_en" required maxlength="48">
+            </fieldset>
+            <fieldset class="fieldset">
+              <label class="fieldset-legend" for="kind-new-{{.Segment}}-hu">{{$L.kinds_name_hu}}</label>
+              <input id="kind-new-{{.Segment}}-hu" class="input w-full" name="name_hu" maxlength="48" aria-describedby="kind-new-{{.Segment}}-hu-help">
+              <p id="kind-new-{{.Segment}}-hu-help" class="label">{{$L.kinds_name_hu_help}}</p>
+            </fieldset>
+            <div><button class="btn btn-primary" type="submit">{{$L.kinds_add}}</button></div>
+          </form>
+        </div>
+      </section>
+    {{end}}
+  {{end}}{{end}}
+{{end}}

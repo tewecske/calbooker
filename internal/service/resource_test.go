@@ -99,7 +99,7 @@ func TestNewResourceServiceRejectsNilDependencies(t *testing.T) {
 }
 
 func TestResourceServiceCreate(t *testing.T) {
-	valid := ResourceInput{Name: " Main field ", Kind: ResourceKindField, Description: " North end ", MaxConcurrentTeams: 2}
+	valid := ResourceInput{Name: " Main field ", KindID: 1, Description: " North end ", MaxConcurrentTeams: 2}
 	tests := []struct {
 		name    string
 		actor   GroupActor
@@ -107,20 +107,20 @@ func TestResourceServiceCreate(t *testing.T) {
 		wantErr error
 	}{
 		{name: "admin creates", actor: adminActor(), input: valid},
-		{name: "manager creates without limit or description", actor: actorWith(memberWith(GroupRoleManager)), input: ResourceInput{Name: "Pool", Kind: ResourceKindPool}},
+		{name: "manager creates without limit or description", actor: actorWith(memberWith(GroupRoleManager)), input: ResourceInput{Name: "Pool", KindID: 1}},
 		{name: "site administrator creates", actor: siteAdminActor(), input: valid},
 		{name: "coach is forbidden", actor: coachOf(1), input: valid, wantErr: ErrGroupForbidden},
 		{name: "player is forbidden", actor: playerOn(1), input: valid, wantErr: ErrGroupForbidden},
 		{name: "parent is forbidden", actor: parentActor(), input: valid, wantErr: ErrGroupForbidden},
 		{name: "outsider is not found", actor: actorWith(GroupAccessGrants{}), input: valid, wantErr: ErrGroupNotFound},
-		{name: "empty name", actor: adminActor(), input: ResourceInput{Name: " ", Kind: ResourceKindField}, wantErr: ErrInvalidResourceName},
-		{name: "long name", actor: adminActor(), input: ResourceInput{Name: strings.Repeat("a", 65), Kind: ResourceKindField}, wantErr: ErrInvalidResourceName},
-		{name: "control character in name", actor: adminActor(), input: ResourceInput{Name: "A\nB", Kind: ResourceKindField}, wantErr: ErrInvalidResourceName},
-		{name: "unknown kind", actor: adminActor(), input: ResourceInput{Name: "A", Kind: "stadium"}, wantErr: ErrInvalidResourceKind},
+		{name: "empty name", actor: adminActor(), input: ResourceInput{Name: " ", KindID: 1}, wantErr: ErrInvalidResourceName},
+		{name: "long name", actor: adminActor(), input: ResourceInput{Name: strings.Repeat("a", 65), KindID: 1}, wantErr: ErrInvalidResourceName},
+		{name: "control character in name", actor: adminActor(), input: ResourceInput{Name: "A\nB", KindID: 1}, wantErr: ErrInvalidResourceName},
+		{name: "unknown kind", actor: adminActor(), input: ResourceInput{Name: "A", KindID: -1}, wantErr: ErrInvalidResourceKind},
 		{name: "missing kind", actor: adminActor(), input: ResourceInput{Name: "A"}, wantErr: ErrInvalidResourceKind},
-		{name: "long description", actor: adminActor(), input: ResourceInput{Name: "A", Kind: ResourceKindRoom, Description: strings.Repeat("d", 256)}, wantErr: ErrInvalidResourceDescription},
-		{name: "negative limit", actor: adminActor(), input: ResourceInput{Name: "A", Kind: ResourceKindRoom, MaxConcurrentTeams: -1}, wantErr: ErrInvalidResourceCapacity},
-		{name: "limit too high", actor: adminActor(), input: ResourceInput{Name: "A", Kind: ResourceKindRoom, MaxConcurrentTeams: 100}, wantErr: ErrInvalidResourceCapacity},
+		{name: "long description", actor: adminActor(), input: ResourceInput{Name: "A", KindID: 1, Description: strings.Repeat("d", 256)}, wantErr: ErrInvalidResourceDescription},
+		{name: "negative limit", actor: adminActor(), input: ResourceInput{Name: "A", KindID: 1, MaxConcurrentTeams: -1}, wantErr: ErrInvalidResourceCapacity},
+		{name: "limit too high", actor: adminActor(), input: ResourceInput{Name: "A", KindID: 1, MaxConcurrentTeams: 100}, wantErr: ErrInvalidResourceCapacity},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -139,7 +139,7 @@ func TestResourceServiceCreate(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Create() error = %v", err)
 			}
-			if created.GroupID != 5 || created.Name != strings.TrimSpace(test.input.Name) || created.Kind != test.input.Kind || created.CreatedAt <= 0 {
+			if created.GroupID != 5 || created.Name != strings.TrimSpace(test.input.Name) || created.KindID != test.input.KindID || created.CreatedAt <= 0 {
 				t.Fatalf("created = %+v, want trimmed resource in group 5", created)
 			}
 			if test.input.MaxConcurrentTeams == 0 && created.MaxConcurrentTeams != nil {
@@ -166,11 +166,11 @@ func TestResourceServiceCreateNameTaken(t *testing.T) {
 	resources := newResourceStub()
 	resources.createErr = ErrResourceNameTaken
 	service, auditor := newTestResourceService(t, resources)
-	if _, err := service.Create(context.Background(), adminActor(), ResourceInput{Name: "Main", Kind: ResourceKindField}); !errors.Is(err, ErrResourceNameTaken) {
+	if _, err := service.Create(context.Background(), adminActor(), ResourceInput{Name: "Main", KindID: 1}); !errors.Is(err, ErrResourceNameTaken) {
 		t.Fatalf("Create() error = %v, want ErrResourceNameTaken", err)
 	}
 	resources.createErr = errors.New("database down")
-	if _, err := service.Create(context.Background(), adminActor(), ResourceInput{Name: "Main", Kind: ResourceKindField}); err == nil || errors.Is(err, ErrResourceNameTaken) {
+	if _, err := service.Create(context.Background(), adminActor(), ResourceInput{Name: "Main", KindID: 1}); err == nil || errors.Is(err, ErrResourceNameTaken) {
 		t.Fatalf("Create() error = %v, want a wrapped storage error", err)
 	}
 	if len(auditor.records) != 0 {
@@ -181,9 +181,9 @@ func TestResourceServiceCreateNameTaken(t *testing.T) {
 func TestResourceServiceListAndActive(t *testing.T) {
 	archivedAt := int64(10)
 	resources := newResourceStub(
-		Resource{ID: 1, GroupID: 5, Name: "Main", Kind: ResourceKindField},
-		Resource{ID: 2, GroupID: 5, Name: "Old hall", Kind: ResourceKindHall, ArchivedAt: &archivedAt},
-		Resource{ID: 3, GroupID: 6, Name: "Other club", Kind: ResourceKindPool},
+		Resource{ID: 1, GroupID: 5, Name: "Main", KindID: 1},
+		Resource{ID: 2, GroupID: 5, Name: "Old hall", KindID: 1, ArchivedAt: &archivedAt},
+		Resource{ID: 3, GroupID: 6, Name: "Other club", KindID: 1},
 	)
 	tests := []struct {
 		name    string
@@ -231,9 +231,9 @@ func TestResourceServiceListAndActive(t *testing.T) {
 func TestResourceServiceFindAndUsable(t *testing.T) {
 	archivedAt := int64(10)
 	resources := newResourceStub(
-		Resource{ID: 1, GroupID: 5, Name: "Main", Kind: ResourceKindField},
-		Resource{ID: 2, GroupID: 5, Name: "Old hall", Kind: ResourceKindHall, ArchivedAt: &archivedAt},
-		Resource{ID: 3, GroupID: 6, Name: "Other club", Kind: ResourceKindPool},
+		Resource{ID: 1, GroupID: 5, Name: "Main", KindID: 1},
+		Resource{ID: 2, GroupID: 5, Name: "Old hall", KindID: 1, ArchivedAt: &archivedAt},
+		Resource{ID: 3, GroupID: 6, Name: "Other club", KindID: 1},
 	)
 	service, _ := newTestResourceService(t, resources)
 	ctx := context.Background()
@@ -264,9 +264,9 @@ func TestResourceServiceFindAndUsable(t *testing.T) {
 }
 
 func TestResourceServiceUpdate(t *testing.T) {
-	stored := Resource{ID: 1, GroupID: 5, Name: "Main", Kind: ResourceKindField, Version: 2}
-	other := Resource{ID: 3, GroupID: 6, Name: "Other club", Kind: ResourceKindPool}
-	input := ResourceInput{Name: "Main pitch", Kind: ResourceKindField, MaxConcurrentTeams: 4}
+	stored := Resource{ID: 1, GroupID: 5, Name: "Main", KindID: 1, Version: 2}
+	other := Resource{ID: 3, GroupID: 6, Name: "Other club", KindID: 1}
+	input := ResourceInput{Name: "Main pitch", KindID: 1, MaxConcurrentTeams: 4}
 	tests := []struct {
 		name       string
 		actor      GroupActor
@@ -284,7 +284,7 @@ func TestResourceServiceUpdate(t *testing.T) {
 		{name: "other group's resource is not found", actor: adminActor(), resourceID: 3, version: 0, input: input, wantErr: ErrResourceNotFound},
 		{name: "invalid id", actor: adminActor(), resourceID: 0, version: 2, input: input, wantErr: ErrResourceNotFound},
 		{name: "negative version", actor: adminActor(), resourceID: 1, version: -1, input: input, wantErr: ErrInvalidGroup},
-		{name: "invalid input", actor: adminActor(), resourceID: 1, version: 2, input: ResourceInput{Name: "A", Kind: "x"}, wantErr: ErrInvalidResourceKind},
+		{name: "invalid input", actor: adminActor(), resourceID: 1, version: 2, input: ResourceInput{Name: "A", KindID: -1}, wantErr: ErrInvalidResourceKind},
 		{name: "stale revision is a conflict", actor: adminActor(), resourceID: 1, version: 1, input: input, updateErr: ErrOptimisticLockConflict, wantErr: ErrOptimisticLockConflict},
 		{name: "vanished resource is not found", actor: adminActor(), resourceID: 1, version: 2, input: input, updateErr: ErrRecordNotFound, wantErr: ErrResourceNotFound},
 		{name: "duplicate name", actor: adminActor(), resourceID: 1, version: 2, input: input, updateErr: ErrResourceNameTaken, wantErr: ErrResourceNameTaken},
@@ -324,7 +324,7 @@ func TestResourceServiceUpdate(t *testing.T) {
 }
 
 func TestResourceServiceSetArchived(t *testing.T) {
-	resources := newResourceStub(Resource{ID: 1, GroupID: 5, Name: "Main", Kind: ResourceKindField, Version: 2})
+	resources := newResourceStub(Resource{ID: 1, GroupID: 5, Name: "Main", KindID: 1, Version: 2})
 	service, auditor := newTestResourceService(t, resources)
 	ctx := context.Background()
 
@@ -362,19 +362,5 @@ func TestResourceServiceSetArchived(t *testing.T) {
 	}
 	if len(auditor.records) != 2 {
 		t.Fatal("failed archive changes were audited")
-	}
-}
-
-func TestResourceKinds(t *testing.T) {
-	kinds := ResourceKinds()
-	if len(kinds) != 6 || kinds[0] != ResourceKindField || kinds[len(kinds)-1] != ResourceKindOther {
-		t.Fatalf("ResourceKinds() = %v", kinds)
-	}
-	kinds[0] = "changed"
-	if ResourceKinds()[0] != ResourceKindField {
-		t.Fatal("ResourceKinds() exposed its backing slice")
-	}
-	if ValidResourceKind("stadium") || !ValidResourceKind(ResourceKindHall) {
-		t.Fatal("ValidResourceKind wrong")
 	}
 }

@@ -46,6 +46,7 @@ type ResourceTableView struct {
 type ResourceRowView struct {
 	ID          int64
 	Name        string
+	KindID      int64
 	Kind        string
 	KindLabel   string
 	Description string
@@ -210,7 +211,11 @@ func (h *groupHandler) loadResources(writer http.ResponseWriter, request *http.R
 		Archived: ResourceTableView{L: labels, TestID: "resources-archived"},
 	}
 	if current.access.CanManageResources() {
-		list.CreateForm = h.resourceFormView(current.language, "resource-new", h.groupPath(current.language, current.slug, "/resources"), nil, form)
+		kinds, ok := h.kindChoices(writer, request, current, service.KindScopeResource, 0)
+		if !ok {
+			return false
+		}
+		list.CreateForm = h.resourceFormView(current.language, "resource-new", h.groupPath(current.language, current.slug, "/resources"), kinds, nil, form)
 	}
 	for _, resource := range resources {
 		row := h.resourceRow(current.language, current.slug, resource)
@@ -244,7 +249,11 @@ func (h *groupHandler) loadResource(writer http.ResponseWriter, request *http.Re
 		ArchiveURL:      row.URL + "/archive",
 	}
 	if detail.CanEdit {
-		detail.EditForm = h.resourceFormView(current.language, "resource-edit", row.URL, &resource, form)
+		kinds, ok := h.kindChoices(writer, request, current, service.KindScopeResource, resource.KindID)
+		if !ok {
+			return false
+		}
+		detail.EditForm = h.resourceFormView(current.language, "resource-edit", row.URL, kinds, &resource, form)
 	}
 	view.Resource = detail
 	return true
@@ -265,8 +274,9 @@ func (h *groupHandler) resourceRow(language locale.Code, groupSlug string, resou
 	row := ResourceRowView{
 		ID:        resource.ID,
 		Name:      resource.Name,
-		Kind:      resource.Kind,
-		KindLabel: h.t(language, "resources.kind."+resource.Kind),
+		KindID:    resource.KindID,
+		Kind:      resource.KindCode,
+		KindLabel: resource.KindName(string(language)),
 		URL:       h.groupPath(language, groupSlug, "/resources/"+strconv.FormatInt(resource.ID, 10)),
 	}
 	if resource.Description != nil {
@@ -282,9 +292,9 @@ func (h *groupHandler) resourceRow(language locale.Code, groupSlug string, resou
 
 // resourceFormView fills the resource form from submitted values after a
 // failed write, else from the stored resource (nil for a new resource).
-func (h *groupHandler) resourceFormView(language locale.Code, prefix, actionURL string, resource *service.Resource, form FormData) *ResourceFormView {
+func (h *groupHandler) resourceFormView(language locale.Code, prefix, actionURL string, kinds []service.Kind, resource *service.Resource, form FormData) *ResourceFormView {
 	view := &ResourceFormView{L: h.labels[language], Prefix: prefix, ActionURL: actionURL}
-	kind := service.ResourceKindField
+	kind := ""
 	switch {
 	case form.Submitted:
 		view.Name = form.Value("name")
@@ -297,7 +307,7 @@ func (h *groupHandler) resourceFormView(language locale.Code, prefix, actionURL 
 		view.MaxTeamsError = form.Error("max_concurrent_teams")
 	case resource != nil:
 		view.Name = resource.Name
-		kind = resource.Kind
+		kind = strconv.FormatInt(resource.KindID, 10)
 		if resource.Description != nil {
 			view.Description = *resource.Description
 		}
@@ -305,8 +315,23 @@ func (h *groupHandler) resourceFormView(language locale.Code, prefix, actionURL 
 			view.MaxTeams = strconv.Itoa(*resource.MaxConcurrentTeams)
 		}
 	}
-	for _, option := range service.ResourceKinds() {
-		view.Kinds = append(view.Kinds, SelectOptionView{Value: option, Label: h.t(language, "resources.kind."+option), Selected: option == kind})
+	if kind == "" {
+		for _, option := range kinds {
+			if option.SystemCode == "field" {
+				kind = strconv.FormatInt(option.ID, 10)
+			}
+		}
+		if kind == "" && len(kinds) > 0 {
+			kind = strconv.FormatInt(kinds[0].ID, 10)
+		}
+	}
+	for _, option := range kinds {
+		value := strconv.FormatInt(option.ID, 10)
+		label := option.Name(string(language))
+		if option.Archived() {
+			label += " (" + h.t(language, "kinds.archived_badge") + ")"
+		}
+		view.Kinds = append(view.Kinds, SelectOptionView{Value: value, Label: label, Selected: value == kind})
 	}
 	return view
 }
@@ -331,6 +356,8 @@ func resourceErrorField(err error) (string, string) {
 		return "name", "resources.error.name_taken"
 	case errors.Is(err, service.ErrInvalidResourceKind):
 		return "kind", "resources.error.invalid_kind"
+	case errors.Is(err, service.ErrResourceKindArchived):
+		return "kind", "resources.error.kind_archived"
 	case errors.Is(err, service.ErrInvalidResourceDescription):
 		return "description", "resources.error.invalid_description"
 	case errors.Is(err, service.ErrInvalidResourceCapacity):
@@ -356,6 +383,6 @@ func resourceForm(request *http.Request) (service.ResourceInput, FormData) {
 		}
 		limit = parsed
 	}
-	input := service.ResourceInput{Name: values["name"], Kind: values["kind"], Description: values["description"], MaxConcurrentTeams: limit}
+	input := service.ResourceInput{Name: values["name"], KindID: optionalFormNumber(values["kind"]), Description: values["description"], MaxConcurrentTeams: limit}
 	return input, FormData{Submitted: true, Values: values}
 }

@@ -30,15 +30,15 @@ func TestPlanSlotRepositoryLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateGroupWithAdmin(other) error = %v", err)
 	}
-	court, err := resources.CreateResource(ctx, service.Resource{GroupID: group.ID, Name: "Court", Kind: service.ResourceKindCourt, CreatedAt: 100})
+	court, err := resources.CreateResource(ctx, service.Resource{GroupID: group.ID, Name: "Court", KindID: kindID(t, harness, service.KindScopeResource, group.ID, "court"), CreatedAt: 100})
 	if err != nil {
 		t.Fatalf("CreateResource() error = %v", err)
 	}
-	field, err := resources.CreateResource(ctx, service.Resource{GroupID: group.ID, Name: "Field", Kind: service.ResourceKindField, CreatedAt: 100})
+	field, err := resources.CreateResource(ctx, service.Resource{GroupID: group.ID, Name: "Field", KindID: kindID(t, harness, service.KindScopeResource, group.ID, "field"), CreatedAt: 100})
 	if err != nil {
 		t.Fatalf("CreateResource(field) error = %v", err)
 	}
-	foreignResource, err := resources.CreateResource(ctx, service.Resource{GroupID: other.ID, Name: "Foreign", Kind: service.ResourceKindCourt, CreatedAt: 100})
+	foreignResource, err := resources.CreateResource(ctx, service.Resource{GroupID: other.ID, Name: "Foreign", KindID: kindID(t, harness, service.KindScopeResource, other.ID, "court"), CreatedAt: 100})
 	if err != nil {
 		t.Fatalf("CreateResource(foreign) error = %v", err)
 	}

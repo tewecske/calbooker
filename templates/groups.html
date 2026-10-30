@@ -124,6 +124,7 @@
       {{if eq .Section "team-calendar"}}{{template "team-tab-head" .}}{{template "group-calendar" $}}{{end}}
       {{if eq .Section "invites"}}{{template "group-invites" $}}{{end}}
       {{if eq .Section "children"}}{{template "group-children" $}}{{end}}
+      {{if eq .Section "kinds"}}{{template "group-kinds" $}}{{end}}
       {{if eq .Section "resources"}}{{template "group-resources" $}}{{end}}
       {{if eq .Section "resource"}}{{template "group-resource" $}}{{end}}
       {{if eq .Section "seasons"}}{{template "group-seasons" $}}{{end}}
@@ -192,6 +193,7 @@
           </fieldset>
           <div><button class="btn btn-primary" type="submit">{{$L.groups_settings_save}}</button></div>
         </form>
+        <p class="text-sm"><a class="link" href="{{.KindsURL}}" data-testid="settings-kinds-link">{{$L.groups_settings_kinds}}</a></p>
       </div>
     </section>
   {{end}}{{end}}

@@ -18,10 +18,6 @@
     "events.cancelled_notice": {"text": "This event is cancelled."},
     "events.create": {"text": "Add an event"},
     "events.kind": {"text": "Kind"},
-    "events.kind.training": {"text": "Training"},
-    "events.kind.match": {"text": "Match"},
-    "events.kind.championship": {"text": "Championship"},
-    "events.kind.other": {"text": "Other"},
     "events.starts_at": {"text": "Starts"},
     "events.ends_at": {"text": "Ends"},
     "events.no_teams": {"text": "There are no teams you can add events for."},
@@ -72,6 +68,7 @@
     "events.error.invalid_max_participants": {"text": "Enter a participant limit from 1 to 999, or leave it empty."},
     "events.error.invalid_signup_deadline": {"text": "The sign-up deadline must be before the event starts."},
     "events.error.invalid_coaches": {"text": "Pick at most 20 extra coaches."},
-    "events.error.coach_role_missing": {"text": "Extra coaches must hold the coach role in the group."}
+    "events.error.coach_role_missing": {"text": "Extra coaches must hold the coach role in the group."},
+    "events.error.kind_archived": {"text": "This kind is archived. Pick another."}
   }
 }

@@ -34,11 +34,11 @@ func TestPlanTrainingRepositoryLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateGroupWithAdmin(other) error = %v", err)
 	}
-	field, err := resources.CreateResource(ctx, service.Resource{GroupID: group.ID, Name: "Field", Kind: service.ResourceKindField, CreatedAt: 100})
+	field, err := resources.CreateResource(ctx, service.Resource{GroupID: group.ID, Name: "Field", KindID: kindID(t, harness, service.KindScopeResource, group.ID, "field"), CreatedAt: 100})
 	if err != nil {
 		t.Fatalf("CreateResource() error = %v", err)
 	}
-	foreignField, err := resources.CreateResource(ctx, service.Resource{GroupID: other.ID, Name: "Foreign", Kind: service.ResourceKindField, CreatedAt: 100})
+	foreignField, err := resources.CreateResource(ctx, service.Resource{GroupID: other.ID, Name: "Foreign", KindID: kindID(t, harness, service.KindScopeResource, other.ID, "field"), CreatedAt: 100})
 	if err != nil {
 		t.Fatalf("CreateResource(foreign) error = %v", err)
 	}
@@ -141,8 +141,8 @@ func TestPlanTrainingRepositoryLifecycle(t *testing.T) {
 	// only its link is cleared. A deleted slot leaves the training in place.
 	var eventID int64
 	if err := harness.DB.QueryRowContext(ctx, `
-		INSERT INTO events (group_id, kind, title, starts_at, ends_at, resource_id, plan_training_id, created_at)
-		VALUES ($1, 'training', 'Lions', now(), now() + interval '1 hour', $2, $3, 300) RETURNING id
+		INSERT INTO events (group_id, kind_id, title, starts_at, ends_at, resource_id, plan_training_id, created_at)
+		VALUES ($1, (SELECT id FROM event_kinds WHERE group_id = $1 AND system_code = 'training'), 'Lions', now(), now() + interval '1 hour', $2, $3, 300) RETURNING id
 	`, group.ID, field.ID, again[0].ID).Scan(&eventID); err != nil {
 		t.Fatalf("insert event error = %v", err)
 	}

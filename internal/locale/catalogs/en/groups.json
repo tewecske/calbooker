@@ -76,6 +76,7 @@
     "groups.slug": {"text": "Link name"},
     "groups.slug_help": {"text": "Used in the group's links. Lowercase letters, digits, and hyphens; changing it changes the group's web address."},
     "groups.error.invalid_slug": {"text": "Use lowercase letters, digits, and single hyphens, up to 64 characters. Numbers alone and words like \"new\" or \"settings\" are not allowed."},
-    "groups.error.slug_taken": {"text": "Another group already uses that link name."}
+    "groups.error.slug_taken": {"text": "Another group already uses that link name."},
+    "groups.settings.kinds": {"text": "Manage event kinds and resource kinds"}
   }
 }

@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -18,28 +17,6 @@ const (
 	// use a resource at the same time.
 	MaxResourceConcurrentTeams = 99
 )
-
-// Resource kinds, stored as stable codes and labelled per language.
-const (
-	ResourceKindField = "field"
-	ResourceKindCourt = "court"
-	ResourceKindHall  = "hall"
-	ResourceKindPool  = "pool"
-	ResourceKindRoom  = "room"
-	ResourceKindOther = "other"
-)
-
-var resourceKindOrder = []string{ResourceKindField, ResourceKindCourt, ResourceKindHall, ResourceKindPool, ResourceKindRoom, ResourceKindOther}
-
-// ResourceKinds returns every resource kind in display order.
-func ResourceKinds() []string {
-	return slices.Clone(resourceKindOrder)
-}
-
-// ValidResourceKind reports whether kind is a resource kind.
-func ValidResourceKind(kind string) bool {
-	return slices.Contains(resourceKindOrder, kind)
-}
 
 // Stable resource audit action codes; the group is the target.
 const (
@@ -61,7 +38,11 @@ var (
 	// ErrResourceNameTaken identifies a name already used by another active
 	// resource of the group.
 	ErrResourceNameTaken = errors.New("service: resource name taken")
-	// ErrInvalidResourceKind identifies a kind outside ResourceKinds.
+	// ErrResourceKindArchived identifies an archived kind chosen for a new
+	// or changed resource kind.
+	ErrResourceKindArchived = errors.New("service: resource kind archived")
+	// ErrInvalidResourceKind identifies a kind that is not one of the group's
+	// resource kinds.
 	ErrInvalidResourceKind = errors.New("service: invalid resource kind")
 	// ErrInvalidResourceDescription identifies a description outside storage
 	// limits.
@@ -79,7 +60,12 @@ type Resource struct {
 	ID          int64
 	GroupID     int64
 	Name        string
-	Kind        string
+	// KindID is the group's resource kind. KindCode (the system code, empty
+	// for kinds an administrator added) and the names are filled on reads.
+	KindID      int64
+	KindCode    string
+	KindNameEN  string
+	KindNameHU  string
 	Description *string
 	// MaxConcurrentTeams limits how many teams may use the resource at the
 	// same time; nil is no limit.
@@ -87,6 +73,11 @@ type Resource struct {
 	ArchivedAt         *int64
 	CreatedAt          int64
 	Version            int64
+}
+
+// KindName returns the resource kind's name for a language code.
+func (r Resource) KindName(language string) string {
+	return Kind{NameEN: r.KindNameEN, NameHU: r.KindNameHU}.Name(language)
 }
 
 // Archived reports whether the resource is archived.
@@ -98,7 +89,7 @@ func (r Resource) Archived() bool {
 // no limit.
 type ResourceInput struct {
 	Name               string
-	Kind               string
+	KindID             int64
 	Description        string
 	MaxConcurrentTeams int
 }
@@ -123,6 +114,7 @@ type ResourceService struct {
 	resources ResourceRepository
 	users     UserRepository
 	auditor   AuditRecorder
+	kinds     KindSource
 	now       func() time.Time
 }
 
@@ -142,6 +134,35 @@ func NewResourceService(resources ResourceRepository, users UserRepository) (*Re
 func (s *ResourceService) SetAuditor(auditor AuditRecorder) {
 	if s != nil {
 		s.auditor = auditor
+	}
+}
+
+// SetKinds attaches the group's resource kinds, which resources check. It is
+// intended to be called once during startup.
+func (s *ResourceService) SetKinds(kinds KindSource) {
+	if s != nil {
+		s.kinds = kinds
+	}
+}
+
+// checkKind validates the chosen kind: it must be one of the group's
+// resource kinds, and not archived unless it is the resource's existing kind.
+func (s *ResourceService) checkKind(ctx context.Context, access *GroupAccess, chosen, existing int64) error {
+	if s.kinds == nil {
+		return nil
+	}
+	_, err := s.kinds.Usable(ctx, access, KindScopeResource, chosen)
+	switch {
+	case err == nil:
+		return nil
+	case errors.Is(err, ErrKindArchived) && chosen == existing:
+		return nil
+	case errors.Is(err, ErrKindNotFound):
+		return ErrInvalidResourceKind
+	case errors.Is(err, ErrKindArchived):
+		return ErrResourceKindArchived
+	default:
+		return fmt.Errorf("find resource kind: %w", err)
 	}
 }
 
@@ -213,6 +234,9 @@ func (s *ResourceService) Create(ctx context.Context, actor GroupActor, input Re
 	if err != nil {
 		return Resource{}, err
 	}
+	if err := s.checkKind(ctx, actor.Access, resource.KindID, 0); err != nil {
+		return Resource{}, err
+	}
 	resource.GroupID = actor.Access.GroupID()
 	resource.CreatedAt = s.now().Unix()
 	created, err := s.resources.CreateResource(ctx, resource)
@@ -237,7 +261,10 @@ func (s *ResourceService) Update(ctx context.Context, actor GroupActor, resource
 	if err != nil {
 		return Resource{}, err
 	}
-	resource.Name, resource.Kind, resource.Description, resource.MaxConcurrentTeams = changed.Name, changed.Kind, changed.Description, changed.MaxConcurrentTeams
+	if err := s.checkKind(ctx, actor.Access, changed.KindID, resource.KindID); err != nil {
+		return Resource{}, err
+	}
+	resource.Name, resource.KindID, resource.Description, resource.MaxConcurrentTeams = changed.Name, changed.KindID, changed.Description, changed.MaxConcurrentTeams
 	updated, err := s.update(ctx, resource, expectedVersion)
 	if err != nil {
 		return Resource{}, err
@@ -322,7 +349,7 @@ func (s *ResourceService) update(ctx context.Context, resource Resource, expecte
 func (s *ResourceService) record(ctx context.Context, actor GroupActor, action string, resource Resource) {
 	detail := "resource " + strconv.FormatInt(resource.ID, 10) + ": " + resource.Name
 	if action == AuditActionResourceCreated || action == AuditActionResourceUpdated {
-		detail += "; kind " + resource.Kind
+		detail += "; kind " + resource.KindNameEN
 		if resource.MaxConcurrentTeams != nil {
 			detail += "; max teams " + strconv.Itoa(*resource.MaxConcurrentTeams)
 		}
@@ -350,11 +377,10 @@ func buildResource(input ResourceInput) (Resource, error) {
 	if name == "" || utf8.RuneCountInString(name) > maxResourceNameLength || hasControl(name) {
 		return Resource{}, ErrInvalidResourceName
 	}
-	kind := strings.TrimSpace(input.Kind)
-	if !ValidResourceKind(kind) {
+	if input.KindID <= 0 {
 		return Resource{}, ErrInvalidResourceKind
 	}
-	resource := Resource{Name: name, Kind: kind}
+	resource := Resource{Name: name, KindID: input.KindID}
 	description := strings.TrimSpace(input.Description)
 	if description != "" {
 		if utf8.RuneCountInString(description) > maxResourceDescriptionLength || hasControl(description) {

@@ -183,8 +183,12 @@ func (h *groupHandler) loadCalendarScope(writer http.ResponseWriter, request *ht
 	if id := calendarQueryID(values.Get("resource")); id > 0 && slices.ContainsFunc(resourceOptions, optionHasValue(id)) {
 		selection.filter.ResourceID = id
 	}
-	if kind := strings.TrimSpace(values.Get("kind")); service.ValidEventKind(kind) {
-		selection.filter.Kind = kind
+	kinds, ok := h.calendarKinds(writer, request, current)
+	if !ok {
+		return false
+	}
+	if id := calendarQueryID(values.Get("kind")); id > 0 && slices.ContainsFunc(kinds, func(kind service.Kind) bool { return kind.ID == id }) {
+		selection.filter.KindID = id
 	}
 	// The fixed team narrows the events but is not a filter the viewer set.
 	viewerFilter := selection.filter
@@ -193,8 +197,9 @@ func (h *groupHandler) loadCalendarScope(writer http.ResponseWriter, request *ht
 	}
 	page.TeamOptions = selectOptions(teamOptions, strconv.FormatInt(selection.filter.TeamID, 10))
 	page.ResourceOptions = selectOptions(resourceOptions, strconv.FormatInt(selection.filter.ResourceID, 10))
-	for _, kind := range service.EventKinds() {
-		page.KindOptions = append(page.KindOptions, SelectOptionView{Value: kind, Label: h.t(language, "events.kind."+kind), Selected: kind == selection.filter.Kind})
+	for _, kind := range kinds {
+		value := strconv.FormatInt(kind.ID, 10)
+		page.KindOptions = append(page.KindOptions, SelectOptionView{Value: value, Label: kind.Name(string(language)), Selected: kind.ID == selection.filter.KindID})
 	}
 	page.Filtered = viewerFilter != service.CalendarFilter{}
 	page.PreviousURL = calendarURL(page.BaseURL, week.Previous(), viewerFilter)
@@ -228,7 +233,7 @@ func (h *groupHandler) loadCalendarScope(writer http.ResponseWriter, request *ht
 		})
 	}
 	if teamID == 0 {
-		if page.Groups, ok = h.calendarGroups(writer, request, current, group.ID, week.Monday, selection.filter.Kind); !ok {
+		if page.Groups, ok = h.calendarGroups(writer, request, current, group.ID, week.Monday); !ok {
 			return false
 		}
 	}
@@ -284,9 +289,9 @@ func (h *groupHandler) calendarResourceOptions(writer http.ResponseWriter, reque
 }
 
 // calendarGroups lists the account's groups for switching, keeping the week
-// and the kind filter; team and resource filters belong to one group and are
+// only; the team, resource, and kind filters belong to one group and are
 // dropped.
-func (h *groupHandler) calendarGroups(writer http.ResponseWriter, request *http.Request, current groupRequest, groupID int64, monday time.Time, kind string) ([]CalendarGroupView, bool) {
+func (h *groupHandler) calendarGroups(writer http.ResponseWriter, request *http.Request, current groupRequest, groupID int64, monday time.Time) ([]CalendarGroupView, bool) {
 	if h.dependencies.Groups == nil {
 		return nil, true
 	}
@@ -303,7 +308,7 @@ func (h *groupHandler) calendarGroups(writer http.ResponseWriter, request *http.
 		base := h.groupPath(current.language, summary.Group.Slug, "/calendar")
 		groups = append(groups, CalendarGroupView{
 			Name:    summary.Group.Name,
-			URL:     calendarURL(base, monday, service.CalendarFilter{Kind: kind}),
+			URL:     calendarURL(base, monday, service.CalendarFilter{}),
 			Current: summary.Group.ID == groupID,
 		})
 	}
@@ -377,7 +382,7 @@ func (h *groupHandler) calendarItems(language locale.Code, group service.Group, 
 				EndMinute:   segment.EndMinute,
 				Label:       row.Title,
 				Detail:      calendarDetail(row),
-				Variant:     calendarVariant(event.Kind),
+				Variant:     calendarVariant(event.KindCode),
 				URL:         row.URL,
 				Muted:       row.Cancelled,
 			}
@@ -454,8 +459,8 @@ func calendarURL(base string, monday time.Time, filter service.CalendarFilter) s
 	if filter.ResourceID > 0 {
 		values.Set("resource", strconv.FormatInt(filter.ResourceID, 10))
 	}
-	if filter.Kind != "" {
-		values.Set("kind", filter.Kind)
+	if filter.KindID > 0 {
+		values.Set("kind", strconv.FormatInt(filter.KindID, 10))
 	}
 	if len(values) == 0 {
 		return base

@@ -189,7 +189,7 @@ func newParticipationSetup(t *testing.T) participationSetup {
 	t.Helper()
 	events := &participationEventsStub{events: map[int64]Event{1: storedEvent(1, 1), 2: storedEvent(2, 1)}}
 	nominated := events.events[2]
-	nominated.SignupMode, nominated.Kind = EventSignupNominated, EventKindMatch
+	nominated.SignupMode, nominated.KindID = EventSignupNominated, 2
 	events.events[2] = nominated
 	repo := &participantRepositoryStub{
 		events: events,

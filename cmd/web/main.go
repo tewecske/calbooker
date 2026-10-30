@@ -84,6 +84,7 @@ func main() {
 		Invites:             applicationGraph.Invite,
 		Profiles:            applicationGraph.Profile,
 		Resources:           applicationGraph.Resource,
+		Kinds:               applicationGraph.Kind,
 		Seasons:             applicationGraph.Season,
 		Events:              applicationGraph.Event,
 		Coaches:             applicationGraph.Coach,

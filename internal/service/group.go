@@ -175,7 +175,14 @@ type GroupService struct {
 	memberships GroupMembershipRepository
 	users       UserRepository
 	auditor     AuditRecorder
+	kinds       GroupKindSeeder
 	now         func() time.Time
+}
+
+// GroupKindSeeder gives a new group its default event kinds and resource
+// kinds (KindService).
+type GroupKindSeeder interface {
+	SeedDefaults(ctx context.Context, groupID int64) error
 }
 
 // NewGroupService constructs group use cases with explicit dependencies.
@@ -197,6 +204,14 @@ func NewGroupService(groups GroupRepository, memberships GroupMembershipReposito
 func (s *GroupService) SetAuditor(auditor AuditRecorder) {
 	if s != nil {
 		s.auditor = auditor
+	}
+}
+
+// SetKinds attaches the seeding of default kinds for new groups. It is
+// intended to be called once during startup.
+func (s *GroupService) SetKinds(kinds GroupKindSeeder) {
+	if s != nil {
+		s.kinds = kinds
 	}
 }
 
@@ -258,6 +273,11 @@ func (s *GroupService) Create(ctx context.Context, userID int64, origin, name, t
 	}
 	if err := validateCreatedGroup(created, membership, userID); err != nil {
 		return GroupSummary{}, err
+	}
+	if s.kinds != nil {
+		if err := s.kinds.SeedDefaults(ctx, created.ID); err != nil {
+			return GroupSummary{}, fmt.Errorf("seed group kinds: %w", err)
+		}
 	}
 	s.record(ctx, userID, origin, created.ID, AuditActionGroupCreated, "name: "+created.Name+"; slug: "+created.Slug+"; time zone: "+created.TimeZone)
 	return GroupSummary{Group: created, MemberCount: 1, Roles: []string{GroupRoleAdmin}}, nil

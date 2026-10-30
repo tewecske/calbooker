@@ -30,26 +30,6 @@ const (
 	maxEventListLimit = 500
 )
 
-// Event kinds, stored as stable codes and labelled per language.
-const (
-	EventKindTraining     = "training"
-	EventKindMatch        = "match"
-	EventKindChampionship = "championship"
-	EventKindOther        = "other"
-)
-
-var eventKindOrder = []string{EventKindTraining, EventKindMatch, EventKindChampionship, EventKindOther}
-
-// EventKinds returns every event kind in display order.
-func EventKinds() []string {
-	return slices.Clone(eventKindOrder)
-}
-
-// ValidEventKind reports whether kind is an event kind.
-func ValidEventKind(kind string) bool {
-	return slices.Contains(eventKindOrder, kind)
-}
-
 // Sign-up modes (#9): players opt in, or a coach nominates players who can
 // then opt out.
 const (
@@ -85,7 +65,11 @@ var (
 	// ErrEventNotFound identifies an event that does not exist in the group
 	// or that the account may not see.
 	ErrEventNotFound = errors.New("service: event not found")
-	// ErrInvalidEventKind identifies a kind outside EventKinds.
+	// ErrEventKindArchived identifies an archived kind offered for a new or
+	// changed event kind.
+	ErrEventKindArchived = errors.New("service: event kind archived")
+	// ErrInvalidEventKind identifies a kind that is not one of the group's
+	// event kinds.
 	ErrInvalidEventKind = errors.New("service: invalid event kind")
 	// ErrInvalidEventTitle identifies a title outside storage limits.
 	ErrInvalidEventTitle = errors.New("service: invalid event title")
@@ -154,7 +138,12 @@ func (e *EventFieldError) Unwrap() error {
 type Event struct {
 	ID         int64
 	GroupID    int64
-	Kind       string
+	// KindID is the group's event kind. KindCode (the system code, empty for
+	// kinds an administrator added) and the names are filled on reads.
+	KindID     int64
+	KindCode   string
+	KindNameEN string
+	KindNameHU string
 	Title      string
 	StartsAt   time.Time
 	EndsAt     time.Time
@@ -194,6 +183,11 @@ type EventCoach struct {
 	Username    *string
 }
 
+// KindName returns the event kind's name for a language code.
+func (e Event) KindName(language string) string {
+	return Kind{NameEN: e.KindNameEN, NameHU: e.KindNameHU}.Name(language)
+}
+
 // Cancelled reports whether the event is cancelled.
 func (e Event) Cancelled() bool {
 	return e.CancelledAt != nil
@@ -228,7 +222,7 @@ func (e Event) CoachUserIDs() []int64 {
 // time is missing. ResourceID 0 and an empty Location are none;
 // MaxParticipants 0 is no limit.
 type EventInput struct {
-	Kind            string
+	KindID          int64
 	Title           string
 	StartsAt        time.Time
 	EndsAt          time.Time
@@ -303,6 +297,8 @@ type EventFormOptions struct {
 	Teams []Team
 	// Resources not archived (plus the edited event's own).
 	Resources []Resource
+	// Kinds not archived (plus the edited event's own).
+	Kinds []Kind
 	// Coaches are members with the coach role, for extra coaches.
 	Coaches []GroupMember
 }
@@ -344,7 +340,15 @@ type EventService struct {
 	memberships GroupMembershipRepository
 	users       UserRepository
 	auditor     AuditRecorder
+	kinds       KindSource
+	kindList    EventKindLister
 	now         func() time.Time
+}
+
+// EventKindLister is the part of KindService the event form uses.
+type EventKindLister interface {
+	Active(ctx context.Context, access *GroupAccess, scope KindScope) ([]Kind, error)
+	Find(ctx context.Context, access *GroupAccess, scope KindScope, kindID int64) (Kind, error)
 }
 
 // NewEventService constructs event use cases with explicit dependencies.
@@ -369,6 +373,14 @@ func NewEventService(events EventRepository, teams TeamRepository, resources Eve
 func (s *EventService) SetAuditor(auditor AuditRecorder) {
 	if s != nil {
 		s.auditor = auditor
+	}
+}
+
+// SetKinds attaches the group's event kinds, which events check and the
+// event form lists. It is intended to be called once during startup.
+func (s *EventService) SetKinds(kinds *KindService) {
+	if s != nil && kinds != nil {
+		s.kinds, s.kindList = kinds, kinds
 	}
 }
 
@@ -496,6 +508,16 @@ func (s *EventService) FormOptions(ctx context.Context, access *GroupAccess, eve
 			options.Resources = append(options.Resources, resource)
 		}
 	}
+	if s.kindList != nil {
+		if options.Kinds, err = s.kindList.Active(ctx, access, KindScopeEvent); err != nil {
+			return EventFormOptions{}, fmt.Errorf("list event kinds: %w", err)
+		}
+		if event != nil && !slices.ContainsFunc(options.Kinds, func(k Kind) bool { return k.ID == event.KindID }) {
+			if kind, err := s.kindList.Find(ctx, access, KindScopeEvent, event.KindID); err == nil {
+				options.Kinds = append(options.Kinds, kind)
+			}
+		}
+	}
 	members, err := s.memberships.ListMembers(ctx, access.GroupID())
 	if err != nil {
 		return EventFormOptions{}, fmt.Errorf("list event coaches: %w", err)
@@ -532,6 +554,9 @@ func (s *EventService) Create(ctx context.Context, actor GroupActor, input Event
 	if err := s.checkResource(ctx, actor.Access, event.ResourceID, nil); err != nil {
 		return Event{}, nil, err
 	}
+	if err := s.checkKind(ctx, actor.Access, event.KindID, 0); err != nil {
+		return Event{}, nil, err
+	}
 	event.GroupID = actor.Access.GroupID()
 	event.CreatedAt = s.now().Unix()
 	created, err := s.events.CreateEvent(ctx, event)
@@ -562,6 +587,9 @@ func (s *EventService) Update(ctx context.Context, actor GroupActor, eventID, ex
 		return Event{}, nil, ErrGroupForbidden
 	}
 	if err := s.checkResource(ctx, actor.Access, event.ResourceID, existing.ResourceID); err != nil {
+		return Event{}, nil, err
+	}
+	if err := s.checkKind(ctx, actor.Access, event.KindID, existing.KindID); err != nil {
 		return Event{}, nil, err
 	}
 	event.ID, event.GroupID, event.CreatedAt, event.Version = existing.ID, existing.GroupID, existing.CreatedAt, existing.Version
@@ -684,6 +712,27 @@ func (s *EventService) checkResource(ctx context.Context, access *GroupAccess, c
 		return ErrEventResourceArchived
 	default:
 		return fmt.Errorf("find event resource: %w", err)
+	}
+}
+
+// checkKind validates the chosen kind: it must be one of the group's event
+// kinds, and not archived unless it is the event's existing kind.
+func (s *EventService) checkKind(ctx context.Context, access *GroupAccess, chosen, existing int64) error {
+	if s.kinds == nil {
+		return nil
+	}
+	_, err := s.kinds.Usable(ctx, access, KindScopeEvent, chosen)
+	switch {
+	case err == nil:
+		return nil
+	case errors.Is(err, ErrKindArchived) && chosen == existing:
+		return nil
+	case errors.Is(err, ErrKindNotFound):
+		return ErrInvalidEventKind
+	case errors.Is(err, ErrKindArchived):
+		return ErrEventKindArchived
+	default:
+		return fmt.Errorf("find event kind: %w", err)
 	}
 }
 
@@ -868,7 +917,11 @@ func (s *EventService) timeZone(ctx context.Context, groupID int64) (string, err
 }
 
 func (s *EventService) record(ctx context.Context, actor GroupActor, action string, event Event) {
-	detail := "event " + strconv.FormatInt(event.ID, 10) + ": " + event.Title + "; " + event.Kind +
+	kind := event.KindNameEN
+	if kind == "" {
+		kind = "#" + strconv.FormatInt(event.KindID, 10)
+	}
+	detail := "event " + strconv.FormatInt(event.ID, 10) + ": " + event.Title + "; kind " + kind +
 		"; " + event.StartsAt.UTC().Format(time.RFC3339) + " to " + event.EndsAt.UTC().Format(time.RFC3339)
 	if action == AuditActionEventCreated || action == AuditActionEventUpdated {
 		detail += "; teams " + joinIDs(event.TeamIDs())
@@ -932,8 +985,7 @@ func mapEventWriteError(operation string, err error) error {
 // buildEvent validates event input and converts its wall-clock times in
 // zone to instants (EventInstant).
 func buildEvent(input EventInput, zone string) (Event, error) {
-	kind := strings.TrimSpace(input.Kind)
-	if !ValidEventKind(kind) {
+	if input.KindID <= 0 {
 		return Event{}, ErrInvalidEventKind
 	}
 	title := strings.TrimSpace(input.Title)
@@ -957,7 +1009,7 @@ func buildEvent(input EventInput, zone string) (Event, error) {
 	if !starts.Before(ends) || ends.Sub(starts) > MaxEventDuration {
 		return Event{}, ErrInvalidEventEnd
 	}
-	event := Event{Kind: kind, Title: title, StartsAt: starts, EndsAt: ends}
+	event := Event{KindID: input.KindID, Title: title, StartsAt: starts, EndsAt: ends}
 	teamIDs, ok := uniquePositiveIDs(input.TeamIDs)
 	switch {
 	case !ok || len(teamIDs) > MaxEventTeams:

@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	"github.com/tewecske/calbooker/internal/store/postgres"
 )
 
 // TimeZone is the zone of every demo group (the schema default).
@@ -243,6 +245,13 @@ func (s *seeder) group(g GroupPlan) {
 	groupID := s.insert(`
 		INSERT INTO groups (name, slug, name_norm, time_zone, created_by, created_at)
 		VALUES ($1, $2, $3, $4, $5, $6)`, g.Name, g.Slug, strings.ToLower(g.Name), TimeZone, s.users[g.Admin()], unix)
+	// New groups get the default event kinds and resource kinds when created
+	// through the application; seeded groups get them here.
+	if s.err == nil {
+		if err := postgres.SeedDefaultKinds(s.ctx, s.tx, groupID, unix); err != nil {
+			s.err = fmt.Errorf("seed kinds: %w", err)
+		}
+	}
 	for _, m := range g.Members {
 		userID := s.users[m.Email]
 		s.exec(`INSERT INTO group_members (group_id, user_id, created_at) VALUES ($1, $2, $3)`, groupID, userID, unix)
@@ -252,10 +261,10 @@ func (s *seeder) group(g GroupPlan) {
 	}
 
 	resources := []int64{
-		s.insert(`INSERT INTO resources (group_id, name, kind, description, max_concurrent_teams, created_at)
-			VALUES ($1, 'Field 1', 'field', 'Main pitch', 2, $2)`, groupID, unix),
-		s.insert(`INSERT INTO resources (group_id, name, kind, description, max_concurrent_teams, created_at)
-			VALUES ($1, 'Field 2', 'field', 'Small pitch', 1, $2)`, groupID, unix),
+		s.insert(`INSERT INTO resources (group_id, name, kind_id, description, max_concurrent_teams, created_at)
+			VALUES ($1, 'Field 1', (SELECT id FROM resource_kinds WHERE group_id = $1 AND system_code = 'field'), 'Main pitch', 2, $2)`, groupID, unix),
+		s.insert(`INSERT INTO resources (group_id, name, kind_id, description, max_concurrent_teams, created_at)
+			VALUES ($1, 'Field 2', (SELECT id FROM resource_kinds WHERE group_id = $1 AND system_code = 'field'), 'Small pitch', 1, $2)`, groupID, unix),
 	}
 
 	season := Season(s.now.In(s.loc))
@@ -334,8 +343,8 @@ func (s *seeder) events(groupID, teamID int64, teamIndex int, resources []int64,
 			deadline = starts.Add(-2 * time.Hour)
 		}
 		eventID := s.insert(`
-			INSERT INTO events (group_id, kind, title, starts_at, ends_at, resource_id, location, signup_mode, signup_deadline, created_at)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+			INSERT INTO events (group_id, kind_id, title, starts_at, ends_at, resource_id, location, signup_mode, signup_deadline, created_at)
+			VALUES ($1, (SELECT id FROM event_kinds WHERE group_id = $1 AND system_code = $2), $3, $4, $5, $6, $7, $8, $9, $10)`,
 			groupID, spec.Kind, title, starts, ends, resource, location, mode, deadline, unix)
 		s.exec(`INSERT INTO event_teams (group_id, event_id, team_id) VALUES ($1, $2, $3)`, groupID, eventID, teamID)
 		for _, coach := range team.Coaches {

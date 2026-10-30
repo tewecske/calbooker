@@ -503,7 +503,7 @@ func PlanGeneration(in GenerationInput) (GenerationOutcome, error) {
 			base.StartsAt, base.EndsAt = starts, ends
 			resourceID, weekValue, trainingID := resource.ID, week, training.ID
 			fresh := Event{
-				GroupID: in.GroupID, Kind: EventKindTraining, Title: team.Name, StartsAt: starts, EndsAt: ends, ResourceID: &resourceID,
+				GroupID: in.GroupID, KindCode: EventKindTraining, Title: team.Name, StartsAt: starts, EndsAt: ends, ResourceID: &resourceID,
 				SignupMode: EventSignupOpen, Teams: []EventTeam{{ID: team.ID, Name: team.Name}},
 				PlanTrainingID: &trainingID, GeneratedForWeek: &weekValue, CreatedAt: in.CreatedAt,
 			}
@@ -550,7 +550,7 @@ func PlanGeneration(in GenerationInput) (GenerationOutcome, error) {
 // generatedMatches reports whether a generated event already is what the
 // plan says.
 func generatedMatches(current, fresh Event) bool {
-	return current.Kind == fresh.Kind && current.Title == fresh.Title && current.StartsAt.Equal(fresh.StartsAt) && current.EndsAt.Equal(fresh.EndsAt) &&
+	return current.KindCode == fresh.KindCode && current.Title == fresh.Title && current.StartsAt.Equal(fresh.StartsAt) && current.EndsAt.Equal(fresh.EndsAt) &&
 		current.SignupMode == fresh.SignupMode && current.ResourceID != nil && fresh.ResourceID != nil && *current.ResourceID == *fresh.ResourceID &&
 		slices.Equal(current.TeamIDs(), fresh.TeamIDs()) && current.CancelledAt == nil
 }

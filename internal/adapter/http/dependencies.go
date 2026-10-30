@@ -37,6 +37,8 @@ type Dependencies struct {
 	Invites     InviteUseCases
 	Profiles    ProfileUseCases
 	Resources   ResourceUseCases
+	// Kinds are the group's event kinds and resource kinds (#43).
+	Kinds       KindUseCases
 	Seasons     SeasonUseCases
 	Events      EventUseCases
 	Coaches     CoachUseCases

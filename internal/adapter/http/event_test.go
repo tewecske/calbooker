@@ -99,7 +99,7 @@ func eventFixture() service.Event {
 	deadline := budapestTime("2026-11-06T20:00")
 	carla := "Carla Coach"
 	return service.Event{
-		ID: 5, GroupID: 3, Kind: service.EventKindChampionship, Title: "Autumn cup",
+		ID: 5, GroupID: 3, KindID: 3, KindCode: service.EventKindChampionship, KindNameEN: "Championship", Title: "Autumn cup",
 		StartsAt: budapestTime("2026-11-07T09:00"), EndsAt: budapestTime("2026-11-07T16:00"),
 		Location: &location, SignupMode: service.EventSignupNominated, MaxParticipants: &limit, SignupDeadline: &deadline,
 		Teams: []service.EventTeam{{ID: 4, Name: "Lions"}}, Coaches: []service.EventCoach{{UserID: 9, DisplayName: &carla}}, Version: 2,
@@ -112,7 +112,7 @@ func eventDependencies(t *testing.T, access *service.GroupAccess) (Dependencies,
 	teams.summaries = []service.TeamSummary{{Team: service.Team{ID: 4, Slug: "t4", GroupID: 3, Name: "Lions"}}}
 	event := eventFixture()
 	head := "Hanna Head"
-	court := service.Resource{ID: 31, GroupID: 3, Name: "Court 1", Kind: service.ResourceKindCourt}
+	court := service.Resource{ID: 31, GroupID: 3, Name: "Court 1", KindID: 1}
 	events := &eventsUseCaseStub{
 		list: []service.Event{event},
 		detail: service.EventDetail{
@@ -127,6 +127,7 @@ func eventDependencies(t *testing.T, access *service.GroupAccess) (Dependencies,
 			TimeZone:  "Europe/Budapest",
 			Teams:     []service.Team{{ID: 4, GroupID: 3, Name: "Lions"}, {ID: 5, GroupID: 3, Name: "Tigers"}},
 			Resources: []service.Resource{court},
+			Kinds:     append(defaultEventKindFixtures(), service.Kind{ID: 5, GroupID: 3, NameEN: "Camp", NameHU: "Tábor", ArchivedAt: new(int64(9))}),
 			Coaches:   []service.GroupMember{{UserID: 9, Roles: []string{service.GroupRoleCoach}, DisplayName: eventStr("Carla Coach")}},
 		},
 	}
@@ -274,7 +275,7 @@ func TestEventDetailByRole(t *testing.T) {
 	}
 }
 
-const eventFormBody = "kind=championship&title=Autumn+cup&starts_at=2026-11-07T09%3A00&ends_at=2026-11-07T16%3A00" +
+const eventFormBody = "kind=3&title=Autumn+cup&starts_at=2026-11-07T09%3A00&ends_at=2026-11-07T16%3A00" +
 	"&team_id=4&team_id=5&resource_id=&location=City+stadium&signup_mode=nominated&max_participants=18" +
 	"&signup_deadline=2026-11-06T20%3A00&coach_user_id=9"
 
@@ -285,7 +286,7 @@ func TestEventCreate(t *testing.T) {
 		t.Fatalf("create = %d %q, want 303 to the new event", created.Code, created.Header().Get("Location"))
 	}
 	input := events.lastInput
-	if input.Kind != "championship" || input.Title != "Autumn cup" || service.FormatEventLocalTime(input.StartsAt) != "2026-11-07T09:00" ||
+	if input.KindID != 3 || input.Title != "Autumn cup" || service.FormatEventLocalTime(input.StartsAt) != "2026-11-07T09:00" ||
 		service.FormatEventLocalTime(input.EndsAt) != "2026-11-07T16:00" || !slices.Equal(input.TeamIDs, []int64{4, 5}) || input.ResourceID != 0 ||
 		input.Location != "City stadium" || input.SignupMode != "nominated" || input.MaxParticipants != 18 ||
 		service.FormatEventLocalTime(input.SignupDeadline) != "2026-11-06T20:00" || !slices.Equal(input.CoachUserIDs, []int64{9}) {
@@ -395,5 +396,35 @@ func TestFormatEventRange(t *testing.T) {
 	}
 	if got := formatEventInstant(budapestTime("2026-10-25T03:30"), "Europe/Budapest"); got != "2026-10-25 03:30" {
 		t.Fatalf("fall-back instant = %q", got)
+	}
+}
+
+func TestEventFormListsTheGroupsKinds(t *testing.T) {
+	dependencies, _ := eventDependencies(t, groupMemberAs(service.GroupRoleAdmin))
+	body := serveGroups(t, dependencies, http.MethodGet, "/en/groups/lions/events", "", false).Body.String()
+	for _, want := range []string{`<option value="1" selected>Training</option>`, `<option value="2">Match</option>`, `<option value="3">Championship</option>`, `<option value="5">Camp (Archived)</option>`} {
+		if !strings.Contains(body, want) {
+			t.Errorf("event form missing %q", want)
+		}
+	}
+	hungarian := serveGroups(t, dependencies, http.MethodGet, "/hu/groups/lions/events", "", false).Body.String()
+	for _, want := range []string{`>Edzés</option>`, `>Mérkőzés</option>`, `>Tábor (Archivált)</option>`} {
+		if !strings.Contains(hungarian, want) {
+			t.Errorf("Hungarian event form missing %q", want)
+		}
+	}
+	for name, test := range map[string]struct {
+		err  error
+		text string
+	}{
+		"archived kind": {service.ErrEventKindArchived, "This kind is archived."},
+		"foreign kind":  {service.ErrInvalidEventKind, "Pick a kind."},
+	} {
+		dependencies, events := eventDependencies(t, groupMemberAs(service.GroupRoleAdmin))
+		events.writeErr = test.err
+		response := serveGroups(t, dependencies, http.MethodPost, "/en/groups/lions/events", eventFormBody, true)
+		if response.Code != http.StatusUnprocessableEntity || !strings.Contains(response.Body.String(), test.text) || !strings.Contains(response.Body.String(), `id="event-new-kind-error"`) {
+			t.Errorf("%s = %d, want 422 with %q on the kind field", name, response.Code, test.text)
+		}
 	}
 }

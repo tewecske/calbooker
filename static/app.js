@@ -435,3 +435,250 @@
   document.addEventListener("DOMContentLoaded", () => init(document.documentElement));
   document.addEventListener("htmx:load", (event) => init(event.detail.elt));
 })();
+
+// Combobox (ARIA 1.2 combobox with listbox popup). Enhances a <select> or
+// <select multiple> marked with data-combobox: the native select stays in the
+// form, hidden, as the source of truth, so the form still submits without
+// JavaScript and with the same field names and values. Multi-selects show
+// their choices as removable chips. Texts come from data-combobox-* attributes
+// (placeholder, empty, remove) so the server localizes them.
+(() => {
+  const fold = (text) => text.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
+  let counter = 0;
+
+  const enhance = (select) => {
+    if (select.dataset.comboboxReady) return;
+    select.dataset.comboboxReady = "true";
+    const multiple = select.multiple;
+    const baseID = select.id || `combobox-${++counter}`;
+    const inputID = `${baseID}-input`;
+    const listID = `${baseID}-list`;
+    const options = Array.from(select.options);
+    const label = select.id ? document.querySelector(`label[for="${CSS.escape(select.id)}"]`) : null;
+
+    const root = document.createElement("div");
+    root.className = "relative";
+    const field = document.createElement("div");
+    field.className = "input combobox-field w-full h-auto min-h-10 flex-wrap items-center gap-1 py-1";
+    const input = document.createElement("input");
+    input.type = "text";
+    input.id = inputID;
+    input.className = "combobox-input grow min-w-24";
+    input.setAttribute("role", "combobox");
+    input.setAttribute("aria-autocomplete", "list");
+    input.setAttribute("aria-haspopup", "listbox");
+    input.setAttribute("aria-expanded", "false");
+    input.setAttribute("aria-controls", listID);
+    input.autocomplete = "off";
+    input.placeholder = select.dataset.comboboxPlaceholder || "";
+    const describedBy = select.getAttribute("aria-describedby");
+    if (describedBy) input.setAttribute("aria-describedby", describedBy);
+    const list = document.createElement("ul");
+    list.id = listID;
+    list.className = "combobox-list menu menu-sm absolute z-20 mt-1 w-full flex-nowrap overflow-y-auto rounded-box border border-base-300 bg-base-100 shadow-lg";
+    list.setAttribute("role", "listbox");
+    if (multiple) list.setAttribute("aria-multiselectable", "true");
+    if (label) {
+      label.setAttribute("for", inputID);
+      label.id = label.id || `${baseID}-label`;
+      list.setAttribute("aria-labelledby", label.id);
+    }
+    list.hidden = true;
+    field.append(input);
+    root.append(field, list);
+    select.after(root);
+    select.hidden = true;
+    select.tabIndex = -1;
+    select.removeAttribute("id");
+    select.removeAttribute("aria-describedby");
+
+    let shown = [];
+    let active = -1;
+
+    const open = () => {
+      list.hidden = false;
+      input.setAttribute("aria-expanded", "true");
+    };
+    const close = () => {
+      list.hidden = true;
+      input.setAttribute("aria-expanded", "false");
+      input.removeAttribute("aria-activedescendant");
+      active = -1;
+    };
+    const setActive = (index) => {
+      active = index;
+      list.querySelectorAll("[role=option]").forEach((item, position) => {
+        item.classList.toggle("menu-active", position === index);
+        if (position === index) {
+          item.scrollIntoView({block: "nearest"});
+          input.setAttribute("aria-activedescendant", item.id);
+        }
+      });
+      if (index < 0) input.removeAttribute("aria-activedescendant");
+    };
+
+    const renderChips = () => {
+      field.querySelectorAll(".combobox-chip").forEach((chip) => chip.remove());
+      if (multiple) {
+        for (const option of options.filter((item) => item.selected)) {
+          const chip = document.createElement("span");
+          chip.className = "combobox-chip badge badge-neutral gap-1";
+          chip.dataset.value = option.value;
+          chip.append(document.createTextNode(option.text));
+          const remove = document.createElement("button");
+          remove.type = "button";
+          remove.className = "combobox-remove cursor-pointer";
+          remove.tabIndex = -1;
+          remove.textContent = "×";
+          remove.setAttribute("aria-label", `${select.dataset.comboboxRemove || "Remove"} ${option.text}`);
+          remove.addEventListener("click", () => {
+            option.selected = false;
+            changed();
+            input.focus();
+          });
+          chip.append(remove);
+          field.insertBefore(chip, input);
+        }
+        input.placeholder = options.some((item) => item.selected) ? "" : select.dataset.comboboxPlaceholder || "";
+      } else {
+        const chosen = options.find((item) => item.selected && item.value !== "");
+        input.value = chosen ? chosen.text : "";
+      }
+    };
+
+    const renderList = () => {
+      const query = input.dataset.typed ? fold(input.value.trim()) : "";
+      shown = options.filter((option) => !option.disabled && !(multiple && option.selected) && fold(option.text).includes(query));
+      list.replaceChildren();
+      shown.forEach((option, index) => {
+        const item = document.createElement("li");
+        item.id = `${baseID}-opt-${index}`;
+        item.setAttribute("role", "option");
+        item.setAttribute("aria-selected", String(option.selected));
+        item.dataset.value = option.value;
+        const text = document.createElement("a");
+        text.textContent = option.text;
+        item.append(text);
+        item.addEventListener("mousedown", (event) => {
+          event.preventDefault();
+          choose(option);
+        });
+        list.append(item);
+      });
+      if (shown.length === 0) {
+        const empty = document.createElement("li");
+        empty.className = "menu-disabled";
+        empty.setAttribute("role", "option");
+        empty.setAttribute("aria-disabled", "true");
+        empty.id = `${baseID}-empty`;
+        const text = document.createElement("span");
+        text.textContent = select.dataset.comboboxEmpty || "";
+        empty.append(text);
+        list.append(empty);
+      }
+      setActive(shown.length > 0 ? 0 : -1);
+    };
+
+    const changed = () => {
+      renderChips();
+      select.dispatchEvent(new Event("change", {bubbles: true}));
+    };
+
+    const choose = (option) => {
+      option.selected = true;
+      delete input.dataset.typed;
+      if (multiple) {
+        input.value = "";
+        changed();
+        renderList();
+        open();
+      } else {
+        changed();
+        close();
+      }
+    };
+
+    input.addEventListener("input", () => {
+      input.dataset.typed = "true";
+      renderList();
+      open();
+    });
+    input.addEventListener("focus", () => {
+      if (!multiple) input.select();
+    });
+    input.addEventListener("blur", () => {
+      close();
+      delete input.dataset.typed;
+      input.value = "";
+      renderChips();
+    });
+    field.addEventListener("mousedown", (event) => {
+      if (event.target !== input && !event.target.closest(".combobox-remove")) {
+        event.preventDefault();
+        input.focus();
+      }
+    });
+    input.addEventListener("click", () => {
+      if (list.hidden) {
+        renderList();
+        open();
+      }
+    });
+    input.addEventListener("keydown", (event) => {
+      switch (event.key) {
+        case "ArrowDown":
+        case "ArrowUp": {
+          event.preventDefault();
+          if (list.hidden) {
+            renderList();
+            open();
+            return;
+          }
+          if (shown.length === 0) return;
+          const step = event.key === "ArrowDown" ? 1 : -1;
+          setActive((active + step + shown.length) % shown.length);
+          break;
+        }
+        case "Enter":
+          if (!list.hidden && active >= 0 && shown[active]) {
+            event.preventDefault();
+            choose(shown[active]);
+          } else if (!list.hidden || input.value !== "") {
+            event.preventDefault();
+          }
+          break;
+        case "Escape":
+          if (!list.hidden) {
+            event.preventDefault();
+            event.stopPropagation();
+            close();
+          }
+          break;
+        case "Backspace":
+          if (multiple && input.value === "") {
+            const selected = options.filter((item) => item.selected);
+            if (selected.length > 0) {
+              selected[selected.length - 1].selected = false;
+              changed();
+              if (!list.hidden) renderList();
+            }
+          }
+          break;
+        case "Tab":
+          close();
+          break;
+      }
+    });
+    select.form?.addEventListener("reset", () => setTimeout(renderChips));
+    renderChips();
+  };
+
+  const init = (scope) => {
+    scope.querySelectorAll?.("select[data-combobox]").forEach(enhance);
+    if (scope.matches?.("select[data-combobox]")) enhance(scope);
+  };
+  document.addEventListener("DOMContentLoaded", () => {
+    init(document);
+    document.body.addEventListener("htmx:load", (event) => init(event.target));
+  });
+})();

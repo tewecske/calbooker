@@ -54,8 +54,8 @@ test.describe("team page", () => {
 
     // The create form has the team preselected.
     const teams = page.getByTestId("event-new-teams");
-    await expect(teams.getByLabel(lions)).toBeChecked();
-    await expect(teams.getByLabel(tigers)).not.toBeChecked();
+    await expect(teams.locator("option", { hasText: lions })).toHaveJSProperty("selected", true);
+    await expect(teams.locator("option", { hasText: tigers })).toHaveJSProperty("selected", false);
     await page.locator("#event-new-title").fill(title);
     await page.locator("#event-new-starts-at").fill(`${day}T12:00`);
     await page.locator("#event-new-ends-at").fill(`${day}T13:00`);

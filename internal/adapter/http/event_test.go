@@ -259,7 +259,7 @@ func TestEventDetailByRole(t *testing.T) {
 						t.Errorf("warning missing %q", want)
 					}
 				}
-				if !strings.Contains(body, `value="2026-11-07T09:00"`) || !strings.Contains(body, `id="event-edit-team-4" class="checkbox" type="checkbox" name="team_id" value="4" checked`) || !strings.Contains(body, `id="event-edit-coach-9" class="checkbox" type="checkbox" name="coach_user_id" value="9" checked`) {
+				if !strings.Contains(body, `value="2026-11-07T09:00"`) || !strings.Contains(body, `<option value="4" selected>`) || !strings.Contains(body, `<option value="9" selected>`) {
 					t.Error("edit form not prefilled from the event")
 				}
 			}
@@ -323,7 +323,7 @@ func TestEventCreate(t *testing.T) {
 		if response.Code != http.StatusUnprocessableEntity || !strings.Contains(body, test.text) || !strings.Contains(body, test.field) {
 			t.Errorf("error %v = %d, want 422 with %q on %s", test.err, response.Code, test.text, test.field)
 		}
-		if !strings.Contains(body, `value="Autumn cup"`) || !strings.Contains(body, `value="2026-11-06T20:00"`) || !strings.Contains(body, `name="team_id" value="5" checked`) || !strings.Contains(body, `name="coach_user_id" value="9" checked`) {
+		if !strings.Contains(body, `value="Autumn cup"`) || !strings.Contains(body, `value="2026-11-06T20:00"`) || !strings.Contains(body, `<option value="5" selected>`) || !strings.Contains(body, `<option value="9" selected>`) {
 			t.Errorf("error %v: submitted values not kept", test.err)
 		}
 	}

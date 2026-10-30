@@ -59,7 +59,7 @@ test.describe("kinds", () => {
     await mp.locator("#event-new-title").fill(title);
     await mp.locator("#event-new-starts-at").fill("2027-03-06T09:00");
     await mp.locator("#event-new-ends-at").fill("2027-03-06T11:00");
-    await mp.getByTestId("event-new-teams").getByLabel(teamName).check();
+    await mp.locator("select[name=team_id]").selectOption({ label: teamName }, { force: true });
     await mp.locator("#event-new-location").fill("Lake");
     await mp.getByRole("button", { name: "Add an event" }).click();
     await mp.waitForURL(/\/en\/groups\/[a-z0-9-]+\/events\/\d+$/);

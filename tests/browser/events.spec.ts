@@ -78,8 +78,8 @@ test.describe("events", () => {
     await coach.page.goto(groupURL);
     await coach.page.locator("nav a[data-section=events]").click();
     const teams = coach.page.getByTestId("event-new-teams");
-    await expect(teams.getByLabel(lions)).toBeVisible();
-    await expect(teams.getByLabel(tigers)).toHaveCount(0);
+    await expect(teams.locator("option", { hasText: lions })).toHaveCount(1);
+    await expect(teams.locator("option", { hasText: tigers })).toHaveCount(0);
     await coach.page.locator("#event-new-kind").selectOption({ label: "Championship" });
     await coach.page.locator("#event-new-title").fill(title);
     await coach.page.locator("#event-new-starts-at").fill(`${dateFromToday(7)}T09:00`);
@@ -90,7 +90,7 @@ test.describe("events", () => {
     await coach.page.getByRole("button", { name: "Add an event" }).click();
     await expect(coach.page.locator("#event-new-teams-error")).toContainText("Pick at least one team");
     await expect(coach.page.locator("#event-new-title")).toHaveValue(title);
-    await coach.page.getByTestId("event-new-teams").getByLabel(lions).check();
+    await coach.page.locator("select[name=team_id]").selectOption({ label: lions }, { force: true });
     await coach.page.getByRole("button", { name: "Add an event" }).click();
     await expect(coach.page.locator("#event-new-place-error")).toContainText("not both");
 

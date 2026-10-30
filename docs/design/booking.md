@@ -631,3 +631,19 @@ Refinements made in #43 (open for the owner to confirm):
   too, so old events can be found) and uses the kind ID in `?kind=`; old
   `?kind=training` links are ignored. Switching groups keeps only the week,
   because kind IDs belong to one group. Statistics do not depend on kinds.
+
+Refinements made in #45 (open for the owner to confirm):
+
+- The event form's teams and extra coaches were checkbox lists. They are now
+  `<select multiple>` fields (`team_id`, `coach_user_id`, same values), so the
+  form still submits without JavaScript. Both teams and coaches stay
+  multi-choice.
+- `static/app.js` enhances any `<select data-combobox>` (single or multiple)
+  into an ARIA 1.2 combobox with a listbox popup: type to filter (case- and
+  accent-insensitive), arrows, Enter, Escape, Backspace on an empty input
+  removes the last chip, removable chips for multi-selects. The native select
+  stays in the form, hidden, as the source of truth. It initialises on page
+  load and after HTMX swaps (`htmx:load`). The texts come from
+  `data-combobox-placeholder|empty|remove` (catalog IDs `events.combobox_*`).
+  No new dependency; styles are DaisyUI classes plus a few rules in
+  `static/src/app.css`. Reuse it by adding `data-combobox` to a long select.

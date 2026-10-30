@@ -207,3 +207,25 @@
 .tp-drag {
   @apply opacity-90 shadow-lg;
 }
+
+/* ---- Combobox (static/app.js, templates/events.html) ----
+   The script builds these classes at runtime, so Tailwind scans it. */
+@source "../app.js";
+
+.combobox-list[hidden] {
+  display: none;
+}
+
+.combobox-list {
+  max-height: 15rem;
+}
+
+.combobox-input {
+  background: transparent;
+  outline: none;
+}
+
+.combobox-field:focus-within {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}

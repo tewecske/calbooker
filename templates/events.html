@@ -28,17 +28,12 @@
       {{with .EndsAtError}}<p id="{{$p}}-ends-at-error" class="text-sm text-error" role="alert">{{.}}</p>{{end}}
     </fieldset>
   </div>
-  <fieldset class="fieldset rounded-box border border-base-300 p-4" data-testid="{{$p}}-teams" aria-describedby="{{$p}}-teams-error">
-    <legend class="fieldset-legend">{{$L.events_teams}}</legend>
+  <fieldset class="fieldset" data-testid="{{$p}}-teams">
+    <label class="fieldset-legend" for="{{$p}}-teams-select">{{$L.events_teams}}</label>
     {{if .Teams}}
-      <div class="grid gap-2 sm:grid-cols-2">
-        {{range .Teams}}
-          <label class="label cursor-pointer justify-start gap-3" for="{{$p}}-team-{{.Value}}">
-            <input id="{{$p}}-team-{{.Value}}" class="checkbox" type="checkbox" name="team_id" value="{{.Value}}"{{if .Checked}} checked{{end}}>
-            <span>{{.Label}}</span>
-          </label>
-        {{end}}
-      </div>
+      <select id="{{$p}}-teams-select" class="select w-full" name="team_id" multiple size="4" data-combobox data-combobox-placeholder="{{$L.events_combobox_search}}" data-combobox-empty="{{$L.events_combobox_empty}}" data-combobox-remove="{{$L.events_combobox_remove}}" aria-describedby="{{$p}}-teams-error">
+        {{range .Teams}}<option value="{{.Value}}"{{if .Checked}} selected{{end}}>{{.Label}}</option>{{end}}
+      </select>
     {{else}}
       <p class="label" data-testid="{{$p}}-no-teams">{{$L.events_no_teams}}</p>
     {{end}}
@@ -86,17 +81,12 @@
     <p class="label">{{$L.events_signup_help}}</p>
   </fieldset>
   {{if .Coaches}}
-    <fieldset class="fieldset rounded-box border border-base-300 p-4" data-testid="{{$p}}-coaches">
-      <legend class="fieldset-legend">{{$L.events_extra_coaches}}</legend>
-      <p class="label">{{$L.events_extra_coaches_help}}</p>
-      <div class="grid gap-2 sm:grid-cols-2">
-        {{range .Coaches}}
-          <label class="label cursor-pointer justify-start gap-3" for="{{$p}}-coach-{{.Value}}">
-            <input id="{{$p}}-coach-{{.Value}}" class="checkbox" type="checkbox" name="coach_user_id" value="{{.Value}}"{{if .Checked}} checked{{end}}>
-            <span>{{.Label}}</span>
-          </label>
-        {{end}}
-      </div>
+    <fieldset class="fieldset" data-testid="{{$p}}-coaches">
+      <label class="fieldset-legend" for="{{$p}}-coaches-select">{{$L.events_extra_coaches}}</label>
+      <select id="{{$p}}-coaches-select" class="select w-full" name="coach_user_id" multiple size="4" data-combobox data-combobox-placeholder="{{$L.events_combobox_search}}" data-combobox-empty="{{$L.events_combobox_empty}}" data-combobox-remove="{{$L.events_combobox_remove}}" aria-describedby="{{$p}}-coaches-help {{$p}}-coaches-error">
+        {{range .Coaches}}<option value="{{.Value}}"{{if .Checked}} selected{{end}}>{{.Label}}</option>{{end}}
+      </select>
+      <p id="{{$p}}-coaches-help" class="label">{{$L.events_extra_coaches_help}}</p>
       {{with .CoachesError}}<p id="{{$p}}-coaches-error" class="text-sm text-error" role="alert">{{.}}</p>{{end}}
     </fieldset>
   {{end}}

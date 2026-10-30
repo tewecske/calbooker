@@ -184,12 +184,12 @@ Progress is in the Status table below. The original first steps were:
 | 37 | merged (demo seed) | #39 |
 | 38 | merged (parent links on Members, A/B switch on plan pages) | #40 |
 | 42 | merged (slug URLs, migration 000013) | #49 |
-| 43 | in review, rebasing after #47 (migration 000014) | #52 |
+| 43 | merged (managed kinds, migration 000014) | #52 |
+| 45 | in progress (lane A) | |
 | 44 | merged (team page tabs) | #50 |
-| 46 | in progress (lane B) | |
+| 46 | in review, rebasing after #43 | #53 |
 | 47 | merged (team invites, call-ups, migration 000015) | #51 |
 | 41 | merged (scroll guard; cause not reproduced) | #48 |
-| 45 | open (after #43) | |
 
 ## Owner answers (2026-10-23)
 

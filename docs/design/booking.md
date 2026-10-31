@@ -647,3 +647,16 @@ Refinements made in #45 (open for the owner to confirm):
   `data-combobox-placeholder|empty|remove` (catalog IDs `events.combobox_*`).
   No new dependency; styles are DaisyUI classes plus a few rules in
   `static/src/app.css`. Reuse it by adding `data-combobox` to a long select.
+
+## Refinements made in #55
+
+- The team Roster tab is one list. Each player row lists the player's parents
+  beneath it (derived from `guardians` or added by hand); a parent with several
+  children on the team appears under each child, with the same remove button
+  (hand-added parents only) and test hooks (`data-roster-user`,
+  `data-roster-role`, `data-roster-linked`) under each.
+- Parents with no child on the team are listed last under "Other parents"
+  (`team-other-parents`), so nobody disappears.
+- The coaches card sits above the roster. The separate parents list
+  (`team-parents`) and the "Parent of" line are gone. Linking and unlinking
+  stays on the group Members page; there are no link controls on the roster.

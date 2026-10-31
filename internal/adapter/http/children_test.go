@@ -148,7 +148,7 @@ func TestTeamRosterShowsLinkedParents(t *testing.T) {
 		},
 	}
 	body := serveGroups(t, dependencies, http.MethodGet, "/en/groups/lions/teams/t4", "", false).Body.String()
-	if !strings.Contains(body, `data-roster-linked="true"`) || !strings.Contains(body, "Parent of Anna") {
+	if !strings.Contains(body, `data-roster-linked="true"`) || !strings.Contains(body, "Parent Pat") {
 		t.Fatal("linked parent missing from the roster")
 	}
 	if strings.Contains(body, `value="7:parent"`) {

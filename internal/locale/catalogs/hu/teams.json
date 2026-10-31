@@ -23,7 +23,7 @@
     "teams.roster.remove": {"text": "Eltávolítás"},
     "teams.roster.added": {"text": "Hozzáadva a csapathoz."},
     "teams.roster.removed": {"text": "Eltávolítva a csapatból."},
-    "teams.roster.parent_of": {"text": "Szülője:"},
+    "teams.roster.other_parents": {"text": "További szülők"},
     "teams.tab.roster": {"text": "Névsor"},
     "teams.tab.events": {"text": "Események"},
     "teams.tab.invites": {"text": "Meghívók"},

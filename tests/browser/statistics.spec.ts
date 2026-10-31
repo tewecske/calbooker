@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 
-import { appURL, becomeGuest, createInvite, joinWithCode, poolUser, ssoEnabled, uniqueName } from "./support";
+import { appURL, becomeGuest, createInvite, joinWithCode, pickEventTeams, poolUser, ssoEnabled, uniqueName } from "./support";
 
 // Participation statistics (#11): a coach opens the monthly statistics of
 // their team; a player and a parent see only their own (or their child's)
@@ -21,7 +21,7 @@ async function createEvent(page: Page, groupURL: string, team: string, title: st
   await page.locator("#event-new-title").fill(title);
   await page.locator("#event-new-starts-at").fill(`${day}T09:00`);
   await page.locator("#event-new-ends-at").fill(`${day}T10:30`);
-  await page.getByTestId("event-new-teams").getByLabel(team).check();
+  await pickEventTeams(page, [team]);
   await page.locator("#event-new-location").fill("Clubhouse");
   await page.getByRole("button", { name: "Add an event" }).click();
   await page.waitForURL(/\/en\/groups\/[a-z0-9-]+\/events\/\d+$/);

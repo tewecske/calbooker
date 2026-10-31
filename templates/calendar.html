@@ -2,7 +2,8 @@
      Links and the filter form inside #calendar are boosted: HTMX fetches the
      group page fragment and swaps #page-content, and the address bar follows;
      without JavaScript they are plain links and a GET form. Wide screens get
-     the week grid, narrow ones a list of days. */}}
+     the week grid, narrow ones the agenda (a list of days); ?view=grid|agenda
+     overrides that on any screen. */}}
 {{define "group-calendar"}}
   {{with .Group}}{{$L := .L}}{{with .Calendar}}
     <section id="calendar" class="card card-border bg-base-100 shadow-sm" aria-labelledby="calendar-heading"
@@ -26,7 +27,7 @@
           </div>
         </div>
 
-        <nav class="flex items-center gap-2 md:hidden" aria-label="{{$L.calendar_week_navigation}}">
+        <nav class="flex items-center gap-2 {{.ViewNav}}" aria-label="{{$L.calendar_week_navigation}}">
           <a class="btn btn-sm btn-square" href="{{.PreviousURL}}" aria-label="{{.Grid.Labels.Previous}}" title="{{.Grid.Labels.Previous}}" data-testid="calendar-previous">
             <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5"/></svg>
           </a>
@@ -36,9 +37,15 @@
           </a>
         </nav>
 
+        <nav class="join self-start" aria-label="{{$L.calendar_view_switch}}" data-testid="calendar-view-toggle">
+          <a class="btn btn-sm join-item{{if eq .View "grid"}} btn-active{{else if not .View}} md:btn-active{{end}}" href="{{.GridURL}}"{{if eq .View "grid"}} aria-current="true"{{end}} data-testid="calendar-view-grid">{{$L.calendar_view_grid}}</a>
+          <a class="btn btn-sm join-item{{if eq .View "agenda"}} btn-active{{else if not .View}} max-md:btn-active{{end}}" href="{{.AgendaURL}}"{{if eq .View "agenda"}} aria-current="true"{{end}} data-testid="calendar-view-agenda">{{$L.calendar_view_agenda}}</a>
+        </nav>
+
         <form class="flex flex-wrap items-end gap-2" method="get" action="{{.BaseURL}}" hx-get="{{.BaseURL}}" hx-trigger="change, submit"
               aria-label="{{$L.calendar_filters}}" data-testid="calendar-filters">
           <input type="hidden" name="week" value="{{.Week}}">
+          {{if .View}}<input type="hidden" name="view" value="{{.View}}">{{end}}
           {{if .TeamOptions}}
             <fieldset class="fieldset">
               <label class="fieldset-legend" for="calendar-filter-team">{{$L.calendar_filter_team}}</label>
@@ -87,11 +94,11 @@
           <p class="text-sm opacity-70" role="status" data-testid="calendar-empty">{{if .Filtered}}{{$L.calendar_empty_filtered}}{{else}}{{$L.calendar_empty}}{{end}}</p>
         {{end}}
 
-        <div class="max-md:hidden" data-testid="calendar-grid-view">
+        <div class="{{.ViewGrid}}" data-testid="calendar-grid-view">
           {{template "weekgrid" .Grid}}
         </div>
 
-        <section class="grid gap-3 md:hidden" aria-label="{{$L.calendar_day_list}}" data-testid="calendar-day-list">
+        <section class="grid gap-3 {{.ViewAgenda}}" aria-label="{{$L.calendar_day_list}}" data-testid="calendar-day-list">
           {{range .Days}}
             <article class="card card-border card-sm" aria-labelledby="calendar-day-{{.Date}}" data-calendar-day="{{.Date}}"{{if .Today}} data-calendar-today{{end}}>
               <div class="card-body">

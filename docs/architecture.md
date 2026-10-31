@@ -414,7 +414,15 @@ get `service.ErrGroupNotFound`, which handlers render as 404.
   `FilterCalendarEvents`, and `CalendarEventResources`.
 - The week grid shows 08:00 to 20:00, widened to whole hours so every
   segment fits, in 30-minute rows; items are colored by kind and link to the
-  event page. Below the `md` breakpoint a list of days replaces the grid.
+  event page. The agenda (#57), a list of the week's events grouped by day
+  (time, title, kind, resource and teams, cancelled state, answer badges,
+  child dots, and a "no events" line for empty days), is the other view. The
+  `?view=agenda|grid` parameter picks one on any screen; without it both are
+  rendered and CSS shows the agenda below `md` and the grid from `md` up
+  (`calendarViewClasses`, no script). Week navigation, Today, the filter
+  form, the Clear link, the child filter and the group switcher keep `view`
+  when it is set; any other value is dropped. The Grid / Agenda toggle is a
+  DaisyUI `join` of plain links, so it works without JavaScript.
   Links and the filter form inside `#calendar` are boosted (`hx-boost`,
   target `#page-content`, URL pushed); without JavaScript they are plain
   links and a GET form. The group switcher lists the account's groups when

@@ -660,3 +660,15 @@ Refinements made in #45 (open for the owner to confirm):
 - The coaches card sits above the roster. The separate parents list
   (`team-parents`) and the "Parent of" line are gone. Linking and unlinking
   stays on the group Members page; there are no link controls on the roster.
+
+Refinements made in #57 (open for the owner to confirm):
+
+- Every calendar (group, team Calendar tab, family calendar) has a Grid /
+  Agenda toggle. The former below-`md` day list is now the agenda and can be
+  chosen on any screen with `?view=agenda`; `?view=grid` forces the grid.
+  Without `view` the agenda shows on small screens and the grid from `md`
+  up, picked by CSS (both are rendered), so there is no script and no stored
+  preference. The choice is not remembered between visits; it lives in the
+  URL, and week navigation, Today, filters, Clear and the group switcher keep
+  it.
+- The agenda entries are the day list entries of #10, #30 and #46 unchanged.

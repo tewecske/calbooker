@@ -47,6 +47,9 @@ Issue numbers are the GitHub ones. "After" lists what must be merged first.
 | 45 | Event form autocomplete pickers (hand-rolled) | M5 Owner feedback | 43 | A |
 | 46 | Role-based start page and navigation | M5 Owner feedback | 44 | B |
 | 47 | Team invites, multi-team players, per-event call-ups | M5 Owner feedback | 42 | C |
+| 55 | Team roster as one list | M6 Owner feedback 2 | 44 | B |
+| 56 | Event pages inside the team | M6 Owner feedback 2 | 44 | C |
+| 57 | Weekly agenda view, default on small screens | M6 Owner feedback 2 | 10, 46 | A |
 
 - M1 is one subagent at a time: everything else builds on it.
 - Then at most three lanes run in parallel (A: data and events, B: grid and
@@ -186,6 +189,9 @@ Progress is in the Status table below. The original first steps were:
 | 42 | merged (slug URLs, migration 000013) | #49 |
 | 43 | merged (managed kinds, migration 000014) | #52 |
 | 45 | merged (searchable team and coach pickers) | #54 |
+| 55 | in progress (lane B) | |
+| 56 | in progress (lane C) | |
+| 57 | in progress (lane A) | |
 | 44 | merged (team page tabs) | #50 |
 | 46 | merged (role start page, family nav, child colours) | #53 |
 | 47 | merged (team invites, call-ups, migration 000015) | #51 |

@@ -52,6 +52,7 @@ Issue numbers are the GitHub ones. "After" lists what must be merged first.
 | 57 | Weekly agenda view, default on small screens | M6 Owner feedback 2 | 10, 46 | A |
 | 61 | Fix stale browser specs, full e2e on master | M6 Owner feedback 2 | 56, 57 | B |
 | 62 | Add my child (profile children joined to a team) | M6 Owner feedback 2 | 61 | B |
+| 63 | Remember the calendar Grid/Agenda choice (cookie) | M6 Owner feedback 2 | 56 | A |
 
 - M1 is one subagent at a time: everything else builds on it.
 - Then at most three lanes run in parallel (A: data and events, B: grid and
@@ -196,6 +197,7 @@ Progress is in the Status table below. The original first steps were:
 | 57 | merged (weekly agenda view) | #59 |
 | 61 | open (fix specs broken by #45, full e2e on master) | |
 | 62 | open (after #61) | |
+| 63 | open (after #56) | |
 | 44 | merged (team page tabs) | #50 |
 | 46 | merged (role start page, family nav, child colours) | #53 |
 | 47 | merged (team invites, call-ups, migration 000015) | #51 |

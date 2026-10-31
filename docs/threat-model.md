@@ -102,6 +102,10 @@ state, and revision-checked writes. None are trusted from the client.
   name profiles by ID only, never by the child's name or birth year.
 - Removing a member cascades their roles and team roster entries; removing a
   group role removes the roster entries that depended on it.
+- The `calendar_view` cookie (`agenda` or `grid`) is a functional preference
+  with no personal data. It is HttpOnly, SameSite Lax, Secure like the session
+  cookie, and set by an idempotent GET (no CSRF token needed); any other value
+  is ignored.
 - See [backup and retention](backup-retention.md) for periods and schedules.
 
 ## Operational assumptions

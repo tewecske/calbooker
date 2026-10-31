@@ -71,6 +71,36 @@ const (
 	calendarViewAgenda = "agenda"
 )
 
+// calendarViewCookie remembers the Grid/Agenda choice per device (#63).
+const calendarViewCookie = "calendar_view"
+
+func validCalendarView(value string) bool {
+	return value == calendarViewGrid || value == calendarViewAgenda
+}
+
+// calendarViewChoice returns the view to render: a valid ?view= parameter
+// wins and is remembered in a functional preference cookie (an idempotent
+// write, so no CSRF token); otherwise a valid cookie decides; otherwise empty
+// (the breakpoint default). Invalid values count as unset.
+func (h *groupHandler) calendarViewChoice(writer http.ResponseWriter, request *http.Request) string {
+	if requested := request.URL.Query().Get("view"); validCalendarView(requested) {
+		http.SetCookie(writer, &http.Cookie{
+			Name:     calendarViewCookie,
+			Value:    requested,
+			Path:     "/",
+			MaxAge:   365 * 24 * 60 * 60,
+			HttpOnly: true,
+			Secure:   h.dependencies.SessionCookie.Secure(),
+			SameSite: http.SameSiteLaxMode,
+		})
+		return requested
+	}
+	if cookie, err := request.Cookie(calendarViewCookie); err == nil && validCalendarView(cookie.Value) {
+		return cookie.Value
+	}
+	return ""
+}
+
 // calendarViewClasses returns the visibility classes of the grid, the
 // agenda, and the standalone week navigation (the grid has its own) for a
 // view. Full class names stay literal so the CSS build sees them.
@@ -205,10 +235,7 @@ func (h *groupHandler) loadCalendarScope(writer http.ResponseWriter, request *ht
 		return false
 	}
 	selection.week = week.Monday
-	mode := values.Get("view")
-	if mode != calendarViewGrid && mode != calendarViewAgenda {
-		mode = ""
-	}
+	mode := h.calendarViewChoice(writer, request)
 	events, err := h.dependencies.Events.List(ctx, current.access, service.EventQuery{From: week.From, To: week.To})
 	if err != nil {
 		h.renderEventLoadError(writer, request, language, err)

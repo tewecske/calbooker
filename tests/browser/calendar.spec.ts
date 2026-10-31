@@ -123,6 +123,7 @@ test.describe("calendar", () => {
 
     // On a wide screen the grid is the default and the agenda is selectable.
     await page.setViewportSize({ width: 1280, height: 800 });
+    await page.context().clearCookies({ name: "calendar_view" }); // remembered choice (#63)
     await page.goto(`${groupURL}/calendar`);
     await expect(grid).toBeVisible();
     await expect(dayList).toBeHidden();
@@ -130,6 +131,7 @@ test.describe("calendar", () => {
     await page.waitForURL(/view=agenda/);
     await expect(dayList).toBeVisible();
     await expect(grid).toBeHidden();
+    await page.context().clearCookies({ name: "calendar_view" });
     await page.goto(`${groupURL}/calendar?week=${nextWeek}`);
 
     // Open an event from the grid.

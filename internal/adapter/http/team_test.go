@@ -3,6 +3,7 @@ package httpadapter
 import (
 	"context"
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -205,6 +206,16 @@ func (s *teamsUseCaseStub) BySlug(_ context.Context, _ *service.GroupAccess, slu
 
 func (s *teamsUseCaseStub) ByID(_ context.Context, _ *service.GroupAccess, teamID int64) (service.Team, error) {
 	return service.Team{ID: teamID, GroupID: 3, Slug: "t" + strconv.FormatInt(teamID, 10)}, nil
+}
+
+// ForEvent resolves t<ID> like BySlug but requires the team on the event and
+// the event visible, like TeamService.
+func (s *teamsUseCaseStub) ForEvent(ctx context.Context, access *service.GroupAccess, slug string, event service.Event) (service.Team, error) {
+	team, err := s.BySlug(ctx, access, slug)
+	if err != nil || !access.CanViewEvent(event) || !slices.Contains(event.TeamIDs(), team.ID) {
+		return service.Team{}, service.ErrTeamNotFound
+	}
+	return team, nil
 }
 
 func (s *teamsUseCaseStub) Slugs(context.Context, *service.GroupAccess) (map[int64]string, error) {

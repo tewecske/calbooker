@@ -113,11 +113,11 @@
      tabs (such as invites) are added in team_tabs.go and need no markup. */}}
 {{define "team-tabs"}}
   {{with .TeamTabs}}
-    <nav aria-label="{{.Name}}">
+    {{if .Tabs}}<nav aria-label="{{.Name}}">
       <div role="tablist" class="tabs tabs-box" data-testid="team-tabs">
         {{range .Tabs}}<a role="tab" class="tab{{if .Current}} tab-active{{end}}" href="{{.URL}}" data-team-tab="{{.ID}}"{{if .Current}} aria-selected="true" aria-current="page"{{end}}>{{.Label}}</a>{{end}}
       </div>
-    </nav>
+    </nav>{{end}}
   {{end}}
 {{end}}
 

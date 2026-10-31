@@ -61,20 +61,40 @@ test.describe("team page", () => {
     await page.locator("#event-new-ends-at").fill(`${day}T13:00`);
     await page.locator("#event-new-location").fill("Club ground");
     await page.getByRole("button", { name: "Add an event" }).click();
-    await page.waitForURL(/\/en\/groups\/[a-z0-9-]+\/events\/\d+$/);
+    // Created from the team tab: the event page stays inside the team (#56).
+    await page.waitForURL(new RegExp(`${teamURLs[lions]}/events/\\d+$`));
     await expect(page.locator("#event-heading")).toContainText(title);
     await expect(page.getByTestId("event-teams")).toHaveText(lions);
+    await expect(page.getByTestId("team-tabs").locator("[data-team-tab=events]")).toHaveAttribute("aria-current", "page");
+
+    // Edit it there: the page stays under the team, then Back returns to the tab.
+    const edited = `${title} edited`;
+    await page.locator("#event-edit-title").fill(edited);
+    await page.getByRole("button", { name: "Save event" }).click();
+    await expect(page.locator("#alerts")).toContainText("Event saved.");
+    await expect(page.locator("#event-heading")).toContainText(edited);
+    await expect(page.getByTestId("team-tabs").locator("[data-team-tab=events]")).toHaveAttribute("aria-current", "page");
+    await page.getByRole("link", { name: "Back to events" }).click();
+    await page.waitForURL(`${teamURLs[lions]}/events`);
+
+    // The Events tab opens the event inside the team again, and the other
+    // team's URL for it is a 404.
+    await page.getByTestId("events").getByRole("link", { name: edited }).click();
+    await page.waitForURL(new RegExp(`${teamURLs[lions]}/events/\\d+$`));
+    const eventID = page.url().split("/").pop();
+    expect((await page.goto(`${teamURLs[tigers]}/events/${eventID}`))?.status()).toBe(404);
+    await page.goto(teamURLs[lions]);
 
     // The team's Events and Calendar show it; the other team's do not.
     await page.goto(`${teamURLs[lions]}/events`);
-    await expect(page.getByTestId("events").locator("tr[data-event-id]").filter({ hasText: title })).toHaveCount(1);
+    await expect(page.getByTestId("events").locator("tr[data-event-id]").filter({ hasText: edited })).toHaveCount(1);
     await page.getByTestId("team-tabs").locator("[data-team-tab=calendar]").click();
     await page.waitForURL(`${teamURLs[lions]}/calendar`);
     await page.goto(`${teamURLs[lions]}/calendar?week=${day}`);
     await expect(page.locator("#calendar-filter-team")).toHaveCount(0);
-    await expect(page.getByTestId("calendar-day-list").locator("li[data-event-id]").filter({ hasText: title })).toHaveCount(1);
+    await expect(page.getByTestId("calendar-day-list").locator("li[data-event-id]").filter({ hasText: edited })).toHaveCount(1);
     await page.goto(`${teamURLs[tigers]}/calendar?week=${day}`);
-    await expect(page.getByTestId("calendar-day-list").locator("li[data-event-id]").filter({ hasText: title })).toHaveCount(0);
+    await expect(page.getByTestId("calendar-day-list").locator("li[data-event-id]").filter({ hasText: edited })).toHaveCount(0);
     await page.goto(`${teamURLs[tigers]}/events`);
     await expect(page.getByTestId("events-empty")).toBeVisible();
 

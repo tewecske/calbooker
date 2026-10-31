@@ -81,6 +81,9 @@ func registerParticipationRoutes(mux *http.ServeMux, groups *groupHandler) {
 		mux.HandleFunc("POST "+prefix+"/groups/{group}/events/{eventID}/participation", groups.respondToEvent)
 		mux.HandleFunc("POST "+prefix+"/groups/{group}/events/{eventID}/attendance", groups.recordAttendance)
 		mux.HandleFunc("POST "+prefix+"/groups/{group}/events/{eventID}/call-up", groups.callUpPlayer)
+		mux.HandleFunc("POST "+prefix+"/groups/{group}/teams/{team}/events/{eventID}/participation", groups.respondToEvent)
+		mux.HandleFunc("POST "+prefix+"/groups/{group}/teams/{team}/events/{eventID}/attendance", groups.recordAttendance)
+		mux.HandleFunc("POST "+prefix+"/groups/{group}/teams/{team}/events/{eventID}/call-up", groups.callUpPlayer)
 	}
 }
 

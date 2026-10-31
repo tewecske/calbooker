@@ -20,6 +20,8 @@ type TeamUseCases interface {
 	// current URLs, the ID for the redirect from old numeric URLs.
 	BySlug(ctx context.Context, access *service.GroupAccess, slug string) (service.Team, error)
 	ByID(ctx context.Context, access *service.GroupAccess, teamID int64) (service.Team, error)
+	// ForEvent resolves the team of a team-scoped event page.
+	ForEvent(ctx context.Context, access *service.GroupAccess, slug string, event service.Event) (service.Team, error)
 	// Slugs maps the group's team IDs to URL slugs for building links.
 	Slugs(ctx context.Context, access *service.GroupAccess) (map[int64]string, error)
 	Update(ctx context.Context, actor service.GroupActor, teamID, expectedVersion int64, input service.TeamInput) (service.Team, error)

@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/tewecske/calbooker/internal/locale"
 	"github.com/tewecske/calbooker/internal/service"
 )
 
@@ -309,7 +308,7 @@ func (h *groupHandler) loadCalendarScope(writer http.ResponseWriter, request *ht
 	if !ok {
 		return false
 	}
-	items, days := h.calendarItems(language, group, week, shown, answers, children)
+	items, days := h.calendarItems(current, teamID, group, week, shown, answers, children)
 	grid, err := BuildWeekGrid(calendarGridConfig(week, items, page.PreviousURL, page.NextURL), items, h.renderer.WeekGridTranslator(language))
 	if err != nil {
 		h.renderError(writer, request, http.StatusInternalServerError)
@@ -493,14 +492,22 @@ func (h *groupHandler) calendarAnswers(writer http.ResponseWriter, request *http
 
 // calendarItems turns the week's events into grid items (one per event and
 // day) and the day list's entries.
-func (h *groupHandler) calendarItems(language locale.Code, group service.Group, week service.CalendarWeek, events []service.Event, answers map[int64][]CalendarAnswerView, children []calendarChild) ([]WeekGridItem, [7][]CalendarItemView) {
+func (h *groupHandler) calendarItems(current groupRequest, teamID int64, group service.Group, week service.CalendarWeek, events []service.Event, answers map[int64][]CalendarAnswerView, children []calendarChild) ([]WeekGridItem, [7][]CalendarItemView) {
 	var (
 		items []WeekGridItem
 		days  [7][]CalendarItemView
 	)
+	language := current.language
 	cancelled := h.t(language, "events.cancelled")
 	for _, event := range events {
 		row := h.eventRow(language, group.Slug, group.TimeZone, event)
+		// Events open inside a team: the calendar's own team, else the
+		// viewer's only team on the event.
+		if teamID > 0 && slices.Contains(event.TeamIDs(), teamID) {
+			row.URL = h.teamEventLink(current, teamID, event)
+		} else {
+			row.URL = h.eventLink(current, event)
+		}
 		marks := eventChildren(event, children)
 		segments := week.Segments(event)
 		for _, segment := range segments {

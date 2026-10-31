@@ -672,3 +672,29 @@ Refinements made in #57 (open for the owner to confirm):
   URL, and week navigation, Today, filters, Clear and the group switcher keep
   it.
 - The agenda entries are the day list entries of #10, #30 and #46 unchanged.
+
+Refinements made in #56 (open for the owner to confirm):
+
+- Team-scoped event routes: `/{language}/groups/{group}/teams/{team}/events/{eventID}`
+  with the same `cancel`, `delete`, `participation`, `attendance` and
+  `call-up` writes as the group-level pages (which keep working). They share
+  the group handlers; `eventPathRequest` resolves the team when the path has
+  one. The page renders inside the team's section with the team tabs, Events
+  highlighted, the Teams menu entry current, and Back to the team's Events
+  tab.
+- The event must be one of the team's events, otherwise 404
+  (`TeamService.ForEvent`). Visibility stays with `GroupAccess.CanViewEvent`,
+  so a called-up player (#47) can open the event through its team URL
+  although the team is not theirs; they see the team name but no tabs (the
+  tabs would be closed to them) and Back goes to the group calendar.
+- Writes from the team-scoped page render the team-scoped page again (forms
+  post to the team URL, so no return target is ever taken from the client);
+  delete redirects to the team's Events tab; creating an event from the team's
+  Events tab redirects to the team-scoped event page.
+- Links: `eventLink(current, event)` (`internal/adapter/http/event.go`)
+  returns the team URL when exactly one team of the event is visible to the
+  viewer (administrators see all teams, so an event with one team opens under
+  it; an event with several teams opens at group level for them), else the
+  group-level URL. The calendar uses it; the team's own Calendar and Events
+  tabs always link under their team. The group-level Events list keeps group
+  URLs.

@@ -217,6 +217,9 @@ type groupRequest struct {
 	slug string
 	// teamSlugs resolves team IDs to URL slugs on demand.
 	teamSlugs *teamSlugLookup
+	// eventTeam is set on a team-scoped event page: the team whose tabs
+	// frame the event and whose URL the page's forms and links use.
+	eventTeam *service.Team
 }
 
 func (g groupRequest) actor() service.GroupActor {
@@ -865,7 +868,7 @@ func (h *groupHandler) groupShell(current groupRequest, group service.Group, sec
 		items = append(items, navEntry{groupSectionSettings, "groups.nav.settings", "/settings"})
 	}
 	for _, item := range items {
-		currentSection := section == item.id || (section == groupSectionKinds && item.id == groupSectionSettings) || ((section == groupSectionTeam || section == groupSectionTeamEvents || section == groupSectionTeamCalendar || section == groupSectionTeamInvites) && item.id == groupSectionTeams) || (section == groupSectionResource && item.id == groupSectionResources) || ((section == groupSectionSeason || section == groupSectionCoachBoard) && item.id == groupSectionSeasons) || (section == groupSectionEvent && item.id == groupSectionEvents) ||
+		currentSection := section == item.id || (section == groupSectionKinds && item.id == groupSectionSettings) || ((section == groupSectionTeam || section == groupSectionTeamEvents || section == groupSectionTeamCalendar || section == groupSectionTeamInvites) && item.id == groupSectionTeams) || (section == groupSectionResource && item.id == groupSectionResources) || ((section == groupSectionSeason || section == groupSectionCoachBoard) && item.id == groupSectionSeasons) || (section == groupSectionEvent && current.eventTeam == nil && item.id == groupSectionEvents) || (section == groupSectionEvent && current.eventTeam != nil && item.id == groupSectionTeams) ||
 			(item.id == groupSectionCoaches && (section == groupSectionAvailability || section == groupSectionAvailabilityOverview)) ||
 			(section == groupSectionPlanSlot && item.id == groupSectionPlan) ||
 			(section == groupSectionEventGeneration && item.id == groupSectionTrainingPlan)

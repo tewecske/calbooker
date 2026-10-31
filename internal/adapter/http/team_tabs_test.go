@@ -65,7 +65,7 @@ func TestTeamEventsTabByRole(t *testing.T) {
 				t.Fatalf("status = %d", response.Code)
 			}
 			body := response.Body.String()
-			for _, want := range []string{`id="group-events-heading"`, "Autumn cup", `href="/en/groups/lions/events/5"`, `href="/en/groups/lions/teams/t4/events?when=past"`} {
+			for _, want := range []string{`id="group-events-heading"`, "Autumn cup", `href="/en/groups/lions/teams/t4/events/5"`, `href="/en/groups/lions/teams/t4/events?when=past"`} {
 				if !strings.Contains(body, want) {
 					t.Errorf("team events tab missing %q", want)
 				}
@@ -104,7 +104,7 @@ func TestTeamEventCreate(t *testing.T) {
 	dependencies, events := eventDependencies(t, coachOfTeam(4))
 	form := "title=Cup&kind=training&starts_at=2026-11-07T09:00&ends_at=2026-11-07T10:00&team_id=4&location=Park"
 	response := serveGroups(t, dependencies, http.MethodPost, "/en/groups/lions/teams/t4/events", form, true)
-	if response.Header().Get("HX-Redirect") != "/en/groups/lions/events/99" || events.writes != 1 {
+	if response.Header().Get("HX-Redirect") != "/en/groups/lions/teams/t4/events/99" || events.writes != 1 {
 		t.Fatalf("redirect = %q, writes = %d", response.Header().Get("HX-Redirect"), events.writes)
 	}
 	events.writeErr = service.ErrInvalidEventTeams

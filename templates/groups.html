@@ -130,7 +130,7 @@
       {{if eq .Section "seasons"}}{{template "group-seasons" $}}{{end}}
       {{if eq .Section "season"}}{{template "group-season" $}}{{end}}
       {{if eq .Section "events"}}{{template "group-events" $}}{{end}}
-      {{if eq .Section "event"}}{{template "group-event" $}}{{end}}
+      {{if eq .Section "event"}}{{if .TeamTabs}}{{template "team-tab-head" .}}{{end}}{{template "group-event" $}}{{end}}
       {{if eq .Section "calendar"}}{{template "group-calendar" $}}{{end}}
       {{if eq .Section "coaches"}}{{template "group-coaches" $}}{{end}}
       {{if or (eq .Section "availability") (eq .Section "availability-overview")}}{{template "group-availability" $}}{{end}}

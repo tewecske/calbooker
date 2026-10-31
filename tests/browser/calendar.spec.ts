@@ -29,7 +29,9 @@ async function createEvent(page: Page, groupURL: string, event: { kind: string; 
   await page.locator("#event-new-title").fill(event.title);
   await page.locator("#event-new-starts-at").fill(`${event.day}T${event.from}`);
   await page.locator("#event-new-ends-at").fill(`${event.day}T${event.to}`);
-  await page.getByTestId("event-new-teams").getByLabel(event.team).check();
+  const teams = page.getByRole("combobox", { name: "Teams" });
+  await teams.fill(event.team);
+  await teams.press("Enter");
   await page.locator("#event-new-location").fill("Club ground");
   await page.getByRole("button", { name: "Add an event" }).click();
   await page.waitForURL(/\/en\/groups\/[a-z0-9-]+\/events\/\d+$/);
@@ -104,7 +106,31 @@ test.describe("calendar", () => {
     await expect(dayList.getByRole("link", { name: match })).toHaveCount(0);
     await page.getByTestId("calendar-previous").click();
     await expect(dayList.getByRole("link", { name: match })).toBeVisible();
+
+    // The agenda is the phone default (#57); the toggle switches to the grid,
+    // and the choice stays in the URL through navigation.
+    await page.getByTestId("calendar-view-grid").click();
+    await page.waitForURL(/view=grid/);
+    await expect(grid).toBeVisible();
+    await expect(dayList).toBeHidden();
+    await page.getByTestId("calendar-today").click();
+    await page.waitForURL(/view=grid/);
+    await expect(grid).toBeVisible();
+    await page.getByTestId("calendar-view-agenda").click();
+    await page.waitForURL(/view=agenda/);
+    await expect(dayList).toBeVisible();
+    await expect(grid).toBeHidden();
+
+    // On a wide screen the grid is the default and the agenda is selectable.
     await page.setViewportSize({ width: 1280, height: 800 });
+    await page.goto(`${groupURL}/calendar`);
+    await expect(grid).toBeVisible();
+    await expect(dayList).toBeHidden();
+    await page.getByTestId("calendar-view-agenda").click();
+    await page.waitForURL(/view=agenda/);
+    await expect(dayList).toBeVisible();
+    await expect(grid).toBeHidden();
+    await page.goto(`${groupURL}/calendar?week=${nextWeek}`);
 
     // Open an event from the grid.
     await grid.getByRole("link", { name: training }).click();

@@ -55,6 +55,35 @@ type CalendarView struct {
 	Grid   *WeekGridView
 	Days   []CalendarDayView
 	Empty  bool
+	// View is the requested view, "agenda" or "grid"; empty means the
+	// default (agenda below md, grid from md up, chosen by CSS). The classes
+	// carry the visibility of each part for that view.
+	View       string
+	ViewGrid   string
+	ViewAgenda string
+	ViewNav    string
+	GridURL    string
+	AgendaURL  string
+}
+
+// Calendar view names of the ?view= parameter.
+const (
+	calendarViewGrid   = "grid"
+	calendarViewAgenda = "agenda"
+)
+
+// calendarViewClasses returns the visibility classes of the grid, the
+// agenda, and the standalone week navigation (the grid has its own) for a
+// view. Full class names stay literal so the CSS build sees them.
+func calendarViewClasses(view string) (grid, agenda, nav string) {
+	switch view {
+	case calendarViewGrid:
+		return "", "hidden", "hidden"
+	case calendarViewAgenda:
+		return "hidden", "", ""
+	default:
+		return "max-md:hidden", "md:hidden", "md:hidden"
+	}
 }
 
 // CalendarGroupView is one entry of the group switcher.
@@ -177,6 +206,10 @@ func (h *groupHandler) loadCalendarScope(writer http.ResponseWriter, request *ht
 		return false
 	}
 	selection.week = week.Monday
+	mode := values.Get("view")
+	if mode != calendarViewGrid && mode != calendarViewAgenda {
+		mode = ""
+	}
 	events, err := h.dependencies.Events.List(ctx, current.access, service.EventQuery{From: week.From, To: week.To})
 	if err != nil {
 		h.renderEventLoadError(writer, request, language, err)
@@ -188,7 +221,9 @@ func (h *groupHandler) loadCalendarScope(writer http.ResponseWriter, request *ht
 		Week:        service.FormatSeasonDate(week.Monday),
 		BaseURL:     h.groupPath(language, group.Slug, "/calendar"),
 		CurrentWeek: week.Contains(today),
+		View:        mode,
 	}
+	page.ViewGrid, page.ViewAgenda, page.ViewNav = calendarViewClasses(mode)
 	if teamID > 0 {
 		page.BaseURL = h.teamPath(current, teamID, "/calendar")
 	}
@@ -255,10 +290,13 @@ func (h *groupHandler) loadCalendarScope(writer http.ResponseWriter, request *ht
 		}
 		return link + separator + "child=" + strconv.FormatInt(childFilter.UserID, 10)
 	}
-	page.PreviousURL = withChild(calendarURL(page.BaseURL, week.Previous(), viewerFilter))
-	page.NextURL = withChild(calendarURL(page.BaseURL, week.Next(), viewerFilter))
-	page.TodayURL = withChild(calendarURL(page.BaseURL, time.Time{}, viewerFilter))
-	page.ClearURL = calendarURL(page.BaseURL, week.Monday, service.CalendarFilter{})
+	page.PreviousURL = withChild(calendarURL(page.BaseURL, week.Previous(), viewerFilter, mode))
+	page.NextURL = withChild(calendarURL(page.BaseURL, week.Next(), viewerFilter, mode))
+	page.TodayURL = withChild(calendarURL(page.BaseURL, time.Time{}, viewerFilter, mode))
+	page.ClearURL = calendarURL(page.BaseURL, week.Monday, service.CalendarFilter{}, mode)
+	// The toggle keeps the week and every filter, and sets the view.
+	page.GridURL = withChild(calendarURL(page.BaseURL, week.Monday, viewerFilter, calendarViewGrid))
+	page.AgendaURL = withChild(calendarURL(page.BaseURL, week.Monday, viewerFilter, calendarViewAgenda))
 
 	shown := service.FilterCalendarEvents(events, selection.filter)
 	if childFilter != nil {
@@ -291,7 +329,7 @@ func (h *groupHandler) loadCalendarScope(writer http.ResponseWriter, request *ht
 		})
 	}
 	if teamID == 0 {
-		if page.Groups, ok = h.calendarGroups(writer, request, current, group.ID, week.Monday); !ok {
+		if page.Groups, ok = h.calendarGroups(writer, request, current, group.ID, week.Monday, mode); !ok {
 			return false
 		}
 	}
@@ -394,9 +432,9 @@ func (h *groupHandler) calendarResourceOptions(writer http.ResponseWriter, reque
 }
 
 // calendarGroups lists the account's groups for switching, keeping the week
-// only; the team, resource, and kind filters belong to one group and are
+// and view only; the team, resource, and kind filters belong to one group and are
 // dropped.
-func (h *groupHandler) calendarGroups(writer http.ResponseWriter, request *http.Request, current groupRequest, groupID int64, monday time.Time) ([]CalendarGroupView, bool) {
+func (h *groupHandler) calendarGroups(writer http.ResponseWriter, request *http.Request, current groupRequest, groupID int64, monday time.Time, view string) ([]CalendarGroupView, bool) {
 	if h.dependencies.Groups == nil {
 		return nil, true
 	}
@@ -413,7 +451,7 @@ func (h *groupHandler) calendarGroups(writer http.ResponseWriter, request *http.
 		base := h.groupPath(current.language, summary.Group.Slug, "/calendar")
 		groups = append(groups, CalendarGroupView{
 			Name:    summary.Group.Name,
-			URL:     calendarURL(base, monday, service.CalendarFilter{}),
+			URL:     calendarURL(base, monday, service.CalendarFilter{}, view),
 			Current: summary.Group.ID == groupID,
 		})
 	}
@@ -557,9 +595,12 @@ func calendarGridConfig(week service.CalendarWeek, items []WeekGridItem, previou
 }
 
 // calendarURL links to the week of monday (zero: the current week) with the
-// filter.
-func calendarURL(base string, monday time.Time, filter service.CalendarFilter) string {
+// filter and view (empty: the default).
+func calendarURL(base string, monday time.Time, filter service.CalendarFilter, view string) string {
 	values := url.Values{}
+	if view != "" {
+		values.Set("view", view)
+	}
 	if !monday.IsZero() {
 		values.Set("week", service.FormatSeasonDate(monday))
 	}

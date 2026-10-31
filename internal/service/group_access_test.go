@@ -363,3 +363,25 @@ func TestNewGroupAccessServiceRejectsNilDependencies(t *testing.T) {
 		t.Fatalf("nil users error = %v", err)
 	}
 }
+
+func TestGroupAccessCanSeeAccountStatus(t *testing.T) {
+	tests := []struct {
+		name   string
+		grants GroupAccessGrants
+		want   bool
+	}{
+		{"site admin", GroupAccessGrants{SiteAdmin: true}, true},
+		{"admin", GroupAccessGrants{Member: true, Roles: []string{GroupRoleAdmin}}, true},
+		{"manager", GroupAccessGrants{Member: true, Roles: []string{GroupRoleManager}}, true},
+		{"coach", GroupAccessGrants{Member: true, Roles: []string{GroupRoleCoach}}, true},
+		{"parent", GroupAccessGrants{Member: true, Roles: []string{GroupRoleParent}}, false},
+		{"player", GroupAccessGrants{Member: true, Roles: []string{GroupRolePlayer}}, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := NewGroupAccess(3, 7, tt.grants).CanSeeAccountStatus(); got != tt.want {
+				t.Errorf("CanSeeAccountStatus = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

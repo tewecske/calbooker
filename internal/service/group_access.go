@@ -197,6 +197,12 @@ func (a *GroupAccess) CanManageInvites() bool {
 	return a.CanManageGroup() || a.HasRole(GroupRoleCoach)
 }
 
+// CanSeeAccountStatus reports whether the account may see which roster people
+// have no sign-in account: admins, managers, site administrators, and coaches.
+func (a *GroupAccess) CanSeeAccountStatus() bool {
+	return a.CanManageInvites()
+}
+
 // CanCreateInvite reports whether the account may create, see, and revoke an
 // invite for role and, when teamID > 0, that team. Only admins invite
 // admins; admins and managers invite any other role; coaches invite players

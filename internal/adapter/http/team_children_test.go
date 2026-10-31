@@ -71,14 +71,26 @@ func TestTeamPageHidesAddChildOnArchivedTeam(t *testing.T) {
 
 func TestTeamRosterMarksProfilesWithoutAccount(t *testing.T) {
 	name := "Anna"
-	dependencies, _, teams := groupTestDependencies(t, teamParentAccess())
-	teams.detail = service.TeamDetail{
-		Team:   service.Team{ID: 4, Slug: "t4", GroupID: 3, Name: "Lions"},
-		Roster: []service.TeamRosterEntry{{UserID: 20, Role: service.GroupRolePlayer, Kind: service.UserKindProfile, DisplayName: &name}, {UserID: 8, Role: service.GroupRolePlayer}},
+	tests := []struct {
+		name   string
+		access *service.GroupAccess
+		want   int
+	}{
+		{"parent", teamParentAccess(), 0},
+		{"manager", groupAccessAs(service.GroupAccessGrants{Member: true, Roles: []string{service.GroupRoleManager}}), 1},
 	}
-	body := serveGroups(t, dependencies, http.MethodGet, "/en/groups/lions/teams/t4", "", false).Body.String()
-	if strings.Count(body, `data-testid="roster-no-account"`) != 1 {
-		t.Errorf("want exactly one no-account marker on the roster")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dependencies, _, teams := groupTestDependencies(t, tt.access)
+			teams.detail = service.TeamDetail{
+				Team:   service.Team{ID: 4, Slug: "t4", GroupID: 3, Name: "Lions"},
+				Roster: []service.TeamRosterEntry{{UserID: 20, Role: service.GroupRolePlayer, Kind: service.UserKindProfile, DisplayName: &name}, {UserID: 8, Role: service.GroupRolePlayer}},
+			}
+			body := serveGroups(t, dependencies, http.MethodGet, "/en/groups/lions/teams/t4", "", false).Body.String()
+			if got := strings.Count(body, `data-testid="roster-no-account"`); got != tt.want {
+				t.Errorf("no-account markers = %d, want %d", got, tt.want)
+			}
+		})
 	}
 }
 

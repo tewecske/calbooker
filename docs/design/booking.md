@@ -736,7 +736,8 @@ Refinements made in #56 (open for the owner to confirm):
   `?add_child=1`, which shows an info prompt above the form and focuses the
   name field (`InviteRedemption.Role` carries the invite's role).
 - Roster rows of profile children carry a "No account" badge
-  (`data-testid="roster-no-account"`), shown to every viewer of the roster.
+  (`data-testid="roster-no-account"`), shown only to staff (admins, managers, coaches;
+  `GroupAccess.CanSeeAccountStatus`), not to players or parents.
   Participant lists already mark profiles (#9) and calendars colour children
   through `ChildTeamIDs` (#46). Only linked parents answer for them
   (`CanRespondFor`, verified by a test).

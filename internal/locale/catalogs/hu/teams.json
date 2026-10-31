@@ -45,6 +45,19 @@
     "teams.slug": {"text": "Hivatkozásnév"},
     "teams.slug_help": {"text": "A csapat hivatkozásaiban szerepel. Kisbetűk, számok és kötőjelek; módosítása megváltoztatja a csapat webcímét."},
     "teams.error.invalid_slug": {"text": "Használjon kisbetűket, számokat és egyes kötőjeleket, legfeljebb 64 karakterig. Csak számok, valamint az olyan szavak, mint a „new” vagy az „edit” nem engedélyezettek."},
-    "teams.error.slug_taken": {"text": "Ezt a hivatkozásnevet már használja a csoport egy másik csapata."}
+    "teams.error.slug_taken": {"text": "Ezt a hivatkozásnevet már használja a csoport egy másik csapata."},
+    "teams.roster.no_account": {"text": "Nincs fiók"},
+    "teams.children.heading": {"text": "Gyermekem hozzáadása"},
+    "teams.children.help": {"text": "Adj hozzá egy bejelentkezés nélküli gyermeket. Te válaszolsz helyette, és játékosként csatlakozik ehhez a csapathoz. A nevet és a születési évet csak te, az edzők és a vezetők látják."},
+    "teams.children.prompt": {"text": "Szülőként csatlakoztál. Add hozzá most a gyermekedet a csapathoz."},
+    "teams.children.add": {"text": "Gyermekem hozzáadása"},
+    "teams.children.mine": {"text": "Gyermekeim"},
+    "teams.children.join": {"text": "Hozzáadás ehhez a csapathoz"},
+    "teams.children.leave": {"text": "Eltávolítás a csapatból"},
+    "teams.children.leave_confirm": {"text": "Eltávolítod a gyermeket a csapatból?"},
+    "teams.children.added": {"text": "A gyermeked hozzá lett adva a csapathoz."},
+    "teams.children.saved": {"text": "A gyermek mentve."},
+    "teams.children.joined": {"text": "A gyermeked hozzá lett adva ehhez a csapathoz."},
+    "teams.children.left": {"text": "A gyermeked el lett távolítva ebből a csapatból."}
   }
 }

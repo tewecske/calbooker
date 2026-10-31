@@ -112,7 +112,7 @@ func (h *groupHandler) revokeTeamInvite(writer http.ResponseWriter, request *htt
 // teamFormData drops the submitted values of the invite card, so a failed or
 // finished invite write does not blank the team edit form.
 func teamFormData(form FormData) FormData {
-	if form.Value("invite") != "" || form.Value("created") != "" {
+	if form.Value("invite") != "" || form.Value("child_form") != "" || form.Value("created") != "" {
 		return FormData{}
 	}
 	return form

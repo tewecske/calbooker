@@ -59,7 +59,8 @@ func TestSeedFillsAndIsRepeatable(t *testing.T) {
 			t.Errorf("%s: %d then %d", table, n, second[table])
 		}
 	}
-	want := map[string]int{"users": 77, "oauth_identities": 77, "groups": 3, "teams": 5, "guardians": 30, "season_parts": 6,
+	// users and guardians include the profile child "BVSC Kid 1" (no identity).
+	want := map[string]int{"users": 78, "oauth_identities": 77, "groups": 3, "teams": 5, "guardians": 31, "season_parts": 6,
 		"season_team_coaches": 9, "plan_trainings": 0}
 	for table, n := range want {
 		if first[table] != n {

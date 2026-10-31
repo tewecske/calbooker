@@ -710,3 +710,41 @@ Refinements made in #56 (open for the owner to confirm):
   group-level URL. The calendar uses it; the team's own Calendar and Events
   tabs always link under their team. The group-level Events list keeps group
   URLs.
+
+## Refinements made in #62
+
+- "Add my child" is a card on the team's Roster tab, not its own tab. The
+  roster is where the child appears, the parent sees the result at once, and
+  a tab would add a fourth entry to the submenu for a form most parents use a
+  few times a season. The card shows for parents of the team (a roster entry
+  as parent, or a linked child who plays on it) on non-archived teams.
+  `GroupAccess.CanAddChildToTeam(teamID)` answers; everyone else sees no card.
+- `POST .../teams/{team}/children` (name, birth year) creates the profile,
+  links it to the parent as guardian and puts it on the team as a player in
+  one transaction (`ProfileService.AddChildToTeam`, which reuses
+  `ProfileRepository.CreateProfile`). A non-member gets 404 as for every team
+  route; a member who is not a parent of the team gets 403.
+- Editing from the same card: rename or correct the birth year (revision
+  checked, `UpdateProfile`), add the child to another team the parent is a
+  parent on (`.../children/{id}/join`) and remove it from a team
+  (`.../children/{id}/leave`, allowed for any team the parent can see). Only
+  profiles linked to the caller are listed and acted on; account children are
+  untouched. Staff keep the Members and roster controls (a profile is a
+  player member, so it is in the roster candidates) and the old Children
+  routes.
+- Joining with a parent team invite redirects to the team page with
+  `?add_child=1`, which shows an info prompt above the form and focuses the
+  name field (`InviteRedemption.Role` carries the invite's role).
+- Roster rows of profile children carry a "No account" badge
+  (`data-testid="roster-no-account"`), shown to every viewer of the roster.
+  Participant lists already mark profiles (#9) and calendars colour children
+  through `ChildTeamIDs` (#46). Only linked parents answer for them
+  (`CanRespondFor`, verified by a test).
+- Audit entries: `group.profile_created` (profile, guardian and team IDs),
+  `group.profile_team_added` and `group.profile_team_removed`. Never the
+  child's name or birth year.
+- No migration. The demo seed gives BVSC's `bvsc-parent-1` a profile child
+  "BVSC Kid 1" on BVSC U10.
+- Not in scope, a later option: "give my child their own login". Profiles are
+  users, so a claim flow like the guest upgrade (convert the profile to an
+  issuer account, keep roster, guardian links and answers) would fit.

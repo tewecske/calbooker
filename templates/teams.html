@@ -90,7 +90,7 @@
       {{range .Rows}}
         <li class="list-row items-center" data-roster-user="{{.UserID}}" data-roster-role="{{.Role}}"{{if .Linked}} data-roster-linked="true"{{end}}>
           <div class="list-col-grow">
-            <div>{{.Label}}</div>
+            <div>{{.Label}}{{if .NoAccount}} <span class="badge badge-ghost badge-sm" data-testid="roster-no-account">{{$.NoAccountLabel}}</span>{{end}}</div>
             {{if .Email}}<div class="text-sm opacity-70">{{.Email}}</div>{{end}}
             {{with .Parents}}<div class="mt-2 ms-4 border-s-2 border-base-300 ps-3" data-testid="roster-parents"><div class="text-xs opacity-70">{{.Heading}}</div>{{template "team-roster-rows" .}}</div>{{end}}
           </div>
@@ -255,6 +255,64 @@
       </div>
     </section>
 
+
+    {{with .AddChild}}
+      <section class="card card-border bg-base-100 shadow-sm" aria-labelledby="team-add-child-heading" data-testid="team-add-child">
+        <div class="card-body">
+          <h2 id="team-add-child-heading" class="card-title">{{$L.teams_children_heading}}</h2>
+          {{if .Prompt}}<div role="status" class="alert alert-info alert-soft" data-testid="add-child-prompt"><span>{{$L.teams_children_prompt}}</span></div>{{end}}
+          <p class="text-sm opacity-70">{{$L.teams_children_help}}</p>
+          <form class="grid gap-4 sm:grid-cols-[1fr_10rem_auto] sm:items-start" method="post" action="{{.AddURL}}" hx-post="{{.AddURL}}" hx-target="#page-content" hx-swap="outerHTML" hx-disabled-elt="this">
+            <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
+            <fieldset class="fieldset">
+              <label class="fieldset-legend" for="team-child-name">{{$L.children_name}}</label>
+              <input id="team-child-name" class="input w-full" name="display_name" required maxlength="64" value="{{.Name}}"{{if .Prompt}} autofocus{{end}} aria-describedby="team-child-name-error">
+              {{with .NameError}}<p id="team-child-name-error" class="text-sm text-error" role="alert">{{.}}</p>{{end}}
+            </fieldset>
+            <fieldset class="fieldset">
+              <label class="fieldset-legend" for="team-child-birth-year">{{$L.children_birth_year}}</label>
+              <input id="team-child-birth-year" class="input w-full" type="number" name="birth_year" required min="1900" max="2200" value="{{.BirthYear}}" aria-describedby="team-child-year-error">
+              {{with .YearError}}<p id="team-child-year-error" class="text-sm text-error" role="alert">{{.}}</p>{{end}}
+            </fieldset>
+            <div class="sm:pt-8"><button class="btn btn-primary" type="submit">{{$L.teams_children_add}}</button></div>
+          </form>
+          {{if .Children}}
+            <div class="divider"></div>
+            <h3 class="font-semibold">{{$L.teams_children_mine}}</h3>
+            <ul class="list rounded-box border border-base-300" data-testid="team-my-children">
+              {{range .Children}}
+                <li class="list-row items-center" data-child-user="{{.UserID}}">
+                  <div class="list-col-grow">
+                    <div>{{.Label}} <span class="opacity-70">({{.BirthYear}})</span></div>
+                    <details class="mt-1">
+                      <summary class="link text-sm">{{$L.children_edit}}</summary>
+                      <form class="mt-2 grid gap-2 sm:grid-cols-[1fr_8rem_auto] sm:items-end" method="post" action="{{.EditURL}}" hx-post="{{.EditURL}}" hx-target="#page-content" hx-swap="outerHTML" hx-disabled-elt="this">
+                        <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
+                        <input type="hidden" name="version" value="{{.Version}}">
+                        <input class="input input-sm w-full" name="display_name" required maxlength="64" value="{{.Label}}" aria-label="{{$L.children_name}}: {{.Label}}">
+                        <input class="input input-sm w-full" type="number" name="birth_year" required min="1900" max="2200" value="{{.BirthYear}}" aria-label="{{$L.children_birth_year}}: {{.Label}}">
+                        <button class="btn btn-sm" type="submit">{{$L.children_save}}</button>
+                      </form>
+                    </details>
+                  </div>
+                  {{if .OnTeam}}
+                    <form method="post" action="{{.LeaveURL}}" hx-post="{{.LeaveURL}}" hx-target="#page-content" hx-swap="outerHTML" hx-disabled-elt="this" hx-confirm="{{$L.teams_children_leave_confirm}}">
+                      <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
+                      <button class="btn btn-xs btn-outline btn-error" type="submit" aria-label="{{$L.teams_children_leave}}: {{.Label}}">{{$L.teams_children_leave}}</button>
+                    </form>
+                  {{else}}
+                    <form method="post" action="{{.JoinURL}}" hx-post="{{.JoinURL}}" hx-target="#page-content" hx-swap="outerHTML" hx-disabled-elt="this">
+                      <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
+                      <button class="btn btn-xs btn-outline" type="submit" aria-label="{{$L.teams_children_join}}: {{.Label}}">{{$L.teams_children_join}}</button>
+                    </form>
+                  {{end}}
+                </li>
+              {{end}}
+            </ul>
+          {{end}}
+        </div>
+      </section>
+    {{end}}
 
     {{if .CanEdit}}
       <section class="card card-border bg-base-100 shadow-sm" aria-labelledby="team-edit-heading">

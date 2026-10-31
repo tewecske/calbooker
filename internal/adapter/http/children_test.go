@@ -165,6 +165,9 @@ type profilesUseCaseStub struct {
 	lastVersion int64
 	lastParent  int64
 	lastChild   int64
+	lastTeam    int64
+	joined      []int64
+	left        []int64
 }
 
 func (s *profilesUseCaseStub) write() error {
@@ -200,5 +203,22 @@ func (s *profilesUseCaseStub) AddGuardian(_ context.Context, _ service.GroupActo
 
 func (s *profilesUseCaseStub) RemoveGuardian(_ context.Context, _ service.GroupActor, parentID, childID int64) error {
 	s.lastParent, s.lastChild = parentID, childID
+	return s.write()
+}
+
+func (s *profilesUseCaseStub) AddChildToTeam(_ context.Context, _ service.GroupActor, teamID int64, input service.ProfileInput) (service.ChildProfile, error) {
+	s.lastTeam, s.lastInput = teamID, input
+	return service.ChildProfile{UserID: 21}, s.write()
+}
+
+func (s *profilesUseCaseStub) JoinChildToTeam(_ context.Context, _ service.GroupActor, teamID, childID int64) error {
+	s.lastTeam, s.lastChild = teamID, childID
+	s.joined = append(s.joined, childID)
+	return s.write()
+}
+
+func (s *profilesUseCaseStub) RemoveChildFromTeam(_ context.Context, _ service.GroupActor, teamID, childID int64) error {
+	s.lastTeam, s.lastChild = teamID, childID
+	s.left = append(s.left, childID)
 	return s.write()
 }

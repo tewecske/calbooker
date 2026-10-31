@@ -45,6 +45,19 @@
     "teams.slug": {"text": "Link name"},
     "teams.slug_help": {"text": "Used in the team's links. Lowercase letters, digits, and hyphens; changing it changes the team's web address."},
     "teams.error.invalid_slug": {"text": "Use lowercase letters, digits, and single hyphens, up to 64 characters. Numbers alone and words like \"new\" or \"edit\" are not allowed."},
-    "teams.error.slug_taken": {"text": "Another team in this group already uses that link name."}
+    "teams.error.slug_taken": {"text": "Another team in this group already uses that link name."},
+    "teams.roster.no_account": {"text": "No account"},
+    "teams.children.heading": {"text": "Add my child"},
+    "teams.children.help": {"text": "Add a child who has no login. You answer for them, and they join this team as a player. Only you, the coaches and the managers see the name and birth year."},
+    "teams.children.prompt": {"text": "You joined as a parent. Add your child to the team now."},
+    "teams.children.add": {"text": "Add my child"},
+    "teams.children.mine": {"text": "My children"},
+    "teams.children.join": {"text": "Add to this team"},
+    "teams.children.leave": {"text": "Remove from team"},
+    "teams.children.leave_confirm": {"text": "Remove this child from the team?"},
+    "teams.children.added": {"text": "Your child was added to the team."},
+    "teams.children.saved": {"text": "Child saved."},
+    "teams.children.joined": {"text": "Your child was added to this team."},
+    "teams.children.left": {"text": "Your child was removed from this team."}
   }
 }

@@ -40,11 +40,13 @@ var (
 
 // Profile and guardian audit action codes.
 const (
-	AuditActionProfileCreated  = "group.profile_created"
-	AuditActionProfileUpdated  = "group.profile_updated"
-	AuditActionProfileDeleted  = "group.profile_deleted"
-	AuditActionGuardianAdded   = "group.guardian_added"
-	AuditActionGuardianRemoved = "group.guardian_removed"
+	AuditActionProfileCreated     = "group.profile_created"
+	AuditActionProfileUpdated     = "group.profile_updated"
+	AuditActionProfileDeleted     = "group.profile_deleted"
+	AuditActionProfileTeamAdded   = "group.profile_team_added"
+	AuditActionProfileTeamRemoved = "group.profile_team_removed"
+	AuditActionGuardianAdded      = "group.guardian_added"
+	AuditActionGuardianRemoved    = "group.guardian_removed"
 )
 
 // ChildProfile is a child without a login: a users row with kind 'profile'
@@ -235,6 +237,113 @@ func (s *ProfileService) CreateProfile(ctx context.Context, actor GroupActor, in
 	}
 	s.record(ctx, actor, AuditActionProfileCreated, detail)
 	return created, nil
+}
+
+// AddChildToTeam creates a child profile for the parent and joins it to the
+// team as a player, in one transaction (#62). The parent must be on the team
+// as a parent; the team must be visible and not archived. The profile is
+// linked to the parent.
+func (s *ProfileService) AddChildToTeam(ctx context.Context, actor GroupActor, teamID int64, input ProfileInput) (ChildProfile, error) {
+	team, err := s.childTeam(ctx, actor, teamID)
+	if err != nil {
+		return ChildProfile{}, err
+	}
+	name, err := normalizeProfileName(input.DisplayName)
+	if err != nil {
+		return ChildProfile{}, err
+	}
+	if err := validateBirthYear(input.BirthYear); err != nil {
+		return ChildProfile{}, err
+	}
+	userID := actor.Access.UserID()
+	profile := ChildProfile{GroupID: actor.Access.GroupID(), DisplayName: name, BirthYear: input.BirthYear, CreatedBy: &userID, CreatedAt: s.now().Unix()}
+	created, err := s.profiles.CreateProfile(ctx, profile, userID, team.ID)
+	if err != nil {
+		switch {
+		case errors.Is(err, ErrGuardianNeedsParentRole), errors.Is(err, ErrMembershipNotFound), errors.Is(err, ErrTeamNotFound):
+			return ChildProfile{}, err
+		}
+		return ChildProfile{}, fmt.Errorf("add child to team: %w", err)
+	}
+	s.record(ctx, actor, AuditActionProfileCreated, profileAuditDetail(created)+"; guardian "+strconv.FormatInt(userID, 10)+"; team "+strconv.FormatInt(team.ID, 10))
+	return created, nil
+}
+
+// JoinChildToTeam puts a child profile of the parent on another team as a
+// player. The parent must be on that team as a parent.
+func (s *ProfileService) JoinChildToTeam(ctx context.Context, actor GroupActor, teamID, childUserID int64) error {
+	team, err := s.childTeam(ctx, actor, teamID)
+	if err != nil {
+		return err
+	}
+	if childUserID <= 0 || !actor.Access.IsGuardianOf(childUserID) {
+		return ErrProfileNotFound
+	}
+	if _, err := s.profiles.FindProfile(ctx, actor.Access.GroupID(), childUserID); err != nil {
+		return err
+	}
+	if err := s.teams.AddRosterEntry(ctx, actor.Access.GroupID(), team.ID, childUserID, GroupRolePlayer, s.now().Unix()); err != nil {
+		if errors.Is(err, ErrTeamNotFound) || errors.Is(err, ErrRosterRoleMissing) {
+			return err
+		}
+		return fmt.Errorf("add child roster entry: %w", err)
+	}
+	s.record(ctx, actor, AuditActionProfileTeamAdded, "profile "+strconv.FormatInt(childUserID, 10)+"; team "+strconv.FormatInt(team.ID, 10))
+	return nil
+}
+
+// RemoveChildFromTeam takes a child profile off a team. The child's
+// guardians; staff use the roster.
+func (s *ProfileService) RemoveChildFromTeam(ctx context.Context, actor GroupActor, teamID, childUserID int64) error {
+	if err := s.validate(ctx); err != nil {
+		return err
+	}
+	if !actor.Access.CanView() {
+		return ErrGroupNotFound
+	}
+	if teamID <= 0 || !actor.Access.CanViewTeam(teamID) {
+		return ErrTeamNotFound
+	}
+	if childUserID <= 0 || !actor.Access.CanRemoveChildFromTeam(teamID, childUserID) {
+		return ErrProfileNotFound
+	}
+	if _, err := s.profiles.FindProfile(ctx, actor.Access.GroupID(), childUserID); err != nil {
+		return err
+	}
+	if err := s.teams.RemoveRosterEntry(ctx, actor.Access.GroupID(), teamID, childUserID, GroupRolePlayer); err != nil {
+		if errors.Is(err, ErrRosterEntryNotFound) {
+			return err
+		}
+		return fmt.Errorf("remove child roster entry: %w", err)
+	}
+	s.record(ctx, actor, AuditActionProfileTeamRemoved, "profile "+strconv.FormatInt(childUserID, 10)+"; team "+strconv.FormatInt(teamID, 10))
+	return nil
+}
+
+// childTeam authorizes adding a child to the team and returns it. A team
+// the account cannot see is not found; a visible team they are not a parent
+// on, or an archived one, is forbidden.
+func (s *ProfileService) childTeam(ctx context.Context, actor GroupActor, teamID int64) (Team, error) {
+	if err := s.validate(ctx); err != nil {
+		return Team{}, err
+	}
+	if !actor.Access.CanView() {
+		return Team{}, ErrGroupNotFound
+	}
+	if teamID <= 0 || !actor.Access.CanViewTeam(teamID) {
+		return Team{}, ErrTeamNotFound
+	}
+	if !actor.Access.CanAddChildToTeam(teamID) {
+		return Team{}, ErrGroupForbidden
+	}
+	team, err := s.teams.FindTeam(ctx, actor.Access.GroupID(), teamID)
+	if err != nil {
+		return Team{}, err
+	}
+	if team.Archived() {
+		return Team{}, ErrGroupForbidden
+	}
+	return team, nil
 }
 
 // UpdateProfile renames a profile or changes its birth year at the expected

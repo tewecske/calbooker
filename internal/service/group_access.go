@@ -241,6 +241,24 @@ func (a *GroupAccess) CanEditProfile(userID int64) bool {
 	return a.CanManageGroup() || a.IsGuardianOf(userID)
 }
 
+// CanAddChildToTeam reports whether the account may add a child profile of
+// their own to the team (#62): a member with the parent role who is on that
+// team as a parent, either by a roster entry or because a linked child
+// plays there. Whether the team is archived is the use case's rule.
+func (a *GroupAccess) CanAddChildToTeam(teamID int64) bool {
+	if !a.IsMember() || teamID <= 0 || !a.HasRole(GroupRoleParent) {
+		return false
+	}
+	return slices.Contains(a.ownTeams, TeamRole{TeamID: teamID, Role: GroupRoleParent}) || slices.Contains(a.children, teamID)
+}
+
+// CanRemoveChildFromTeam reports whether the account may take the child
+// userID off the team: the child's guardians, on any team they can see.
+// Staff use the roster (CanManageRoster).
+func (a *GroupAccess) CanRemoveChildFromTeam(teamID, userID int64) bool {
+	return a.IsGuardianOf(userID) && a.CanViewTeam(teamID)
+}
+
 // CanManageGuardians reports whether the account may link any parent to any
 // child and remove links (admins, managers, site administrators).
 func (a *GroupAccess) CanManageGuardians() bool {

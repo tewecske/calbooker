@@ -412,8 +412,9 @@ func (h *groupHandler) loadTeam(writer http.ResponseWriter, request *http.Reques
 			players[entry.UserID] = true
 		}
 	}
+	showNoAccount := current.access.CanSeeAccountStatus()
 	rowOf := func(entry service.TeamRosterEntry) RosterRowView {
-		row := RosterRowView{UserID: entry.UserID, Label: h.memberLabel(language, entry.UserID, entry.DisplayName, entry.Username, entry.Email), Role: entry.Role, Linked: entry.Linked, NoAccount: entry.Kind == service.UserKindProfile}
+		row := RosterRowView{UserID: entry.UserID, Label: h.memberLabel(language, entry.UserID, entry.DisplayName, entry.Username, entry.Email), Role: entry.Role, Linked: entry.Linked, NoAccount: showNoAccount && entry.Kind == service.UserKindProfile}
 		if entry.Email != nil {
 			row.Email = *entry.Email
 		}

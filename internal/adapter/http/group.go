@@ -392,6 +392,10 @@ func (h *groupHandler) join(writer http.ResponseWriter, request *http.Request) {
 	route := "/groups/" + redemption.GroupSlug
 	if redemption.TeamSlug != "" {
 		route += "/teams/" + redemption.TeamSlug
+		if redemption.Role == service.GroupRoleParent {
+			// A parent is offered "Add my child" right after joining (#62).
+			route += "?add_child=1"
+		}
 	}
 	h.redirectLocalized(writer, request, language, route)
 }

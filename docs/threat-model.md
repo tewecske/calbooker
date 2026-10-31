@@ -100,6 +100,15 @@ state, and revision-checked writes. None are trusted from the client.
   is removed only by deleting it (its guardians or group staff), which
   cascades its membership, roster entries, and guardian links. Audit entries
   name profiles by ID only, never by the child's name or birth year.
+- A parent adds a child to a team from the team page (#62). The child's name
+  and birth year are stored on the parent's say-so: calbooker does not verify
+  that the child exists, that the parent is the guardian, or that the birth year
+  is right. They are shown to members who see the team roster and to the
+  event's participant lists (names, not birth years), and the birth year to the
+  guardians and group staff. The parent can correct or delete the profile, and
+  group staff can too. Only linked parents answer for the child. A parent can
+  add children only to teams they are a parent on, and a profile never gets a
+  login or an email.
 - Removing a member cascades their roles and team roster entries; removing a
   group role removes the roster entries that depended on it.
 - The `calendar_view` cookie (`agenda` or `grid`) is a functional preference

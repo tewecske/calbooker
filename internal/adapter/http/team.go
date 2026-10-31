@@ -87,7 +87,9 @@ type RosterListView struct {
 	CanManage   bool
 	RemoveURL   string
 	RemoveLabel string
-	EmptyLabel  string
+	// NoAccountLabel marks child profiles.
+	NoAccountLabel string
+	EmptyLabel     string
 	// Heading titles a nested list (the parents under a player).
 	Heading   string
 	CSRFToken string
@@ -133,6 +135,9 @@ type TeamDetailView struct {
 	// Invites is the invite card (#47); nil when the account may not invite
 	// to the team.
 	Invites *TeamInvitesView
+	// AddChild is the "Add my child" card (#62); nil unless the account is
+	// a parent of the team.
+	AddChild *TeamChildrenView
 }
 
 // RosterRowView is one player or parent on a team.
@@ -144,6 +149,8 @@ type RosterRowView struct {
 	// Linked is true for a parent shown only through a guardian link; it
 	// is removed by unlinking, not from the roster.
 	Linked bool
+	// NoAccount marks a child profile, which has no login.
+	NoAccount bool
 	// Parents lists a player's parents on this team; a parent of two players
 	// appears under both. Nil for parent rows and players without parents.
 	Parents *RosterListView
@@ -171,6 +178,7 @@ func registerTeamRoutes(mux *http.ServeMux, groups *groupHandler) {
 		mux.HandleFunc("POST "+prefix+"/groups/{group}/teams/{team}/roster/add", groups.addToRoster)
 		mux.HandleFunc("POST "+prefix+"/groups/{group}/teams/{team}/roster/remove", groups.removeFromRoster)
 		registerTeamInviteRoutesFor(mux, prefix, groups)
+		registerTeamChildRoutes(mux, prefix, groups)
 	}
 }
 
@@ -393,7 +401,7 @@ func (h *groupHandler) loadTeam(writer http.ResponseWriter, request *http.Reques
 	}
 	csrf := csrfToken(request)
 	list := func(empty string) RosterListView {
-		return RosterListView{CanManage: team.CanManageRoster, RemoveURL: team.RosterRemoveURL, RemoveLabel: h.t(language, "teams.roster.remove"), EmptyLabel: empty, CSRFToken: csrf}
+		return RosterListView{CanManage: team.CanManageRoster, RemoveURL: team.RosterRemoveURL, RemoveLabel: h.t(language, "teams.roster.remove"), NoAccountLabel: h.t(language, "teams.roster.no_account"), EmptyLabel: empty, CSRFToken: csrf}
 	}
 	team.PlayerList = list(h.t(language, "teams.roster.no_players"))
 	team.OtherParents = list("")
@@ -405,7 +413,7 @@ func (h *groupHandler) loadTeam(writer http.ResponseWriter, request *http.Reques
 		}
 	}
 	rowOf := func(entry service.TeamRosterEntry) RosterRowView {
-		row := RosterRowView{UserID: entry.UserID, Label: h.memberLabel(language, entry.UserID, entry.DisplayName, entry.Username, entry.Email), Role: entry.Role, Linked: entry.Linked}
+		row := RosterRowView{UserID: entry.UserID, Label: h.memberLabel(language, entry.UserID, entry.DisplayName, entry.Username, entry.Email), Role: entry.Role, Linked: entry.Linked, NoAccount: entry.Kind == service.UserKindProfile}
 		if entry.Email != nil {
 			row.Email = *entry.Email
 		}
@@ -458,6 +466,9 @@ func (h *groupHandler) loadTeam(writer http.ResponseWriter, request *http.Reques
 		}
 	}
 	if !h.loadTeamCoaches(writer, request, current, groupID, teamID, team) {
+		return false
+	}
+	if !h.loadTeamChildren(writer, request, current, team, base, form) {
 		return false
 	}
 	view.Team = team

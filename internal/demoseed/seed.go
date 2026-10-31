@@ -310,8 +310,25 @@ func (s *seeder) group(g GroupPlan) {
 				}
 			}
 		}
+		if g.Slug == "bvsc" && t == 0 {
+			s.profileChild(groupID, teamID, Email(g.Slug, RoleParent, 1), "BVSC Kid 1", team.BirthYearFrom, g.Admin())
+		}
 		s.events(groupID, teamID, t, resources, team)
 	}
+}
+
+// profileChild adds a child without an account: a profile user with the
+// player role, linked to the parent and on the team's roster.
+func (s *seeder) profileChild(groupID, teamID int64, parentEmail, name string, birthYear int, adminEmail string) {
+	unix := s.now.Unix()
+	id := s.insert(`INSERT INTO users (display_name, kind, created_at) VALUES ($1, 'profile', $2)`, name, unix)
+	s.exec(`INSERT INTO child_profiles (user_id, group_id, birth_year, created_by, created_at) VALUES ($1, $2, $3, $4, $5)`,
+		id, groupID, birthYear, s.users[parentEmail], unix)
+	s.exec(`INSERT INTO group_members (group_id, user_id, created_at) VALUES ($1, $2, $3)`, groupID, id, unix)
+	s.exec(`INSERT INTO group_member_roles (group_id, user_id, role, created_at) VALUES ($1, $2, 'player', $3)`, groupID, id, unix)
+	s.exec(`INSERT INTO team_members (group_id, team_id, user_id, role, created_at) VALUES ($1, $2, $3, 'player', $4)`, groupID, teamID, id, unix)
+	s.exec(`INSERT INTO guardians (group_id, parent_user_id, child_user_id, created_by, created_at) VALUES ($1, $2, $3, $4, $5)`,
+		groupID, s.users[parentEmail], id, s.users[adminEmail], unix)
 }
 
 func (s *seeder) events(groupID, teamID int64, teamIndex int, resources []int64, team TeamPlan) {

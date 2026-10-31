@@ -139,7 +139,9 @@ type InviteRedemption struct {
 	// empty when the invite has no team.
 	GroupSlug string
 	TeamSlug  string
-	Changed   bool
+	// Role is the role the invite grants.
+	Role    string
+	Changed bool
 }
 
 // GroupInviteRepository persists invites. RedeemInvite re-checks the invite
@@ -359,6 +361,7 @@ func (s *InviteService) Join(ctx context.Context, userID int64, code string) (In
 		}
 		return InviteRedemption{}, fmt.Errorf("redeem invite: %w", err)
 	}
+	redemption.Role = invite.Role
 	return redemption, nil
 }
 

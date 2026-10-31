@@ -19,6 +19,11 @@ type ProfileUseCases interface {
 	DeleteProfile(ctx context.Context, actor service.GroupActor, userID, expectedVersion int64) error
 	AddGuardian(ctx context.Context, actor service.GroupActor, parentUserID, childUserID int64) error
 	RemoveGuardian(ctx context.Context, actor service.GroupActor, parentUserID, childUserID int64) error
+	// AddChildToTeam, JoinChildToTeam, and RemoveChildFromTeam are the
+	// parent's team-page operations (#62).
+	AddChildToTeam(ctx context.Context, actor service.GroupActor, teamID int64, input service.ProfileInput) (service.ChildProfile, error)
+	JoinChildToTeam(ctx context.Context, actor service.GroupActor, teamID, childUserID int64) error
+	RemoveChildFromTeam(ctx context.Context, actor service.GroupActor, teamID, childUserID int64) error
 }
 
 // ChildrenView is the children page: the children the account sees, the

@@ -82,7 +82,7 @@ test.describe("invites and children", () => {
     await page.locator("#team-roster-entry").selectOption(`${childID}:player`);
     await page.getByRole("button", { name: "Add to team" }).click();
     await expect(page.locator("#alerts")).toContainText("Added to the team.");
-    await expect(page.getByTestId("team-parents").locator("[data-roster-linked=true]")).toContainText("Parent of Anna");
+    await expect(page.getByTestId("team-players").locator("li[data-roster-role=player]").filter({ hasText: "Anna" }).getByTestId("roster-parents").locator("[data-roster-linked=true]")).toHaveCount(1);
 
     await parent.page.goto(teamURL);
     await expect(parent.page.locator("#team-heading")).toContainText(teamName);

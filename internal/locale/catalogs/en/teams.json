@@ -23,7 +23,7 @@
     "teams.roster.remove": {"text": "Remove"},
     "teams.roster.added": {"text": "Added to the team."},
     "teams.roster.removed": {"text": "Removed from the team."},
-    "teams.roster.parent_of": {"text": "Parent of"},
+    "teams.roster.other_parents": {"text": "Other parents"},
     "teams.tab.roster": {"text": "Roster"},
     "teams.tab.events": {"text": "Events"},
     "teams.tab.invites": {"text": "Invites"},

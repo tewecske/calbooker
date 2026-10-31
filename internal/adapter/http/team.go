@@ -86,11 +86,9 @@ type RosterListView struct {
 	RemoveURL   string
 	RemoveLabel string
 	EmptyLabel  string
-	// ParentOfLabel introduces the children of a parent row; ParentsLabel
-	// the parents of a player row.
-	ParentOfLabel string
-	ParentsLabel  string
-	CSRFToken     string
+	// Heading titles a nested list (the parents under a player).
+	Heading   string
+	CSRFToken string
 }
 
 // TeamRowView is one team list row.
@@ -122,9 +120,11 @@ type TeamDetailView struct {
 	RosterAddURL    string
 	RosterRemoveURL string
 	EditForm        *TeamFormView
-	PlayerList      RosterListView
-	ParentList      RosterListView
-	Candidates      []RosterCandidateView
+	// PlayerList holds the players, each with the parents beneath;
+	// OtherParents holds parents with no child on the team.
+	PlayerList   RosterListView
+	OtherParents RosterListView
+	Candidates   []RosterCandidateView
 	// Coaches is the season coaches card; nil when the account sees no
 	// season and cannot assign coaches.
 	Coaches *TeamCoachesView
@@ -142,11 +142,9 @@ type RosterRowView struct {
 	// Linked is true for a parent shown only through a guardian link; it
 	// is removed by unlinking, not from the roster.
 	Linked bool
-	// ParentOf names the players on this team the parent is a guardian of;
-	// Parents names a player's parents on this team (a parent of two
-	// players appears on both rows).
-	ParentOf string
-	Parents  string
+	// Parents lists a player's parents on this team; a parent of two players
+	// appears under both. Nil for parent rows and players without parents.
+	Parents *RosterListView
 }
 
 // RosterCandidateView is one member and role that can be added to the roster;
@@ -392,48 +390,60 @@ func (h *groupHandler) loadTeam(writer http.ResponseWriter, request *http.Reques
 		team.EditForm = h.teamFormView(current, "team-edit", base, &detail.Team, teamFormData(form))
 	}
 	csrf := csrfToken(request)
-	team.PlayerList = RosterListView{CanManage: team.CanManageRoster, RemoveURL: team.RosterRemoveURL, RemoveLabel: h.t(language, "teams.roster.remove"), EmptyLabel: h.t(language, "teams.roster.no_players"), ParentsLabel: h.t(language, "teams.roster.parents_label"), CSRFToken: csrf}
-	team.ParentList = RosterListView{CanManage: team.CanManageRoster, RemoveURL: team.RosterRemoveURL, RemoveLabel: h.t(language, "teams.roster.remove"), EmptyLabel: h.t(language, "teams.roster.no_parents"), ParentOfLabel: h.t(language, "teams.roster.parent_of"), CSRFToken: csrf}
+	list := func(empty string) RosterListView {
+		return RosterListView{CanManage: team.CanManageRoster, RemoveURL: team.RosterRemoveURL, RemoveLabel: h.t(language, "teams.roster.remove"), EmptyLabel: empty, CSRFToken: csrf}
+	}
+	team.PlayerList = list(h.t(language, "teams.roster.no_players"))
+	team.OtherParents = list("")
 	onRoster := make(map[string]bool, len(detail.Roster))
-	playerLabels := make(map[int64]string)
+	players := make(map[int64]bool)
 	for _, entry := range detail.Roster {
 		if entry.Role == service.GroupRolePlayer {
-			playerLabels[entry.UserID] = h.memberLabel(language, entry.UserID, entry.DisplayName, entry.Username, entry.Email)
+			players[entry.UserID] = true
 		}
 	}
-	parentsOf := make(map[int64][]string)
-	for _, entry := range detail.Roster {
-		if entry.Role != service.GroupRoleParent {
-			continue
-		}
-		label := h.memberLabel(language, entry.UserID, entry.DisplayName, entry.Username, entry.Email)
-		for _, childID := range entry.ChildUserIDs {
-			parentsOf[childID] = append(parentsOf[childID], label)
-		}
-	}
-	for _, entry := range detail.Roster {
+	rowOf := func(entry service.TeamRosterEntry) RosterRowView {
 		row := RosterRowView{UserID: entry.UserID, Label: h.memberLabel(language, entry.UserID, entry.DisplayName, entry.Username, entry.Email), Role: entry.Role, Linked: entry.Linked}
 		if entry.Email != nil {
 			row.Email = *entry.Email
 		}
-		children := make([]string, 0, len(entry.ChildUserIDs))
+		return row
+	}
+	parentsOf := make(map[int64][]RosterRowView)
+	for _, entry := range detail.Roster {
+		if entry.Role != service.GroupRoleParent {
+			continue
+		}
+		row := rowOf(entry)
+		placed := false
 		for _, childID := range entry.ChildUserIDs {
-			if label, ok := playerLabels[childID]; ok {
-				children = append(children, label)
+			if players[childID] {
+				parentsOf[childID] = append(parentsOf[childID], row)
+				placed = true
 			}
 		}
-		row.ParentOf = strings.Join(children, ", ")
-		if entry.Role == service.GroupRolePlayer {
-			row.Parents = strings.Join(parentsOf[entry.UserID], ", ")
+		if !placed {
+			team.OtherParents.Rows = append(team.OtherParents.Rows, row)
 		}
 		if !entry.Linked {
 			onRoster[rosterValue(entry.UserID, entry.Role)] = true
 		}
+	}
+	for _, entry := range detail.Roster {
 		if entry.Role == service.GroupRoleParent {
-			team.ParentList.Rows = append(team.ParentList.Rows, row)
-		} else {
-			team.PlayerList.Rows = append(team.PlayerList.Rows, row)
+			continue
 		}
+		row := rowOf(entry)
+		if parents := parentsOf[entry.UserID]; len(parents) > 0 {
+			nested := list("")
+			nested.Heading = h.t(language, "teams.roster.parents_label")
+			nested.Rows = parents
+			row.Parents = &nested
+		}
+		if !entry.Linked {
+			onRoster[rosterValue(entry.UserID, entry.Role)] = true
+		}
+		team.PlayerList.Rows = append(team.PlayerList.Rows, row)
 	}
 	for _, member := range detail.Candidates {
 		for _, role := range service.RosterRoles() {

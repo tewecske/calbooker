@@ -72,7 +72,7 @@ test.describe("members links and A/B weeks", () => {
 
     // The team roster lists the linked parent.
     await page.goto(teamURL);
-    await expect(page.getByTestId("team-parents").locator("[data-roster-role=parent][data-roster-linked=true]")).toHaveCount(1);
+    await expect(page.getByTestId("team-players").getByTestId("roster-parents").locator("[data-roster-role=parent][data-roster-linked=true]")).toHaveCount(1);
 
     // Unlink on Members; the roster drops the parent.
     await page.goto(`${groupURL}/members`);
@@ -81,7 +81,7 @@ test.describe("members links and A/B weeks", () => {
     await expect(page.locator("tr[data-member-id]").filter({ has: page.locator("[data-role=parent]") })).toBeInViewport();
     await expect(page.locator(`tr[data-member-id="${playerValue}"]`).getByTestId("member-parents")).toHaveCount(0);
     await page.goto(teamURL);
-    await expect(page.getByTestId("team-parents").locator("[data-roster-linked=true]")).toHaveCount(0);
+    await expect(page.getByTestId("team-players").locator("[data-roster-linked=true]")).toHaveCount(0);
 
     // Players see no link controls.
     await player.page.goto(`${groupURL}/members`);

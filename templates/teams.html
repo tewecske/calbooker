@@ -92,8 +92,7 @@
           <div class="list-col-grow">
             <div>{{.Label}}</div>
             {{if .Email}}<div class="text-sm opacity-70">{{.Email}}</div>{{end}}
-            {{if .Parents}}<div class="text-sm opacity-70" data-testid="roster-parents">{{$.ParentsLabel}} {{.Parents}}</div>{{end}}
-            {{if .ParentOf}}<div class="text-sm opacity-70" data-testid="roster-parent-of">{{$.ParentOfLabel}} {{.ParentOf}}</div>{{end}}
+            {{with .Parents}}<div class="mt-2 ms-4 border-s-2 border-base-300 ps-3" data-testid="roster-parents"><div class="text-xs opacity-70">{{.Heading}}</div>{{template "team-roster-rows" .}}</div>{{end}}
           </div>
           {{if and $.CanManage (not .Linked)}}
             <form method="post" action="{{$.RemoveURL}}" hx-post="{{$.RemoveURL}}" hx-target="#page-content" hx-swap="outerHTML" hx-disabled-elt="this">
@@ -219,18 +218,22 @@
       </div>
     </section>
 
+    {{with .Coaches}}{{template "team-coaches" .}}{{end}}
+
     <section class="card card-border bg-base-100 shadow-sm" aria-labelledby="team-roster-heading">
       <div class="card-body">
         <h2 id="team-roster-heading" class="card-title">{{$L.teams_roster}}</h2>
-        <div class="grid gap-6 md:grid-cols-2">
+        <div class="grid gap-6">
           <div data-testid="team-players">
             <h3 class="font-semibold mb-2">{{$L.teams_players}}</h3>
             {{template "team-roster-rows" .PlayerList}}
           </div>
-          <div data-testid="team-parents">
-            <h3 class="font-semibold mb-2">{{$L.teams_parents}}</h3>
-            {{template "team-roster-rows" .ParentList}}
-          </div>
+          {{if .OtherParents.Rows}}
+            <div data-testid="team-other-parents">
+              <h3 class="font-semibold mb-2">{{$L.teams_roster_other_parents}}</h3>
+              {{template "team-roster-rows" .OtherParents}}
+            </div>
+          {{end}}
         </div>
         {{if .CanManageRoster}}
           <div class="divider"></div>
@@ -252,7 +255,6 @@
       </div>
     </section>
 
-    {{with .Coaches}}{{template "team-coaches" .}}{{end}}
 
     {{if .CanEdit}}
       <section class="card card-border bg-base-100 shadow-sm" aria-labelledby="team-edit-heading">

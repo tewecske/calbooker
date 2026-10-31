@@ -188,6 +188,7 @@ func TestTeamRosterShowsParentsNextToEachChild(t *testing.T) {
 			{UserID: 9, Role: service.GroupRolePlayer, DisplayName: name("Ben Kid")},
 			{UserID: 10, Role: service.GroupRolePlayer, DisplayName: name("Cili Kid")},
 			{UserID: 20, Role: service.GroupRoleParent, DisplayName: name("Pat Parent"), ChildUserIDs: []int64{8, 9}, Linked: true},
+			{UserID: 21, Role: service.GroupRoleParent, DisplayName: name("Olga Other")},
 		},
 	}
 	body := serveGroups(t, dependencies, http.MethodGet, "/en/groups/lions/teams/t4", "", false).Body.String()
@@ -199,6 +200,13 @@ func TestTeamRosterShowsParentsNextToEachChild(t *testing.T) {
 	}
 	if row := rosterRow(t, body, "10", "player"); strings.Contains(row, "roster-parents") {
 		t.Error("a player without a guardian shows parents")
+	}
+	if got := strings.Count(body, `data-roster-user="20" data-roster-role="parent"`); got != 2 {
+		t.Errorf("parent of two children listed %d times, want 2", got)
+	}
+	other := body[strings.Index(body, `data-testid="team-other-parents"`):]
+	if !strings.Contains(other, "Olga Other") || strings.Contains(other, "Pat Parent") {
+		t.Errorf("other parents = %s", other)
 	}
 }
 

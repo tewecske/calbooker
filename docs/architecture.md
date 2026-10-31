@@ -374,6 +374,12 @@ get `service.ErrGroupNotFound`, which handlers render as 404.
   `GroupAccess` rules; `POST .../teams/{team}/events` creates an event through
   the normal event use case and redirects to the event page. Every tab resolves
   the team with `TeamService.BySlug` first (invisible team: 404).
+- Event pages also exist under the team:
+  `.../teams/{team}/events/{eventID}` (+ `/cancel`, `/delete`,
+  `/participation`, `/attendance`, `/call-up`). They reuse the group
+  handlers and `loadEvent`; `TeamService.ForEvent` requires the team on the
+  event and the event visible (404 otherwise). `eventLink` picks the team URL
+  for calendar links when exactly one of the viewer's teams is on the event.
 
 ## Start page and role navigation
 

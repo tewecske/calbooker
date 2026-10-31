@@ -80,7 +80,12 @@ func (h *groupHandler) createTeamEvent(writer http.ResponseWriter, request *http
 		h.renderWriteError(writer, request, current, groupSectionTeamEvents, teamID, err, h.eventFormErrors(current.language, form, err))
 		return
 	}
-	h.redirectLocalized(writer, request, current.language, "/groups/"+current.slug+"/events/"+strconv.FormatInt(event.ID, 10))
+	team, err := h.dependencies.Teams.ByID(request.Context(), current.access, teamID)
+	if err != nil {
+		h.redirectLocalized(writer, request, current.language, "/groups/"+current.slug+"/events/"+strconv.FormatInt(event.ID, 10))
+		return
+	}
+	h.redirectLocalized(writer, request, current.language, "/groups/"+current.slug+"/teams/"+team.Slug+"/events/"+strconv.FormatInt(event.ID, 10))
 }
 
 // teamEventsRequest authorizes a team page tab that lists events: the team

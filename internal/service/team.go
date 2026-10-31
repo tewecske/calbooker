@@ -435,6 +435,30 @@ func (s *TeamService) BySlug(ctx context.Context, access *GroupAccess, slug stri
 	return team, nil
 }
 
+// ForEvent returns the team a team-scoped event page is under. The team
+// must be one of the event's teams and the account must see the event, which
+// also holds for a called-up player who is not on the team. Anything else is
+// team-not-found.
+func (s *TeamService) ForEvent(ctx context.Context, access *GroupAccess, slug string, event Event) (Team, error) {
+	if err := s.validate(ctx); err != nil {
+		return Team{}, err
+	}
+	if !access.CanView() {
+		return Team{}, ErrGroupNotFound
+	}
+	if ValidateSlug(slug) != nil || !access.CanViewEvent(event) {
+		return Team{}, ErrTeamNotFound
+	}
+	team, err := s.teams.FindTeamBySlug(ctx, access.GroupID(), slug)
+	if err != nil {
+		return Team{}, err
+	}
+	if !slices.Contains(event.TeamIDs(), team.ID) {
+		return Team{}, ErrTeamNotFound
+	}
+	return team, nil
+}
+
 // ByID returns a team of the group the account may see; it backs the
 // redirect from the old numeric team URLs.
 func (s *TeamService) ByID(ctx context.Context, access *GroupAccess, teamID int64) (Team, error) {

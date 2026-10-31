@@ -305,11 +305,11 @@ func TestCalendarMarksCancelledEventsAndLinksDetails(t *testing.T) {
 	body := serveGroups(t, dependencies, http.MethodGet, "/en/groups/lions/calendar?week=2026-10-19", "", false).Body.String()
 	for _, want := range []string{
 		`class="wg-item wg-item-secondary wg-row-`, // other
-		`<a class="wg-item-label wg-item-link" href="/en/groups/lions/events/1" data-wg-link>Event 1</a>`,
+		`<a class="wg-item-label wg-item-link" href="/en/groups/lions/teams/t1/events/1" data-wg-link>Event 1</a>`,
 		`<span class="wg-item-detail">Lions · Court 1</span>`,
 		`<span class="badge badge-xs">Cancelled</span>`,
 		`data-event-id="4" data-event-cancelled="true"`,
-		`<a class="link font-semibold line-through" href="/en/groups/lions/events/4">Event 4</a>`,
+		`<a class="link font-semibold line-through" href="/en/groups/lions/teams/t4/events/4">Event 4</a>`,
 		`hx-boost="true" hx-target="#page-content"`,
 		`data-section="calendar" aria-current="page"`,
 		`data-testid="calendar-today"`,
@@ -337,7 +337,7 @@ func TestCalendarFragmentAndLanguages(t *testing.T) {
 		t.Errorf("fragment shows %v", got)
 	}
 	hungarian := serveGroups(t, dependencies, http.MethodGet, "/hu/groups/lions/calendar?week=2026-10-19", "", false).Body.String()
-	for _, want := range []string{"Heti naptár", "Minden csapat", `href="/hu/groups/lions/events/2"`, "Mérkőzés"} {
+	for _, want := range []string{"Heti naptár", "Minden csapat", `href="/hu/groups/lions/teams/t2/events/2"`, "Mérkőzés"} {
 		if !strings.Contains(hungarian, want) {
 			t.Errorf("Hungarian calendar missing %q", want)
 		}

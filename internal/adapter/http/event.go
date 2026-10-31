@@ -144,6 +144,11 @@ func registerEventRoutes(mux *http.ServeMux, groups *groupHandler) {
 		mux.HandleFunc("POST "+prefix+"/groups/{group}/events/{eventID}", groups.updateEvent)
 		mux.HandleFunc("POST "+prefix+"/groups/{group}/events/{eventID}/cancel", groups.cancelEvent)
 		mux.HandleFunc("POST "+prefix+"/groups/{group}/events/{eventID}/delete", groups.deleteEvent)
+		// The same pages inside a team (#56).
+		mux.HandleFunc("GET "+prefix+"/groups/{group}/teams/{team}/events/{eventID}", groups.event)
+		mux.HandleFunc("POST "+prefix+"/groups/{group}/teams/{team}/events/{eventID}", groups.updateEvent)
+		mux.HandleFunc("POST "+prefix+"/groups/{group}/teams/{team}/events/{eventID}/cancel", groups.cancelEvent)
+		mux.HandleFunc("POST "+prefix+"/groups/{group}/teams/{team}/events/{eventID}/delete", groups.deleteEvent)
 	}
 }
 
@@ -236,6 +241,10 @@ func (h *groupHandler) deleteEvent(writer http.ResponseWriter, request *http.Req
 		h.renderWriteError(writer, request, current, groupSectionEvent, eventID, err, FormData{})
 		return
 	}
+	if current.eventTeam != nil {
+		h.redirectLocalized(writer, request, current.language, "/groups/"+current.slug+"/teams/"+current.eventTeam.Slug+"/events")
+		return
+	}
 	h.redirectLocalized(writer, request, current.language, "/groups/"+current.slug+"/events")
 }
 
@@ -263,7 +272,58 @@ func (h *groupHandler) eventPathRequest(writer http.ResponseWriter, request *htt
 		h.renderGroupNotFound(writer, request, current.language)
 		return groupRequest{}, 0, false
 	}
+	if reference := strings.TrimSpace(request.PathValue("team")); reference != "" {
+		// A team-scoped event page: the event must be one of the team's.
+		// Visibility stays with GroupAccess, so a called-up player may open
+		// it although the team itself is not theirs.
+		if h.dependencies.Teams == nil {
+			h.renderError(writer, request, http.StatusInternalServerError)
+			return groupRequest{}, 0, false
+		}
+		detail, err := h.dependencies.Events.Detail(request.Context(), current.access, eventID)
+		if err != nil {
+			h.renderEventLoadError(writer, request, current.language, err)
+			return groupRequest{}, 0, false
+		}
+		team, err := h.dependencies.Teams.ForEvent(request.Context(), current.access, reference, detail.Event)
+		if err != nil {
+			h.renderGroupNotFound(writer, request, current.language)
+			return groupRequest{}, 0, false
+		}
+		current.eventTeam = &team
+	}
 	return current, eventID, true
+}
+
+// eventLink is the URL of an event page for a link in lists and calendars:
+// under the team when exactly one of the viewer's teams is on the event,
+// else the group-level page.
+func (h *groupHandler) eventLink(current groupRequest, event service.Event) string {
+	if teamID := singleViewerTeam(current.access, event); teamID > 0 {
+		return h.teamEventLink(current, teamID, event)
+	}
+	return h.groupPath(current.language, current.slug, "/events/"+strconv.FormatInt(event.ID, 10))
+}
+
+// teamEventLink is the URL of an event page under a given team of it.
+func (h *groupHandler) teamEventLink(current groupRequest, teamID int64, event service.Event) string {
+	return h.teamPath(current, teamID, "/events/"+strconv.FormatInt(event.ID, 10))
+}
+
+// singleViewerTeam returns the event's team when it is the only one of its
+// teams the viewer can see, else 0.
+func singleViewerTeam(access *service.GroupAccess, event service.Event) int64 {
+	var found int64
+	for _, teamID := range event.TeamIDs() {
+		if !access.CanViewTeam(teamID) {
+			continue
+		}
+		if found != 0 {
+			return 0
+		}
+		found = teamID
+	}
+	return found
 }
 
 func (h *groupHandler) loadEvents(writer http.ResponseWriter, request *http.Request, current groupRequest, group service.Group, form FormData, view *GroupDetailView) bool {
@@ -303,7 +363,11 @@ func (h *groupHandler) loadEventList(writer http.ResponseWriter, request *http.R
 		return false
 	}
 	for _, event := range events {
-		list.Rows = append(list.Rows, h.eventRow(language, group.Slug, group.TimeZone, event))
+		row := h.eventRow(language, group.Slug, group.TimeZone, event)
+		if teamID > 0 {
+			row.URL = h.teamEventLink(current, teamID, event)
+		}
+		list.Rows = append(list.Rows, row)
 	}
 	if h.dependencies.Teams != nil && teamID == 0 {
 		teams, err := h.dependencies.Teams.List(ctx, current.access)
@@ -350,6 +414,20 @@ func (h *groupHandler) loadEvent(writer http.ResponseWriter, request *http.Reque
 	}
 	event := detail.Event
 	row := h.eventRow(language, current.slug, detail.TimeZone, event)
+	listURL := h.groupPath(language, current.slug, "/events")
+	if team := current.eventTeam; team != nil {
+		// Team-scoped page: links and forms stay under the team, with its
+		// tabs above. A called-up player who is not on the team gets the
+		// heading only, since the tabs would be closed to them.
+		row.URL = h.groupPath(language, current.slug, "/teams/"+team.Slug+"/events/"+strconv.FormatInt(event.ID, 10))
+		if current.access.CanViewTeam(team.ID) {
+			view.TeamTabs = h.teamTabs(current, *team, teamTabEvents)
+			listURL = h.groupPath(language, current.slug, "/teams/"+team.Slug+"/events")
+		} else {
+			view.TeamTabs = &TeamTabsView{Name: team.Name, TeamsURL: h.groupPath(language, current.slug, "/teams")}
+			listURL = h.groupPath(language, current.slug, "/calendar")
+		}
+	}
 	page := &EventDetailView{
 		EventRowView: row,
 		TimeZone:     detail.TimeZone,
@@ -358,7 +436,7 @@ func (h *groupHandler) loadEvent(writer http.ResponseWriter, request *http.Reque
 		Edited:       event.EditedAt != nil,
 		CanEdit:      detail.CanEdit,
 		Version:      event.Version,
-		ListURL:      h.groupPath(language, current.slug, "/events"),
+		ListURL:      listURL,
 		CancelURL:    row.URL + "/cancel",
 		DeleteURL:    row.URL + "/delete",
 	}

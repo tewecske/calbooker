@@ -141,6 +141,33 @@ func TestTeamServiceSlugs(t *testing.T) {
 	}
 }
 
+func TestTeamServiceForEvent(t *testing.T) {
+	teams := newTeamStub(Team{ID: 1, GroupID: 5, Name: "U10", Slug: "u10"}, Team{ID: 2, GroupID: 5, Name: "U13", Slug: "u13"})
+	service, _ := newTestTeamService(t, teams, newMembershipStub())
+	event := Event{ID: 9, GroupID: 5, Teams: []EventTeam{{ID: 1, Name: "U10"}}}
+	admin := adminActor().Access
+
+	if team, err := service.ForEvent(context.Background(), admin, "u10", event); err != nil || team.ID != 1 {
+		t.Fatalf("ForEvent(u10) = %+v, %v", team, err)
+	}
+	// The event must belong to the team.
+	if _, err := service.ForEvent(context.Background(), admin, "u13", event); !errors.Is(err, ErrTeamNotFound) {
+		t.Fatalf("ForEvent(u13) error = %v, want ErrTeamNotFound", err)
+	}
+	// A viewer who cannot see the event gets not-found.
+	if _, err := service.ForEvent(context.Background(), coachOf(2).Access, "u10", event); !errors.Is(err, ErrTeamNotFound) {
+		t.Fatalf("ForEvent as another team's coach error = %v, want ErrTeamNotFound", err)
+	}
+	// A called-up player sees the event through the team although the team is not theirs.
+	calledUp := actorWith(GroupAccessGrants{Member: true, Roles: []string{GroupRolePlayer}, CalledUpEventIDs: []int64{9}}).Access
+	if team, err := service.ForEvent(context.Background(), calledUp, "u10", event); err != nil || team.ID != 1 {
+		t.Fatalf("ForEvent as called-up player = %+v, %v", team, err)
+	}
+	if _, err := service.ForEvent(context.Background(), actorWith(GroupAccessGrants{}).Access, "u10", event); !errors.Is(err, ErrGroupNotFound) {
+		t.Fatalf("ForEvent as outsider error = %v, want ErrGroupNotFound", err)
+	}
+}
+
 func TestTeamServiceResolvesSlugsWithinTheGroup(t *testing.T) {
 	teams := newTeamStub(Team{ID: 1, GroupID: 5, Name: "U10", Slug: "u10"}, Team{ID: 2, GroupID: 5, Name: "U13", Slug: "u13"}, Team{ID: 3, GroupID: 6, Name: "Other", Slug: "other"})
 	service, _ := newTestTeamService(t, teams, newMembershipStub())

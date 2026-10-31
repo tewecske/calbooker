@@ -196,7 +196,7 @@ Progress is in the Status table below. The original first steps were:
 | 56 | merged (event pages inside the team) | #60 |
 | 57 | merged (weekly agenda view) | #59 |
 | 61 | merged (spec helper; full e2e 40 passed, 1 skipped) | #64 |
-| 62 | in progress (lane B) | |
+| 62 | merged (add my child) | #66 |
 | 63 | merged (calendar view cookie) | #65 |
 | 44 | merged (team page tabs) | #50 |
 | 46 | merged (role start page, family nav, child colours) | #53 |

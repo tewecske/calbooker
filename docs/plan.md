@@ -193,11 +193,11 @@ Progress is in the Status table below. The original first steps were:
 | 43 | merged (managed kinds, migration 000014) | #52 |
 | 45 | merged (searchable team and coach pickers) | #54 |
 | 55 | merged (roster one list) | #58 |
-| 56 | in review, rebasing after #57 | #60 |
+| 56 | merged (event pages inside the team) | #60 |
 | 57 | merged (weekly agenda view) | #59 |
-| 61 | open (fix specs broken by #45, full e2e on master) | |
+| 61 | in progress (lane B) | |
 | 62 | open (after #61) | |
-| 63 | open (after #56) | |
+| 63 | in progress (lane A) | |
 | 44 | merged (team page tabs) | #50 |
 | 46 | merged (role start page, family nav, child colours) | #53 |
 | 47 | merged (team invites, call-ups, migration 000015) | #51 |

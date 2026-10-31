@@ -401,6 +401,9 @@ get `service.ErrGroupNotFound`, which handlers render as 404.
   `calendar.json`) shows one Monday-based week of events in the group's time
   zone. `week` is any day of the wanted week (missing or invalid: the current
   week). Every member has the Calendar tab.
+- `?view=agenda|grid` picks the view and sets the `calendar_view` cookie
+  (`calendarViewChoice`); without `view` the cookie decides, then the
+  breakpoint default (#63).
 - Data comes only from `EventService.List(access, EventQuery{From, To})`
   (the same as `ListBetween`), so visibility is the Visibility rule of
   `GroupAccess.CanViewEvent`; cancelled events are included and shown muted

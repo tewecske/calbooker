@@ -673,6 +673,18 @@ Refinements made in #57 (open for the owner to confirm):
   it.
 - The agenda entries are the day list entries of #10, #30 and #46 unchanged.
 
+Refinements made in #63 (open for the owner to confirm):
+
+- The Grid / Agenda choice is remembered per device in the `calendar_view`
+  cookie (`agenda` or `grid`; Path `/`, SameSite Lax, HttpOnly, Secure like
+  the session cookie, one year). A calendar request with a valid `view`
+  parameter sets it; without `view` a valid cookie picks the view, and
+  without either the breakpoint default of #57 applies. Unknown values count
+  as unset. With a cookie, only the chosen view is rendered (no breakpoint
+  CSS) and the toggle's active state follows it. It applies to the group,
+  team tab, and family calendars, and is not tied to the account, so guests
+  and issuer accounts behave alike.
+
 Refinements made in #56 (open for the owner to confirm):
 
 - Team-scoped event routes: `/{language}/groups/{group}/teams/{team}/events/{eventID}`

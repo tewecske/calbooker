@@ -51,6 +51,7 @@ Issue numbers are the GitHub ones. "After" lists what must be merged first.
 | 56 | Event pages inside the team | M6 Owner feedback 2 | 44 | C |
 | 57 | Weekly agenda view, default on small screens | M6 Owner feedback 2 | 10, 46 | A |
 | 61 | Fix stale browser specs, full e2e on master | M6 Owner feedback 2 | 56, 57 | B |
+| 62 | Add my child (profile children joined to a team) | M6 Owner feedback 2 | 61 | B |
 
 - M1 is one subagent at a time: everything else builds on it.
 - Then at most three lanes run in parallel (A: data and events, B: grid and
@@ -191,9 +192,10 @@ Progress is in the Status table below. The original first steps were:
 | 43 | merged (managed kinds, migration 000014) | #52 |
 | 45 | merged (searchable team and coach pickers) | #54 |
 | 55 | merged (roster one list) | #58 |
-| 56 | in review, rebases after #57 | #60 |
-| 57 | in review, rebasing after #55 | #59 |
+| 56 | in review, rebasing after #57 | #60 |
+| 57 | merged (weekly agenda view) | #59 |
 | 61 | open (fix specs broken by #45, full e2e on master) | |
+| 62 | open (after #61) | |
 | 44 | merged (team page tabs) | #50 |
 | 46 | merged (role start page, family nav, child colours) | #53 |
 | 47 | merged (team invites, call-ups, migration 000015) | #51 |

@@ -101,14 +101,16 @@
         <section class="grid gap-3 {{.ViewAgenda}}" aria-label="{{$L.calendar_day_list}}" data-testid="calendar-day-list">
           {{range .Days}}
             <article class="card card-border card-sm" aria-labelledby="calendar-day-{{.Date}}" data-calendar-day="{{.Date}}"{{if .Today}} data-calendar-today{{end}}>
-              <div class="card-body">
-                <h3 id="calendar-day-{{.Date}}" class="card-title text-base">
-                  {{.Name}} <span class="font-normal opacity-70">{{.DateLabel}}</span>
-                  {{if .Today}}<span class="badge badge-primary badge-sm">{{$L.calendar_today_marker}}</span>{{end}}
+              <div class="rounded-t-box px-4 py-2 {{if .Today}}bg-primary text-primary-content{{else}}bg-base-200{{end}}" data-testid="calendar-day-header">
+                <h3 id="calendar-day-{{.Date}}" class="flex flex-wrap items-baseline gap-x-2 text-lg font-bold">
+                  {{.Name}} <span class="font-semibold {{if not .Today}}opacity-70{{end}}">{{.DateLabel}}</span>
+                  {{if .Today}}<span class="badge badge-sm badge-neutral">{{$L.calendar_today_marker}}</span>{{end}}
                 </h3>
+              </div>
+              <div class="card-body">
                 {{if .Items}}
                   <ul class="list">
-                    {{range .Items}}
+                    {{range .Items}}{{$item := .}}
                       <li class="list-row px-0" data-event-id="{{.ID}}"{{if .Cancelled}} data-event-cancelled="true"{{end}}>
                         <div class="text-sm tabular-nums opacity-80">{{.Time}}</div>
                         <div class="grid gap-1{{if .Cancelled}} opacity-70{{end}}">
@@ -119,6 +121,25 @@
                             {{range .Children}}<span class="badge badge-outline badge-sm gap-1" data-calendar-for="{{.Name}}"><span class="child-dot {{.Class}}" aria-hidden="true"></span>{{.Name}}</span>{{end}}
                             {{range .Answers}}<span class="badge badge-outline badge-sm" data-calendar-status="{{.Code}}"{{if not .Self}} data-calendar-child="true"{{end}}>{{if .Self}}<span class="sr-only">{{$L.calendar_your_status}} </span>{{end}}{{.Label}}</span>{{end}}
                           </p>
+                          {{range .Respond}}
+                            <div class="flex flex-wrap items-center gap-2" role="group" aria-label="{{.GroupLabel}}" data-calendar-respond="{{.UserID}}">
+                              {{if not .Self}}<span class="text-sm font-medium">{{.Name}}</span>{{end}}
+                              {{$uid := .UserID}}
+                              {{range .Buttons}}
+                                {{if .Current}}
+                                  <button class="btn btn-xs btn-active{{if .Primary}} btn-primary{{else}} btn-outline{{end}}" type="button" disabled aria-pressed="true" aria-label="{{.AriaLabel}}" data-choice="{{.Status}}" data-current="true">{{.Label}}</button>
+                                {{else}}
+                                  <form method="post" action="{{$item.RespondURL}}" hx-post="{{$item.RespondURL}}" hx-target="#page-content" hx-swap="outerHTML" hx-push-url="false" hx-disabled-elt="find button">
+                                    <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
+                                    <input type="hidden" name="user_id" value="{{$uid}}">
+                                    <input type="hidden" name="status" value="{{.Status}}">
+                                    <input type="hidden" name="return_to" value="{{$item.ReturnTo}}">
+                                    <button class="btn btn-xs{{if .Primary}} btn-primary{{else}} btn-outline{{end}}" type="submit" aria-label="{{.AriaLabel}}" data-choice="{{.Status}}">{{.Label}}</button>
+                                  </form>
+                                {{end}}
+                              {{end}}
+                            </div>
+                          {{end}}
                           {{if or .Teams .Place}}<p class="text-sm opacity-70">{{.Teams}}{{if and .Teams .Place}} · {{end}}{{.Place}}</p>{{end}}
                           {{if .MultiDay}}<p class="text-xs opacity-70">{{$L.calendar_multi_day}} {{.When}}</p>{{end}}
                         </div>

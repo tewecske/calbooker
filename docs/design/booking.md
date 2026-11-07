@@ -685,6 +685,29 @@ Refinements made in #63 (open for the owner to confirm):
   team tab, and family calendars, and is not tied to the account, so guests
   and issuer accounts behave alike.
 
+Refinements made in #69 (open for the owner to confirm):
+
+- Agenda day cards have a header strip (`bg-base-200`, larger bold day and
+  date); today's strip is `bg-primary` with the Today badge.
+- Each upcoming agenda event shows the event page's self-service answer
+  buttons ("I'll be there" / "Can't come", "I'll come after all" for
+  nominated events) for the viewer and for each linked child, built by
+  `ParticipationService.CalendarChoices` with the same rules as the event
+  page (`CanRespondFor`, team membership or call-up, deadline, limit,
+  cancelled, started). Events with nothing to answer show no buttons: staff
+  without a player role, cancelled and past events, closed sign-up. Staff
+  and coach rights (nominate, remove) stay on the event page. The current
+  answer stays as a badge, and its button is shown pressed and disabled.
+  The grid view is unchanged.
+- The buttons post to the event's existing `participation` route with a
+  `return_to` field. The server accepts only this group's calendar path or
+  one of its team calendar paths (no other host, scheme, or path); anything
+  else is ignored and the answer shows the event page as before. HTMX
+  swaps the calendar (same week, view, and filters from the `return_to`
+  query) with the alerts region; a refused answer renders the calendar with
+  the error (422). Without JavaScript the answer redirects (303) to the same
+  calendar URL.
+
 Refinements made in #56 (open for the owner to confirm):
 
 - Team-scoped event routes: `/{language}/groups/{group}/teams/{team}/events/{eventID}`

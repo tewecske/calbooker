@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -23,6 +24,9 @@ type ParticipationUseCases interface {
 	// CalendarAnswers returns the viewer's own answers and their children's
 	// for the events overlapping [from, to) (#30).
 	CalendarAnswers(ctx context.Context, access *service.GroupAccess, from, to time.Time) ([]service.CalendarAnswer, error)
+	// CalendarChoices returns the answers the viewer may give from the
+	// calendar agenda, for themself and their children (#69).
+	CalendarChoices(ctx context.Context, access *service.GroupAccess, events []service.Event) ([]service.CalendarChoice, error)
 }
 
 // ParticipationView is the participants card of an event page.
@@ -93,9 +97,14 @@ func (h *groupHandler) respondToEvent(writer http.ResponseWriter, request *http.
 		return
 	}
 	_ = request.ParseForm()
+	// The calendar agenda posts here with the calendar to return to (#69).
+	back := h.calendarReturn(request, current)
+	if back != nil {
+		request = back.request
+	}
 	userID, err := strconv.ParseInt(strings.TrimSpace(request.PostFormValue("user_id")), 10, 64)
 	if err != nil || userID <= 0 {
-		h.renderWriteError(writer, request, current, groupSectionEvent, eventID, service.ErrParticipantNotEligible, FormData{})
+		h.respondFailure(writer, request, current, back, eventID, service.ErrParticipantNotEligible)
 		return
 	}
 	status := strings.TrimSpace(request.PostFormValue("status"))
@@ -105,10 +114,74 @@ func (h *groupHandler) respondToEvent(writer http.ResponseWriter, request *http.
 		status = "invalid"
 	}
 	if _, err := h.dependencies.Participation.Respond(request.Context(), current.actor(), eventID, userID, status); err != nil {
+		h.respondFailure(writer, request, current, back, eventID, err)
+		return
+	}
+	alerts := []Alert{{Level: "success", Message: h.t(current.language, "participation.saved")}}
+	switch {
+	case back == nil:
+		h.renderSection(writer, request, current, groupSectionEvent, eventID, FormData{}, alerts, http.StatusOK)
+	case IsHTMX(request):
+		h.renderSection(writer, request, current, back.section, back.teamID, FormData{}, alerts, http.StatusOK)
+	default:
+		http.Redirect(writer, request, back.target, http.StatusSeeOther)
+	}
+}
+
+// respondFailure shows a refused answer on the page the answer came from.
+func (h *groupHandler) respondFailure(writer http.ResponseWriter, request *http.Request, current groupRequest, back *calendarBack, eventID int64, err error) {
+	if back == nil {
 		h.renderWriteError(writer, request, current, groupSectionEvent, eventID, err, FormData{})
 		return
 	}
-	h.renderSection(writer, request, current, groupSectionEvent, eventID, FormData{}, []Alert{{Level: "success", Message: h.t(current.language, "participation.saved")}}, http.StatusOK)
+	h.renderWriteError(writer, request, current, back.section, back.teamID, err, FormData{})
+}
+
+// calendarBack is the validated calendar an answer returns to: the group's
+// calendar or one of its team calendars, with the week, view, and filters.
+type calendarBack struct {
+	// target is the safe local path and query to redirect to.
+	target  string
+	section string
+	teamID  int64
+	// request is the request with the calendar's URL, so the calendar renders
+	// with the query it was posted from.
+	request *http.Request
+}
+
+// calendarReturn reads the return_to field. Only a path of this group's
+// calendar (or a visible team's calendar) is accepted; anything else,
+// including other hosts and schemes, is ignored and the answer shows the
+// event page as before.
+func (h *groupHandler) calendarReturn(request *http.Request, current groupRequest) *calendarBack {
+	raw := request.PostFormValue("return_to")
+	if raw == "" || !strings.HasPrefix(raw, "/") || strings.HasPrefix(raw, "//") || strings.ContainsAny(raw, "\\\r\n") {
+		return nil
+	}
+	target, err := url.Parse(raw)
+	if err != nil || target.Scheme != "" || target.Host != "" || target.User != nil || target.Fragment != "" {
+		return nil
+	}
+	back := &calendarBack{target: target.RequestURI()}
+	switch {
+	case target.Path == h.groupPath(current.language, current.slug, "/calendar"):
+		back.section = groupSectionCalendar
+	default:
+		prefix := h.groupPath(current.language, current.slug, "/teams/")
+		reference, ok := strings.CutSuffix(strings.TrimPrefix(target.Path, prefix), "/calendar")
+		if !strings.HasPrefix(target.Path, prefix) || !ok || reference == "" || strings.Contains(reference, "/") || h.dependencies.Teams == nil {
+			return nil
+		}
+		team, err := h.dependencies.Teams.BySlug(request.Context(), current.access, reference)
+		if err != nil {
+			return nil
+		}
+		back.section, back.teamID = groupSectionTeamCalendar, team.ID
+	}
+	clone := request.Clone(request.Context())
+	clone.URL = target
+	back.request = clone
+	return back
 }
 
 func (h *groupHandler) callUpPlayer(writer http.ResponseWriter, request *http.Request) {

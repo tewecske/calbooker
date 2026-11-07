@@ -21,6 +21,7 @@ type participationUseCaseStub struct {
 	lastStatus string
 	lastMarks  []service.AttendanceMark
 	overlaps   []service.OverlapEvent
+	choices    []service.CalendarChoice
 }
 
 func (s *participationUseCaseStub) Roster(_ context.Context, _ *service.GroupAccess, detail service.EventDetail) (service.ParticipationRoster, error) {
@@ -57,6 +58,10 @@ func (s *participationUseCaseStub) CallUp(_ context.Context, _ service.GroupActo
 func (s *participationUseCaseStub) CalendarAnswers(context.Context, *service.GroupAccess, time.Time, time.Time) ([]service.CalendarAnswer, error) {
 	s.calls++
 	return nil, nil
+}
+
+func (s *participationUseCaseStub) CalendarChoices(context.Context, *service.GroupAccess, []service.Event) ([]service.CalendarChoice, error) {
+	return s.choices, nil
 }
 
 func participationDependencies(t *testing.T, access *service.GroupAccess) (Dependencies, *eventsUseCaseStub, *participationUseCaseStub) {

@@ -171,6 +171,32 @@ type CalendarItemView struct {
 	Answers []CalendarAnswerView
 	// Children are the viewer's children this event is for (#46).
 	Children []CalendarChildView
+	// Respond are the answer buttons the viewer has for themself and each
+	// child (#69), posted to RespondURL; ReturnTo is the calendar URL the
+	// post returns to.
+	Respond    []CalendarRespondView
+	RespondURL string
+	ReturnTo   string
+}
+
+// CalendarRespondView is the answer buttons for one person on one event.
+type CalendarRespondView struct {
+	UserID int64
+	Name   string
+	// GroupLabel names the button group for assistive technology.
+	GroupLabel string
+	Self       bool
+	Buttons    []CalendarButtonView
+}
+
+// CalendarButtonView is one answer button; Current marks the person's
+// present answer (shown pressed and disabled).
+type CalendarButtonView struct {
+	Status    string
+	Label     string
+	AriaLabel string
+	Primary   bool
+	Current   bool
 }
 
 // CalendarAnswerView is one answer badge. Label is the status, prefixed
@@ -335,7 +361,12 @@ func (h *groupHandler) loadCalendarScope(writer http.ResponseWriter, request *ht
 	if !ok {
 		return false
 	}
-	items, days := h.calendarItems(current, teamID, group, week, shown, answers, children)
+	choices, ok := h.calendarChoices(writer, request, current, shown)
+	if !ok {
+		return false
+	}
+	returnTo := request.URL.RequestURI()
+	items, days := h.calendarItems(current, teamID, group, week, shown, answers, choices, returnTo, children)
 	grid, err := BuildWeekGrid(calendarGridConfig(week, items, page.PreviousURL, page.NextURL), items, h.renderer.WeekGridTranslator(language))
 	if err != nil {
 		h.renderError(writer, request, http.StatusInternalServerError)
@@ -517,9 +548,49 @@ func (h *groupHandler) calendarAnswers(writer http.ResponseWriter, request *http
 	return byEvent, true
 }
 
+// calendarChoices builds the agenda's answer buttons per event with the
+// event page's rules: the participation service decides who may answer what.
+func (h *groupHandler) calendarChoices(writer http.ResponseWriter, request *http.Request, current groupRequest, shown []service.Event) (map[int64][]CalendarRespondView, bool) {
+	if h.dependencies.Participation == nil || len(shown) == 0 {
+		return nil, true
+	}
+	choices, err := h.dependencies.Participation.CalendarChoices(request.Context(), current.access, shown)
+	if err != nil {
+		h.renderEventLoadError(writer, request, current.language, err)
+		return nil, false
+	}
+	language := current.language
+	byEvent := make(map[int64][]CalendarRespondView)
+	for _, choice := range choices {
+		who := h.memberLabel(language, choice.UserID, choice.DisplayName, choice.Username, nil)
+		view := CalendarRespondView{UserID: choice.UserID, Name: who, GroupLabel: h.translate(language, "calendar.answer_for", map[string]string{"name": who}), Self: choice.Self}
+		for _, status := range service.ParticipantStatuses() {
+			isCurrent := status == choice.Current
+			if !isCurrent && !slices.Contains(choice.Choices, status) {
+				continue
+			}
+			// Only the self-service answers have a button of their own;
+			// a nominated or left-out answer is shown by its badge.
+			if isCurrent && status != service.ParticipantSignedUp && status != service.ParticipantDeclined {
+				continue
+			}
+			label := h.t(language, "participation.choice.self."+status)
+			view.Buttons = append(view.Buttons, CalendarButtonView{
+				Status:    status,
+				Label:     label,
+				AriaLabel: label + " – " + who,
+				Primary:   status != service.ParticipantDeclined,
+				Current:   isCurrent,
+			})
+		}
+		byEvent[choice.EventID] = append(byEvent[choice.EventID], view)
+	}
+	return byEvent, true
+}
+
 // calendarItems turns the week's events into grid items (one per event and
 // day) and the day list's entries.
-func (h *groupHandler) calendarItems(current groupRequest, teamID int64, group service.Group, week service.CalendarWeek, events []service.Event, answers map[int64][]CalendarAnswerView, children []calendarChild) ([]WeekGridItem, [7][]CalendarItemView) {
+func (h *groupHandler) calendarItems(current groupRequest, teamID int64, group service.Group, week service.CalendarWeek, events []service.Event, answers map[int64][]CalendarAnswerView, choices map[int64][]CalendarRespondView, returnTo string, children []calendarChild) ([]WeekGridItem, [7][]CalendarItemView) {
 	var (
 		items []WeekGridItem
 		days  [7][]CalendarItemView
@@ -552,6 +623,11 @@ func (h *groupHandler) calendarItems(current groupRequest, teamID int64, group s
 				Cancelled: row.Cancelled,
 				Answers:   answers[event.ID],
 				Children:  marks,
+				Respond:   choices[event.ID],
+				ReturnTo:  returnTo,
+			}
+			if len(entry.Respond) > 0 {
+				entry.RespondURL = row.URL + "/participation"
 			}
 			days[segment.Weekday-1] = append(days[segment.Weekday-1], entry)
 			item := WeekGridItem{

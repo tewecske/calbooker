@@ -701,6 +701,96 @@ func (s *ParticipationService) CalendarAnswers(ctx context.Context, access *Grou
 	return kept, nil
 }
 
+// CalendarChoice is what the viewer may answer for one person on one event
+// from the calendar agenda: the viewer ("Self") or a linked child.
+type CalendarChoice struct {
+	EventID     int64
+	UserID      int64
+	Self        bool
+	DisplayName *string
+	Username    *string
+	// Current is the person's answer ("" for none).
+	Current string
+	// Choices are the answers the person may change to now, by the same
+	// rules as the event page for a player or parent (no staff rights).
+	Choices []string
+}
+
+// CalendarChoices returns the answers the viewer may give from the calendar
+// for the events in the list: for themself and for each linked child on the
+// events they play on or are called up for, by the event page's rules
+// (CanRespondFor and the deadline, limit, cancelled and started checks).
+// Events with nothing to answer are left out. Callers pass only events from
+// EventService.List for the same access.
+func (s *ParticipationService) CalendarChoices(ctx context.Context, access *GroupAccess, events []Event) ([]CalendarChoice, error) {
+	if err := s.validate(ctx); err != nil {
+		return nil, err
+	}
+	if !access.CanView() {
+		return nil, ErrGroupNotFound
+	}
+	now := s.now()
+	ids := []int64{access.UserID()}
+	for _, id := range access.ChildUserIDs() {
+		if !slices.Contains(ids, id) {
+			ids = append(ids, id)
+		}
+	}
+	var choices []CalendarChoice
+	for _, event := range events {
+		state := participationEventOf(event)
+		if state.Cancelled || !now.Before(state.StartsAt) || !access.CanViewEvent(event) {
+			continue
+		}
+		wanted := make([]int64, 0, len(ids))
+		for _, id := range ids {
+			if access.CanRespondFor(event, id) {
+				wanted = append(wanted, id)
+			}
+		}
+		if len(wanted) == 0 {
+			continue
+		}
+		players, rows, err := s.load(ctx, access.GroupID(), event.ID)
+		if err != nil {
+			return nil, err
+		}
+		taken := 0
+		byUser := make(map[int64]Participant, len(rows))
+		for _, row := range rows {
+			byUser[row.UserID] = row
+			if row.Counts() {
+				taken++
+			}
+		}
+		teams := event.TeamIDs()
+		for _, player := range players {
+			if !slices.Contains(wanted, player.UserID) {
+				continue
+			}
+			row, hasRow := byUser[player.UserID]
+			onTeam := slices.ContainsFunc(player.TeamIDs, func(id int64) bool { return slices.Contains(teams, id) })
+			if !onTeam && !(hasRow && row.CalledUp) {
+				continue
+			}
+			var current *Participant
+			choice := CalendarChoice{EventID: event.ID, UserID: player.UserID, Self: player.UserID == access.UserID(), DisplayName: player.DisplayName, Username: player.Username}
+			if hasRow {
+				current, choice.Current = &row, row.Status
+			}
+			for _, status := range ParticipantStatuses() {
+				if status != choice.Current && checkParticipation(state, now, current, taken, status, false) == nil {
+					choice.Choices = append(choice.Choices, status)
+				}
+			}
+			if len(choice.Choices) > 0 {
+				choices = append(choices, choice)
+			}
+		}
+	}
+	return choices, nil
+}
+
 // checkParticipation decides whether the answer may change from current to
 // status ("" removes it) at now. manage is true for staff and the event's
 // coaches, who are bound by neither the deadline nor the limit.

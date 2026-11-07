@@ -53,6 +53,7 @@ Issue numbers are the GitHub ones. "After" lists what must be merged first.
 | 61 | Fix stale browser specs, full e2e on master | M6 Owner feedback 2 | 56, 57 | B |
 | 62 | Add my child (profile children joined to a team) | M6 Owner feedback 2 | 61 | B |
 | 67 | "No account" roster badge for staff only | M6 Owner feedback 2 | 62 | B |
+| 69 | Agenda: stronger day headers, answer buttons | M6 Owner feedback 2 | 57 | A |
 | 63 | Remember the calendar Grid/Agenda choice (cookie) | M6 Owner feedback 2 | 56 | A |
 
 - M1 is one subagent at a time: everything else builds on it.
@@ -199,6 +200,7 @@ Progress is in the Status table below. The original first steps were:
 | 61 | merged (spec helper; full e2e 40 passed, 1 skipped) | #64 |
 | 62 | merged (add my child) | #66 |
 | 67 | merged (staff-only No account badge) | #68 |
+| 69 | merged (agenda headers and answer buttons) | #70 |
 | 63 | merged (calendar view cookie) | #65 |
 | 44 | merged (team page tabs) | #50 |
 | 46 | merged (role start page, family nav, child colours) | #53 |
